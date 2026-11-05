@@ -57,7 +57,7 @@ Apply this once Phase 1 has been in use and the Director agrees. It needs no new
 
 ## 6. Phase 3: living world (pressures and cast)
 
-Apply this after Phase 2 has been used in play and the Director agrees. Again no new files: replace `tools/gm_state.py` and `notes/gm/protocol.md` with the current copies from [files/](files/) if yours are older (the log format is unchanged).
+Apply this after Phase 2 has been used in play and the Director agrees. Again no new files: replace `tools/gm_state.py` and `notes/gm/protocol.md` with the current copies from `files/` if yours are older (the log format is unchanged).
 
 1. Read the "Pressures and cast" section of the protocol.
 2. Design the opposition with the Director's tone in mind. Add two to four pressures: the actors who want something the protagonist touches. For each give a goal, a next action, a trigger, and (where a deadline helps) a clock and a consequence. Prefer one pressure that already threatens something the player cares about (see the contract's `wants`) over several distant ones.
@@ -67,7 +67,7 @@ Apply this after Phase 2 has been used in play and the Director agrees. Again no
 
 ## 7. Phase 4: discovery (revelations)
 
-Apply this after Phase 3 has been used in play and the Director agrees. No new files: refresh `tools/gm_state.py` and `notes/gm/protocol.md` from [files/](files/) if yours are older (the log format is unchanged).
+Apply this after Phase 3 has been used in play and the Director agrees. No new files: refresh `tools/gm_state.py` and `notes/gm/protocol.md` from `files/` if yours are older (the log format is unchanged).
 
 1. Read the "Revelations" section of the protocol.
 2. List the truths the story needs the player to learn (a culprit, a location, a motive). Add each as a hidden fact (`known: false`) and a `required` revelation with three routes of different kinds. Add optional truths only if they are worth the bookkeeping.
