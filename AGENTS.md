@@ -1,38 +1,42 @@
-# CouldHappen development repository: agent instructions
+# CouldHappen: agent instructions
 
-These instructions are for agents working on CouldHappen itself. They are never shipped: the release ZIP forbids `AGENTS.md` and `CLAUDE.md`, and a story workspace has only the writer skill in `.agents/skills/couldhappen/`. Do not run a story here.
+These instructions are for agents working on CouldHappen itself, the development repository. They are never shipped: the release ZIP forbids `AGENTS.md` and `CLAUDE.md`, and a story workspace has only the writer skill in `.agents/skills/couldhappen/`.
 
-Start with [README.md](README.md) and [docs/implementation-progress.md](docs/implementation-progress.md).
+## Everyone
 
-## Two histories: never push `main`
+- Start with [README.md](README.md), then [docs/implementation-progress.md](docs/implementation-progress.md) for the current state and next steps. The [docs index](docs/README.md) lists the rest.
+- **Do not run a story in this repository.** Real stories run in a workspace unpacked from a release ZIP.
+- Markdown that ships in the release is shared with development text. Wrap development-only material in the `dev-only` HTML comment blocks described in [Building a release](docs/setup.md#building-a-release).
+- Keep LF line endings. Run the checks in [docs/setup.md](docs/setup.md#development-checks) before proposing a change.
+- The license is AGPL-3.0-or-later. Contributions are made under it.
 
-This clone holds two unrelated histories ([ADR 0004](docs/decisions/0004-publish-with-fresh-history.md)):
+**Contributors:** work on a branch of your own fork and open a pull request against `main` on [github.com/Synere/CouldHappen](https://github.com/Synere/CouldHappen). Nothing below applies to you; your clone has one ordinary history.
+
+## Maintainer's local clone only
+
+This section applies only to the maintainer's own clone, which holds the private development history. You are in that clone if `git branch` lists both `main` and `publish`, and `git merge-base --is-ancestor 535dbae main` fails. In any other clone, skip this section.
+
+There, the clone holds two unrelated histories ([ADR 0004](docs/decisions/0004-publish-with-fresh-history.md)):
 
 - **`main`** is the private development history. It contains MIT-licensed versions, local evidence, and a personal email. **It must never be pushed anywhere.**
-- **`publish`** is the public history. Its root commit is `535dbae`, and it is pushed to `origin` (`github.com/Synere/CouldHappen`) as `main`.
+- **`publish`** is the public history. Its root commit is `535dbae`, and it is pushed to `origin` as GitHub's `main`.
 
-A plain `git push` is configured (`remote.origin.push`) to push `publish` to the public `main`. To publish work from the private `main`:
+A plain `git push` is configured (`remote.origin.push`) to push `publish` to the public `main`. To publish work:
 
 1. Commit on `main` as usual.
-2. `git switch publish`, then `git cherry-pick <commits>` (or `git checkout main -- <paths>` and commit).
+2. `git switch publish`, then `git cherry-pick <commits>`.
 3. `git push`, then `git switch main`.
 
 Never `git push origin main`, never `git push --all` or `--mirror`, never force-push, and never use `--no-verify`. Push only when the user asks.
 
-## The guard
-
-`scripts/git-hooks/pre-push` refuses any push that:
+The guard script `scripts/git-hooks/pre-push` refuses any push that:
 
 - is not built on the public root `535dbae`;
 - deletes a remote branch;
 - carries a commit whose author or committer email is not a `@users.noreply.github.com` address.
 
-It is installed as `.git/hooks/pre-push`, outside the working tree, so it also runs while `publish` is checked out (that branch does not contain `scripts/`). Before any push, check that `.git/hooks/pre-push` exists and matches `scripts/git-hooks/pre-push`; if not, run `cp scripts/git-hooks/pre-push .git/hooks/pre-push` from `main`. Do not set `core.hooksPath`. If the hook refuses, stop and tell the user. Do not work around it.
+It is installed as `.git/hooks/pre-push`, so it also runs while `publish` is checked out. Before any push, check that `.git/hooks/pre-push` matches `scripts/git-hooks/pre-push`; if not, run `cp scripts/git-hooks/pre-push .git/hooks/pre-push` from `main`. Do not set `core.hooksPath`. If the hook refuses, stop and tell the user; do not work around it.
 
-## Commit identity
+The clone commits as `Synere <61239445+Synere@users.noreply.github.com>` (local `user.email`). A cherry-pick keeps the original author, so commits made before that setting need `--reset-author` before they can be pushed.
 
-This repository commits as `Synere <61239445+Synere@users.noreply.github.com>` (local `user.email`). Commits made before that setting carry a private email and can only reach `publish` by being recommitted (for example, by a cherry-pick, which keeps the original author, so amend it with `--reset-author`).
-
-## Releases
-
-Build releases from the public history so that `release.json` names a public commit: `python scripts/build_release.py --ref refs/heads/publish`, then `python scripts/smoke_release.py release/dist/couldhappen-<version>.zip`. Full steps: [Building a release](docs/setup.md#building-a-release). Attach the ZIP and its `.sha256` to a GitHub release tagged `v<version>` on the public `main`.
+Build releases from the public history, so `release.json` names a public commit: `python scripts/build_release.py --ref refs/heads/publish`, then `python scripts/smoke_release.py release/dist/couldhappen-<version>.zip`. Attach the ZIP and its `.sha256` to a GitHub release tagged `v<version>` on the public `main`.

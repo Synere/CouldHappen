@@ -1,3 +1,3 @@
 @AGENTS.md
 
-The most important rule from AGENTS.md: **never push the local `main` branch.** It is the private history. Only `publish` is pushed (a plain `git push` does that), and the pre-push guard must be installed at `.git/hooks/pre-push` (copied from `scripts/git-hooks/pre-push`).
+Read AGENTS.md first. Contributors: open pull requests as usual. In the maintainer's own clone (it has both `main` and `publish` branches), **never push the local `main`**: it is the private history. Only `publish` is pushed, by a plain `git push`, with the guard installed at `.git/hooks/pre-push`.
