@@ -2,7 +2,7 @@
 
 Follow this only after the Director has agreed (see "Director packages" in the skill). Read [PACKAGE.md](PACKAGE.md) first. Tell the Director in a sentence or two what you will add: a private state script, a short routine each turn, and a session-zero conversation. Say what it costs (a little extra work per turn, no money, no keys) and that it changes no public file, so no restart is needed.
 
-This package is built in phases. This file covers **Phase 1, Continuity**. If later phases have been added to the package folder, apply them one at a time, each only after the previous one has been used in play, and each with the Director's go-ahead.
+This package is built in phases. This file covers **Phase 1, Continuity** (sections 1 to 4) and **Phase 2, Memory** (section 5); section 6 verifies whichever you applied. If later phases have been added to the package folder, apply them one at a time, each only after the previous one has been used in play, and each with the Director's go-ahead.
 
 Use the usual workspace rules: pause before appending to public logs, validate and release, record where a fresh session finds it from `START_HERE.md`, commit, and keep a standing wait running after every turn. Private notes under `notes/` need no pause. On Windows set `PYTHONIOENCODING=utf-8 PYTHONUTF8=1` when generating entries and avoid non-ASCII characters in heredocs.
 
@@ -45,7 +45,17 @@ Set `known` to false for anything the protagonist has not learned. That is what 
 2. Record the package in `notes/packages.md` (name, version, date, phase applied, what you chose not to do).
 3. From now on follow the protocol each turn. After a Director Undo, run `reconcile`, then `reconcile --apply`, as part of the "Reconcile" step of the Undo procedure (`references/recovery.md`), before the next turn. Note that in `notes/packages.md` so a fresh session does it too.
 
-## 5. Verify and report
+## 5. Phase 2: memory (threads)
+
+Apply this once Phase 1 has been in use and the Director agrees. It needs no new files: the script you installed already includes threads and `review`. If you installed an older copy of `tools/gm_state.py`, replace it with [files/gm_state.py](files/gm_state.py) (the log format is unchanged, so existing state keeps replaying) and refresh `notes/gm/protocol.md` from [files/protocol.md](files/protocol.md).
+
+1. Read the "Threads" section of the protocol.
+2. Backfill: open threads for the promises, mysteries and consequences the story has already taken on (at most about ten; the ones that would hurt if forgotten). Cite the entry where each began. Give promises with a clear deadline a `due_day`.
+3. From now on, at each scene boundary, `touch` the threads that advanced, and at each chapter or session boundary run `review` and retire what has run its course.
+4. Update the "Game master" section of `START_HERE.md` and the entry in `notes/packages.md` (phase 2 applied, date).
+5. Verify: `python tools/gm_state.py hot` shows the threads under the contract and situation; `review` runs.
+
+## 6. Verify and report
 
 1. `python tools/gm_state.py hot` prints a compact context of roughly 1,000 tokens or less. If it is longer, you tagged or pinned too much; trim.
 2. Make a deliberately bad delta in a scratch file (for example, an established fact with its text edited) and confirm `check --file` rejects it. Delete the scratch file.

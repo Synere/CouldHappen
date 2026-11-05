@@ -129,6 +129,90 @@ class GmStateTest(unittest.TestCase):
         withdrawn = (self.root / 'notes/gm/withdrawn.jsonl').read_text(encoding='utf-8').strip().split('\n')
         self.assertEqual(len(withdrawn), 2)
 
+    # ---- phase 2: threads and lifecycle ----------------------------------------------------
+
+    def thread(self, tid='T1', **extra):
+        return {'op': 'add', 'kind': 'thread', 'id': tid, 'type': 'promise', 'tags': ['Mara'],
+                'text': 'The player promised Mara to return the ledger.', **extra}
+
+    def scene(self, n, day=None):
+        fields = {'scene': f's{n}', **({'day': day} if day is not None else {})}
+        self.commit(self.delta(self.add_entry(f'Scene {n}.'), [{'op': 'set', 'kind': 'situation', 'fields': fields}]))
+
+    def test_promise_needs_an_outcome_and_a_later_entry(self):
+        e1 = self.add_entry('The promise.')
+        e2 = self.add_entry('The delivery.')
+        self.commit(self.delta(e1, [self.thread()]))
+        resolve = {'op': 'resolve', 'kind': 'thread', 'id': 'T1', 'resolution': 'She got the ledger back.'}
+        self.commit(self.delta(e1, [{**resolve, 'outcome': 'fulfilled'}], why='same entry'), expect=1)
+        self.commit(self.delta(e2, [resolve], why='no outcome given'), expect=1)
+        self.commit(self.delta(e1, [{**resolve, 'outcome': 'fulfilled'}], why='an earlier entry again'), expect=1)
+        e0 = self.add_entry('Later still.')
+        self.commit(self.delta(e0, [{**resolve, 'outcome': 'fulfilled'}]))
+        thread = self.state()['threads']['T1']
+        self.assertEqual((thread['status'], thread['outcome'], thread['resolved_entry']), ('resolved', 'fulfilled', e0))
+        self.assertNotIn('T1', run(self.root, 'hot', '--about', 'Mara').stdout)
+        self.assertNotIn('T1', json.loads(run(self.root, 'state', '--live').stdout)['threads'])
+
+    def test_resolution_must_come_after_the_promise_in_the_log(self):
+        early, late = self.add_entry('Early.'), self.add_entry('Late.')
+        self.commit(self.delta(late, [self.thread()]))
+        resolve = {'op': 'resolve', 'kind': 'thread', 'id': 'T1', 'outcome': 'broken', 'resolution': 'She lied.'}
+        self.commit(self.delta(early, [resolve]), expect=1)
+
+    def test_overdue_promise_is_flagged_in_the_hot_context(self):
+        e = self.add_entry()
+        self.commit(self.delta(e, [{'op': 'set', 'kind': 'situation', 'fields': {'day': 5, 'location': 'Dock'}},
+                                   self.thread(due_day=6)]))
+        self.assertNotIn('OVERDUE', run(self.root, 'hot').stdout)
+        self.commit(self.delta(self.add_entry('Time passes.'),
+                               [{'op': 'set', 'kind': 'situation', 'fields': {'day': 8}}]))
+        out = run(self.root, 'hot').stdout
+        self.assertIn('OVERDUE', out)
+        self.assertIn('was due day 6, it is day 8', out)
+        self.commit(self.delta(self.add_entry(), [self.thread('T2', due_day=3)]), expect=1)
+
+    def test_untouched_threads_are_flagged_until_touched(self):
+        self.commit(self.delta(self.add_entry(), [self.thread(type='mystery', tags=['Mara'])]))
+        for n in range(1, 6):
+            self.scene(n)
+        self.assertIn('untouched for 5 scenes', run(self.root, 'hot').stdout)
+        self.commit(self.delta(self.add_entry('Progress.'), [{'op': 'update', 'kind': 'thread', 'id': 'T1', 'touch': True}]))
+        self.assertNotIn('untouched', run(self.root, 'hot').stdout)
+
+    def test_thread_lifecycle_is_enforced(self):
+        self.commit(self.delta(self.add_entry(), [self.thread(type='callback')]))
+        e = self.add_entry('Next.')
+        finish = {'op': 'update', 'kind': 'thread', 'id': 'T1', 'status': 'resolved', 'reason': 'it ended in scene 3'}
+        self.commit(self.delta(e, [finish]), expect=1)
+        dormant = {'op': 'update', 'kind': 'thread', 'id': 'T1', 'status': 'dormant'}
+        self.commit(self.delta(e, [dormant], why='no reason given'), expect=1)
+        self.commit(self.delta(e, [{**dormant, 'reason': 'the player left town'}]))
+        self.assertNotIn('T1', run(self.root, 'hot').stdout)  # dormant threads leave the hot context
+        e2 = self.add_entry('Later.')
+        self.commit(self.delta(e2, [{'op': 'update', 'kind': 'thread', 'id': 'T1', 'status': 'discarded',
+                                     'reason': 'the idea no longer fits'}]))
+        self.commit(self.delta(self.add_entry(), [{'op': 'update', 'kind': 'thread', 'id': 'T1', 'touch': True}]), expect=1)
+
+    def test_provisional_fact_can_be_discarded_and_leaves_the_hot_context(self):
+        e = self.add_entry()
+        self.commit(self.delta(e, [self.fact(status='provisional')]))
+        self.assertIn('F1', run(self.root, 'hot', '--about', 'Mara').stdout)
+        self.commit(self.delta(self.add_entry('Dropped.'), [{'op': 'update', 'kind': 'fact', 'id': 'F1',
+                                                           'status': 'discarded', 'reason': 'never shown, no longer wanted'}]))
+        self.assertNotIn('F1', run(self.root, 'hot', '--about', 'Mara').stdout)
+        self.assertNotIn('F1', json.loads(run(self.root, 'state', '--live').stdout)['facts'])
+
+    def test_review_lists_what_to_retire_and_changes_nothing(self):
+        e = self.add_entry()
+        self.commit(self.delta(e, [self.fact(status='provisional'), self.fact('F2', status='rumour'),
+                                   self.thread(type='mystery')]))
+        before = (self.root / 'notes/gm/deltas.jsonl').read_text(encoding='utf-8')
+        out = run(self.root, 'review').stdout
+        for expected in ('T1 [mystery, open]', 'F1 [provisional]', 'F2 [rumour]', 'REOPEN'):
+            self.assertIn(expected, out)
+        self.assertEqual((self.root / 'notes/gm/deltas.jsonl').read_text(encoding='utf-8'), before)
+
 
 if __name__ == '__main__':
     unittest.main()

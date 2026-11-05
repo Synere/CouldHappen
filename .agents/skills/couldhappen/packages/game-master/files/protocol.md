@@ -4,7 +4,7 @@ Prepare situations, not scripted plots. Track causes and consequences, not trans
 
 Six questions to answer before you write: What must remain true? What matters to the protagonist? What is happening without them? What must not be forgotten? What could they discover? What makes this moment worth playing?
 
-Phase 1 covers the first (what must remain true) and the start of the second. Later phases add the rest here.
+Phase 1 covers the first (what must remain true) and the start of the second. Phase 2 covers the fourth (what must not be forgotten). Later phases add the rest here.
 
 ## Each turn
 
@@ -37,6 +37,24 @@ Run these around the usual exchange in `references/writing.md` (pause, write, va
 Fact status: `established` (true in the fiction), `rumour` (said or believed, not confirmed), `provisional` (your own idea, not yet shown), `outdated` (no longer true; kept for provenance). Set `known` to false for a truth the protagonist has not learned.
 
 Changing an established fact is a story event: use `replace` with a reason (it records the old one as outdated). Promoting a rumour needs a reason. Time may not move backwards unless the scene is a flashback (`"flashback": true`).
+
+## Threads (phase 2): what must not be forgotten
+
+A thread is an obligation the story has taken on. Types: `promise` (someone said they would), `mystery` (a question the player wants answered), `consequence` (something the player did that the world will answer), `relationship` (a bond that is changing), `callback` (a detail worth echoing later). Open one only when it will change what you write; skip incidental detail.
+
+```json
+{"op": "add", "kind": "thread", "id": "T3", "type": "promise", "due_day": 6, "tags": ["Mara"],
+ "text": "The player promised Mara the ledger back before the tide turns."}
+{"op": "update", "kind": "thread", "id": "T3", "touch": true}
+{"op": "resolve", "kind": "thread", "id": "T3", "outcome": "fulfilled", "resolution": "Returned at the pier."}
+```
+
+- **Lifecycle.** `open` (noted) → `active` (in play) ↔ `dormant` (parked, out of the hot context) → `resolved` (finished: keep a one-line `resolution`, which leaves the hot context) or `discarded` (unused preparation, with a reason). Resolved and discarded are final.
+- **Promises** end with an `outcome`: `fulfilled`, `broken` or `released`, in an entry that comes after the one that made the promise. Never mark one fulfilled without the scene that shows it.
+- **Use `touch: true`** whenever a thread genuinely advanced in a scene, even if nothing else about it changed.
+- **Warnings are advice.** An overdue promise or a thread untouched for five scenes shows as `WARN` at the top of `hot`. You decide what the fiction needs: pay it off, complicate it, let it lapse with a consequence, or park it. A warning never forces an event.
+- **Retire on purpose.** At a scene or chapter boundary run `python tools/gm_state.py review` (Review, Retire, Refresh, Reopen). Park, resolve or discard what has run its course, and discard provisional facts you never used (`"status": "discarded"`, with a reason).
+- **Consequences first.** Promises and consequences stay in the hot context even when their tags do not match the scene, because those are the ones a good game master never lets slip.
 
 ## Self-checks the script cannot do
 

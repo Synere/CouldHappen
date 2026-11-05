@@ -6,13 +6,14 @@ Usage (from the workspace root):  python tools/gm_state.py <command> [--root .]
                              --prose scans a draft for the contract's banned terms
   commit                     validate again, require the cited entry to exist, then append it
   discard                    delete the pending delta
-  state                      print the current state as JSON
+  state [--live]             print the current state as JSON (--live leaves out finished records)
   hot [--about X ...] [--budget N]   print the compact context to read each turn
+  review                     scene/chapter boundary report: stale threads, overdue promises, what to retire
   reconcile [--apply]        find deltas whose entry was withdrawn (Director Undo) and set them aside
 
 State is never edited directly. It is the replay of notes/gm/deltas.jsonl, an append-only log in
 which every delta cites the story or Director entry that justifies it. Stdlib only; no network.
-Phase 1 kinds: contract, situation, fact. Later phases add kinds to KINDS-style handlers below."""
+Kinds: contract, situation, fact (phase 1); thread (phase 2). Later phases add handlers in apply_op."""
 import argparse
 import copy
 import hashlib
@@ -23,12 +24,20 @@ import sys
 import tempfile
 from pathlib import Path
 
-FACT_STATUS = ('established', 'rumour', 'provisional', 'outdated')
+FACT_STATUS = ('established', 'rumour', 'provisional', 'outdated', 'discarded')
+TERMINAL_FACT = ('outdated', 'discarded')
 SOURCES = ('story', 'player', 'director', 'card')
-TRANSITIONS = {'provisional': {'established', 'rumour', 'outdated'},
+TRANSITIONS = {'provisional': {'established', 'rumour', 'outdated', 'discarded'},
                'rumour': {'established', 'outdated'},
                'established': {'outdated'},
-               'outdated': set()}
+               'outdated': set(), 'discarded': set()}
+THREAD_TYPES = ('promise', 'mystery', 'consequence', 'relationship', 'callback')
+THREAD_STATUS = ('open', 'active', 'dormant', 'resolved', 'discarded')
+THREAD_LIVE = ('open', 'active', 'dormant')
+THREAD_MOVES = {'open': {'active', 'dormant', 'discarded'}, 'active': {'dormant'},
+                'dormant': {'open', 'active', 'discarded'}}
+OUTCOMES = ('fulfilled', 'broken', 'released')
+STALE_SCENES = 5
 ID_RE = re.compile(r'^[A-Za-z][A-Za-z0-9_-]{0,31}$')
 UUID_RE = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
 ENTRY_START = re.compile(r'^<!-- couldhappen:entry (\{.*\}) -->$')
@@ -40,6 +49,8 @@ CONTRACT_FIELDS = {'genre': str, 'tone': str, 'boundaries': list, 'banned_terms'
 SITUATION_FIELDS = {'day': int, 'time': str, 'location': str, 'present': list,
                     'problem': str, 'scene': str}
 FACT_FIELDS = {'text': str, 'status': str, 'source': str, 'known': bool, 'tags': list, 'pin': bool}
+THREAD_FIELDS = {'type': str, 'text': str, 'status': str, 'due_condition': str, 'due_day': int,
+                 'tags': list}
 
 
 def typed(value, kind):
@@ -54,7 +65,8 @@ def typed(value, kind):
 
 
 def new_state():
-    return {'contract': {}, 'situation': {}, 'max_day': 0, 'facts': {}, 'seen': []}
+    return {'contract': {}, 'situation': {}, 'max_day': 0, 'scene_count': 0, 'facts': {},
+            'threads': {}, 'seen': []}
 
 
 # ---- applying one delta -------------------------------------------------------------------
@@ -96,7 +108,7 @@ def reason_ok(op, bad, why):
     return True
 
 
-def apply_op(state, op, errs, warns):
+def apply_op(state, op, errs, warns, ctx):
     kind, verb = op.get('kind'), op.get('op')
 
     def bad(msg):
@@ -117,6 +129,9 @@ def apply_op(state, op, errs, warns):
         if day is not None and not flashback and day < state['max_day']:
             bad(f'day {day} is before day {state["max_day"]}; set flashback: true if this is deliberately in the past')
             return
+        scene = op['fields'].get('scene')
+        if scene and scene != state['situation'].get('scene') and not flashback:
+            state['scene_count'] += 1
         state['situation'].update(op['fields'])
         if day is not None and not flashback:
             state['max_day'] = day
@@ -126,6 +141,12 @@ def apply_op(state, op, errs, warns):
         apply_update(state, op, bad)
     elif kind == 'fact' and verb == 'replace':
         apply_replace(state, op, bad, warns)
+    elif kind == 'thread' and verb == 'add':
+        thread_add(state, op, bad, warns, ctx)
+    elif kind == 'thread' and verb == 'update':
+        thread_update(state, op, bad)
+    elif kind == 'thread' and verb == 'resolve':
+        thread_resolve(state, op, bad, ctx)
     else:
         bad('unknown kind/op')
 
@@ -150,7 +171,7 @@ def apply_add(state, op, bad, warns):
     for name in ('text', 'status', 'source'):
         if name not in fields:
             return bad(f'{name} is required')
-    if fields['status'] not in FACT_STATUS or fields['status'] == 'outdated':
+    if fields['status'] not in FACT_STATUS or fields['status'] in TERMINAL_FACT:
         return bad('status must be established, rumour or provisional (state it explicitly; nothing is assumed true)')
     if fields['source'] not in SOURCES:
         return bad('source must be one of ' + ', '.join(SOURCES))
@@ -171,8 +192,8 @@ def apply_update(state, op, bad):
     fact = state['facts'].get(fid)
     if not fact:
         return bad(f'{fid} does not exist')
-    if fact['status'] == 'outdated':
-        return bad(f'{fid} is outdated and cannot change')
+    if fact['status'] in TERMINAL_FACT:
+        return bad(f'{fid} is {fact["status"]} and cannot change')
     new_status = fields.get('status')
     if new_status and new_status != fact['status']:
         if new_status not in TRANSITIONS[fact['status']]:
@@ -198,8 +219,8 @@ def apply_replace(state, op, bad, warns):
     if not old_id or not new_id or not fields_ok(fields, FACT_FIELDS, bad):
         return
     old = state['facts'].get(old_id)
-    if not old or old['status'] == 'outdated':
-        return bad(f'{old_id} must exist and not already be outdated')
+    if not old or old['status'] in TERMINAL_FACT:
+        return bad(f'{old_id} must exist and not already be outdated or discarded')
     if new_id in state['facts']:
         return bad(f'{new_id} already exists')
     if 'text' not in fields:
@@ -212,11 +233,104 @@ def apply_replace(state, op, bad, warns):
     state['facts'][new_id] = fact
 
 
+def later(entries, first, second):
+    """True unless both entries are in the same log and `second` does not come after `first`."""
+    a, b = (entries or {}).get(first), (entries or {}).get(second)
+    if a and b and a['channel'] == b['channel']:
+        return b['pos'] > a['pos']
+    return True
+
+
+def thread_add(state, op, bad, warns, ctx):
+    if not keys_ok(op, {'op', 'kind', 'id'} | set(THREAD_FIELDS), bad):
+        return
+    tid = fact_id(op, 'id', bad)
+    fields = {k: v for k, v in op.items() if k in THREAD_FIELDS}
+    if not tid or not fields_ok(fields, THREAD_FIELDS, bad):
+        return
+    if tid in state['threads']:
+        return bad(f'{tid} already exists')
+    for name in ('type', 'text'):
+        if name not in fields:
+            return bad(f'{name} is required')
+    if fields['type'] not in THREAD_TYPES:
+        return bad('type must be one of ' + ', '.join(THREAD_TYPES))
+    if fields.setdefault('status', 'open') not in ('open', 'active'):
+        return bad('a new thread starts open or active')
+    if fields.get('due_day', state['max_day']) < state['max_day']:
+        return bad(f'due_day {fields["due_day"]} is already past (it is day {state["max_day"]})')
+    state['threads'][tid] = {'id': tid, 'due_condition': '', 'due_day': None, 'tags': [], **fields,
+                             'origin': ctx['entry'], 'touched': state['scene_count'],
+                             'resolution': None, 'outcome': None}
+    if not state['threads'][tid]['tags']:
+        warns.append(f'{tid} has no tags: it will show in the hot context only while overdue or if it is a '
+                     'promise or consequence.')
+
+
+def thread_update(state, op, bad):
+    allowed = {'op', 'kind', 'id', 'reason', 'touch'} | (set(THREAD_FIELDS) - {'type'})
+    if not keys_ok(op, allowed, bad):
+        return
+    tid = fact_id(op, 'id', bad)
+    fields = {k: v for k, v in op.items() if k in THREAD_FIELDS}
+    touch = op.get('touch', False)
+    if not tid or (fields and not fields_ok(fields, THREAD_FIELDS, bad)):
+        return
+    if not isinstance(touch, bool):
+        return bad('touch must be true or false')
+    if not fields and not touch:
+        return bad('nothing to change; use touch: true to record that the thread advanced')
+    thread = state['threads'].get(tid)
+    if not thread:
+        return bad(f'{tid} does not exist')
+    if thread['status'] not in THREAD_LIVE:
+        return bad(f'{tid} is {thread["status"]} and cannot change')
+    new_status = fields.pop('status', None)
+    if new_status and new_status != thread['status']:
+        if new_status not in THREAD_MOVES[thread['status']]:
+            return bad(f'{tid}: {thread["status"]} cannot become {new_status}'
+                       + ('; use resolve to finish a thread' if new_status == 'resolved' else ''))
+        if not reason_ok(op, bad, f'{tid} becoming {new_status}'):
+            return
+        thread['status'] = new_status
+    if fields.get('due_day', state['max_day']) < state['max_day']:
+        return bad(f'due_day {fields["due_day"]} is already past (it is day {state["max_day"]})')
+    thread.update(fields)
+    thread['touched'] = state['scene_count']
+
+
+def thread_resolve(state, op, bad, ctx):
+    if not keys_ok(op, {'op', 'kind', 'id', 'resolution', 'outcome'}, bad):
+        return
+    tid = fact_id(op, 'id', bad)
+    thread = state['threads'].get(tid) if tid else None
+    if not thread:
+        return bad(f'{tid} does not exist')
+    if thread['status'] not in THREAD_LIVE:
+        return bad(f'{tid} is already {thread["status"]}')
+    resolution, outcome = op.get('resolution'), op.get('outcome')
+    if not (typed(resolution, str) and len(resolution.strip()) >= 5):
+        return bad('resolution must say what happened (at least 5 characters)')
+    if thread['type'] == 'promise':
+        if outcome not in OUTCOMES:
+            return bad('a promise needs an outcome: ' + ', '.join(OUTCOMES))
+        if ctx['entry'] == thread['origin']:
+            return bad('a promise cannot be resolved in the same entry that made it')
+        if not later(ctx.get('entries'), thread['origin'], ctx['entry']):
+            return bad('the cited entry must come after the one that made the promise')
+    elif outcome is not None:
+        return bad('outcome is only for promises')
+    thread.update(status='resolved', resolution=resolution, outcome=outcome, resolved_entry=ctx['entry'],
+                  touched=state['scene_count'])
+
+
 def texts_of(delta):
     for op in delta.get('ops', []):
         if not isinstance(op, dict):
             continue
         yield op.get('text')
+        yield op.get('resolution')
+        yield op.get('due_condition')
         fields = op.get('fields')
         if isinstance(fields, dict):
             for key, value in fields.items():
@@ -258,11 +372,12 @@ def validate_delta(state, delta, errs, warns, entries=None):
     if delta.get('delta', delta_hash(delta)) in state['seen']:
         errs.append('this delta was already committed')
     new = copy.deepcopy(state)
+    ctx = {'entry': delta.get('entry'), 'entries': entries}
     for op in ops:
         if not isinstance(op, dict):
             errs.append('each operation must be an object')
             continue
-        apply_op(new, op, errs, warns)
+        apply_op(new, op, errs, warns, ctx)
     for text in texts_of(delta):
         for term in banned_in(new, text):
             errs.append(f'contains the banned term "{term}" (see the contract)')
@@ -316,13 +431,14 @@ def read_entries(root):
         path = Path(root) / 'public' / name
         if not path.exists():
             continue
-        current, body = None, []
+        current, body, pos = None, [], 0
         for line in path.read_text(encoding='utf-8').replace('\r\n', '\n').split('\n'):
             m = ENTRY_START.match(line)
             if m:
                 try:
                     meta = json.loads(m.group(1))
-                    current = {'role': meta.get('role'), 'body': ''}
+                    pos += 1
+                    current = {'role': meta.get('role'), 'body': '', 'channel': name, 'pos': pos}
                     entries[meta['id']] = current
                     body = []
                 except (ValueError, KeyError):
@@ -384,13 +500,47 @@ def hot(state, about, budget):
             head.append('PROBLEM ' + s['problem'])
     context = ' '.join([s.get('location', ''), s.get('problem', ''), s.get('scene', ''),
                         ' '.join(s.get('present', [])), *about]).lower()
-    live = [f for f in state['facts'].values() if f['status'] != 'outdated']
+    used = [sum(len(h) + 1 for h in head)]
+    omitted = {'threads': 0, 'facts': 0}
+
+    def fit(line, group):
+        if used[0] + len(line) + 1 > budget * 4:
+            omitted[group] += 1
+            return False
+        used[0] += len(line) + 1
+        return True
+
+    warnings = [w for w in thread_warnings(state) if fit('WARN ' + w, 'threads')]
+    # threads: overdue first, then due soonest, promises and consequences, then tag-relevant
+    day = state['situation'].get('day', state['max_day'])
+    live_threads = [t for t in state['threads'].values() if t['status'] in THREAD_LIVE]
+
+    def thread_rank(t):
+        overdue = t['due_day'] is not None and t['due_day'] < day
+        return (not overdue, t['due_day'] if t['due_day'] is not None else 10 ** 9,
+                t['type'] not in ('promise', 'consequence'))
+
+    def thread_shown(t):
+        relevant = any(x.lower() in context for x in t['tags'])
+        overdue = t['due_day'] is not None and t['due_day'] < day
+        urgent = t['status'] != 'dormant' and (t['due_day'] is not None or t['type'] in ('promise', 'consequence'))
+        return overdue or urgent or relevant
+    thread_lines = []
+    for t in sorted(filter(thread_shown, live_threads), key=thread_rank):
+        due = ''
+        if t['due_day'] is not None:
+            due = f', due day {t["due_day"]}' + (' OVERDUE' if t['due_day'] < day else '')
+        if t['due_condition']:
+            due += f', due when: {t["due_condition"]}'
+        line = f'{t["id"]} [{t["type"]}, {t["status"]}{due}] {t["text"]}'
+        if fit(line, 'threads'):
+            thread_lines.append(line)
+    live = [f for f in state['facts'].values() if f['status'] not in TERMINAL_FACT]
     shown = [f for f in live if f['pin'] or any(t.lower() in context for t in f['tags'])]
     # pinned first, then known before hidden, established before uncertain, newest first
     order = {f['id']: i for i, f in enumerate(state['facts'].values())}
     shown.sort(key=lambda f: (not f['pin'], not f['known'], f['status'] != 'established', -order[f['id']]))
-    lines, used = [], sum(len(h) + 1 for h in head)
-    omitted = 0
+    lines = []
     for f in shown:
         label = f['status']
         if f['status'] != 'established':
@@ -398,18 +548,55 @@ def hot(state, about, budget):
         if not f['known']:
             label += ', HIDDEN from player'
         line = f'{f["id"]} [{label}] {f["text"]}'
-        if used + len(line) + 1 > budget * 4:
-            omitted += 1
-            continue
-        lines.append(line)
-        used += len(line) + 1
+        if fit(line, 'facts'):
+            lines.append(line)
     tail = []
-    if omitted:
-        tail.append(f'({omitted} relevant facts did not fit the {budget}-token budget; ask with --about)')
+    if omitted['facts'] or omitted['threads']:
+        tail.append(f'({omitted["threads"]} threads/warnings and {omitted["facts"]} facts did not fit the '
+                    f'{budget}-token budget; ask with --about or run review)')
     hidden = len(live) - len(shown)
     if hidden:
         tail.append(f'({hidden} other live facts not shown; use --about <name> or the state command)')
-    return '\n'.join(head + (['FACTS'] + lines if lines else []) + tail)
+    return '\n'.join(head + ['WARN ' + w for w in warnings] + (['THREADS'] + thread_lines if thread_lines else [])
+                     + (['FACTS'] + lines if lines else []) + tail)
+
+
+def thread_warnings(state):
+    """Soft rules only: they inform your judgment and never force an event."""
+    day = state['situation'].get('day', state['max_day'])
+    out = []
+    for t in state['threads'].values():
+        if t['status'] not in THREAD_LIVE:
+            continue
+        if t['due_day'] is not None and t['due_day'] < day:
+            out.append(f'{t["id"]} ({t["type"]}) was due day {t["due_day"]}, it is day {day}: '
+                       'fulfil, break, release or explain it.')
+        quiet = state['scene_count'] - t['touched']
+        if t['status'] != 'dormant' and quiet >= STALE_SCENES:
+            out.append(f'{t["id"]} ({t["type"]}) untouched for {quiet} scenes: advance it, make it dormant, '
+                       'or resolve it.')
+    return out
+
+
+def review(state):
+    """Scene/chapter boundary report: Review, Retire, Refresh, Reopen. Reads only; changes nothing."""
+    out = ['# Review (private)', 'REVIEW what changed and what is still owed']
+    threads = [t for t in state['threads'].values() if t['status'] in THREAD_LIVE]
+    out += [f'  {t["id"]} [{t["type"]}, {t["status"]}] {t["text"]}' for t in threads] or ['  no live threads']
+    warns = thread_warnings(state)
+    out += ['  WARN ' + w for w in warns]
+    out.append('RETIRE candidates (propose each as a delta with a reason; nothing here is automatic)')
+    stale = [t for t in threads if t['status'] != 'dormant' and state['scene_count'] - t['touched'] >= STALE_SCENES]
+    out += [f'  {t["id"]}: make dormant, or resolve if it has already ended' for t in stale]
+    out += [f'  {f["id"]} [provisional]: show it in play and establish it, or discard it'
+            for f in state['facts'].values() if f['status'] == 'provisional']
+    out += [f'  {f["id"]} [rumour]: confirm, disprove (outdated), or leave it a rumour on purpose'
+            for f in state['facts'].values() if f['status'] == 'rumour']
+    done = [t for t in state['threads'].values() if t['status'] == 'resolved']
+    out.append(f'  {len(done)} resolved thread(s) are kept as summaries and left out of the hot context.')
+    out += ['REFRESH check that each live thread and each pressure still has a reason to move',
+            'REOPEN plan a strong next opening: a situation already in motion, not a recap of what happened']
+    return '\n'.join(out)
 
 
 # ---- commands -------------------------------------------------------------------------------
@@ -496,7 +683,9 @@ def main():
     p.add_argument('--prose')
     sub.add_parser('commit')
     sub.add_parser('discard')
-    sub.add_parser('state')
+    p = sub.add_parser('state')
+    p.add_argument('--live', action='store_true')
+    sub.add_parser('review')
     p = sub.add_parser('hot')
     p.add_argument('--about', nargs='*', default=[])
     p.add_argument('--budget', type=int, default=1000)
@@ -517,7 +706,13 @@ def main():
         pending_path.unlink(missing_ok=True)
         print('discarded')
     elif args.cmd == 'state':
-        print(json.dumps(load(args.root), indent=2, ensure_ascii=False))
+        state = load(args.root)
+        if args.live:
+            state['facts'] = {k: v for k, v in state['facts'].items() if v['status'] not in TERMINAL_FACT}
+            state['threads'] = {k: v for k, v in state['threads'].items() if v['status'] in THREAD_LIVE}
+        print(json.dumps(state, indent=2, ensure_ascii=False))
+    elif args.cmd == 'review':
+        print(review(load(args.root)))
     elif args.cmd == 'hot':
         print(hot(load(args.root), args.about, args.budget))
     elif args.cmd == 'reconcile':

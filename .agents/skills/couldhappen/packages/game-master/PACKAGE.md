@@ -17,7 +17,7 @@ This package gives the writer a compact, private memory and a short routine to u
 | Phase | Adds | Status |
 | --- | --- | --- |
 | 1 Continuity | The contract (genre, tone, limits, what the player wants), canon facts with a status and a source, the current situation, and a validated, append-only record of every change. | **Available** |
-| 2 Memory | Open threads: promises, mysteries, consequences, callbacks; lifecycle (active, dormant, resolved, discarded). | Planned |
+| 2 Memory | Open threads: promises, mysteries, consequences, relationships, callbacks, each with a lifecycle (open, active, dormant, resolved, discarded), optional due day, and soft warnings for overdue or forgotten ones. A `review` report for scene and chapter boundaries. | **Available** |
 | 3 Living world | Pressures: factions and NPCs who pursue goals and clocks that move when events justify it. | Planned |
 | 4 Discovery | Secrets kept apart from where they are found, with several routes to each required one. | Planned |
 | 5 Narrative quality | Scene rhythm, callbacks, arc coherence, and soft warnings. | Planned |
@@ -33,6 +33,6 @@ Two new private places: `tools/gm_state.py` (stdlib only) and `notes/gm/` (state
 ## How it stays honest
 
 - Every change to the state cites the story or Director entry that justifies it. If the Director undoes story development, the changes that depended on the withdrawn entries are set aside (`reconcile`), not left to haunt the next session.
-- The script checks what can be checked: ids, legal status changes, a reason for every promotion or replacement, time moving forward, banned terms, the existence of the cited entry. It does **not** judge meaning. Whether a passage contradicts canon, or makes a decision for the protagonist, stays a self-check by the writer (listed in the protocol). The package does not claim otherwise.
+- The script checks what can be checked: ids, legal status changes, a reason for every promotion, replacement or retirement, time moving forward, banned terms, the existence of the cited entry, and that a promise is resolved with an outcome (fulfilled, broken or released) in an entry that comes after the one that made it. It does **not** judge meaning. Whether a passage contradicts canon, or makes a decision for the protagonist, stays a self-check by the writer (listed in the protocol). The package does not claim otherwise.
 
 Apply it with [APPLY.md](APPLY.md).
