@@ -1,0 +1,5 @@
+{
+  "hooks": {
+    "Stop": [{"hooks": [{"type": "command", "command": "\"/absolute/path/to/python\" \"/absolute/workspace/integrations/claude/stop.py\" --root \"/absolute/workspace\"", "timeout": 30}]}]
+  }
+}

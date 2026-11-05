@@ -1,0 +1,14 @@
+{
+  "seedKey": "33498422",
+  "questionKey": "a96d29f6",
+  "answer": {
+    "optionId": "woven",
+    "steer": "",
+    "comp": ".impeccable/mocks/decision/woven.png",
+    "buildPath": "comp",
+    "buildPathFlipped": false
+  },
+  "selectedDirection": "Woven anthology",
+  "approvalScope": "visual direction for the brainstorm; not formal design or implementation",
+  "date": "2026-11-03"
+}

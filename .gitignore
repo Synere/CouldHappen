@@ -1,0 +1,47 @@
+# Local credentials
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Local runtime state
+.couldhappen/
+.impeccable/questions/
+
+# Python caches
+__pycache__/
+*.py[cod]
+.venv/
+
+# Frontend dependencies and generated output
+node_modules/
+web/dist/
+web/test-results/
+web/playwright-report/
+release/dist/
+
+# Interrupted atomic saves
+.couldhappen-tmp-*
+
+# OS/editor metadata that should not dirty a story checkpoint
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*.swo
+*~
+
+# Locally installed Impeccable tooling (npx impeccable install); not part of the app or release
+.claude/*
+!.claude/skills/
+.claude/skills/*
+!.claude/skills/couldhappen/
+.agents/skills/impeccable/
+
+# Development evidence kept locally, never published (ADR 0004)
+.research/
+goldfish_reviews/
+.impeccable/
+
+# Local Impeccable hook config with absolute paths (ADR 0004)
+.codex/hooks.json

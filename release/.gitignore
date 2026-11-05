@@ -1,0 +1,35 @@
+# Local credentials
+.env
+.env.*
+!.env.example
+!.env.*.example
+
+# Local runtime state
+.couldhappen/
+.impeccable/
+
+# Per-user Claude Code settings
+.claude/settings.local.json
+
+# Python caches
+__pycache__/
+*.py[cod]
+.venv/
+
+# Frontend dependencies and generated output
+node_modules/
+web/dist/
+web/test-results/
+web/playwright-report/
+release/dist/
+
+# Interrupted atomic saves
+.couldhappen-tmp-*
+
+# OS/editor metadata
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*.swo
+*~

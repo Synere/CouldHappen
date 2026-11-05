@@ -1,0 +1,4 @@
+{
+  "bodies": ["Paragraph one.\n\nParagraph two.", "trailing\n\n", "<!-- couldhappen:end -->\n\\<!-- couldhappen:entry literal -->\n\\\\<!-- couldhappen:other -->", "CRLF\r\nbody", "<script>alert('x')</script>", "雪と川"],
+  "invalid": ["# Story\nstray prose", "# Story\n<!-- couldhappen:end -->", "# Story\n<!-- couldhappen:entry {} -->\npartial"]
+}

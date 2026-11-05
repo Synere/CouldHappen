@@ -1,0 +1,25 @@
+* text=auto
+*.md text eol=lf
+*.json text eol=lf
+*.txt text eol=lf
+*.py text eol=lf
+*.js text eol=lf
+*.ts text eol=lf
+*.svelte text eol=lf
+*.css text eol=lf
+*.html text eol=lf
+.gitignore text eol=lf
+LICENSE text eol=lf
+.gitattributes text eol=lf
+
+*.png binary
+*.webp binary
+*.zip binary
+
+# Preserve captured evidence exactly across checkouts.
+.research/** -text whitespace=cr-at-eol
+.impeccable/** -text whitespace=cr-at-eol
+goldfish_reviews/** -text whitespace=cr-at-eol
+
+# Raw terminal output contains literal carriage returns.
+.impeccable/direction-roll.txt -diff
