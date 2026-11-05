@@ -291,6 +291,93 @@ class GmStateTest(unittest.TestCase):
         out = run(self.root, 'review').stdout
         self.assertIn('P1 Harbour guild clock 0/4: next "send a bailiff to Mara"', out)
 
+    # ---- phase 4: discovery ------------------------------------------------------------------
+
+    def secret(self, **extra):
+        return self.fact('F9', text='The harbourmaster forged the ledger.', known=False, tags=['harbourmaster'], **extra)
+
+    def rev(self, rid='V1', **extra):
+        return {'op': 'add', 'kind': 'revelation', 'id': rid, 'fact': 'F9', 'importance': 'required',
+                'tags': ['harbourmaster'], **extra}
+
+    def route(self, route, how, rid='V1', **extra):
+        return {'op': 'route', 'kind': 'revelation', 'id': rid, 'route': route, 'how': how, **extra}
+
+    def three_routes(self):
+        return [self.route('a', 'Mara confesses if pressed'), self.route('b', 'the back pages of the ledger'),
+                self.route('c', 'the clerk remembers the ink', where='Harbour office')]
+
+    def test_only_a_hidden_live_fact_can_become_a_revelation(self):
+        e = self.add_entry()
+        self.commit(self.delta(e, [self.fact('F1')]))  # known to the player
+        self.commit(self.delta(self.add_entry('a'), [self.rev(fact='F1')]), expect=1)
+        self.commit(self.delta(self.add_entry('b'), [self.rev(fact='F404')]), expect=1)
+        self.commit(self.delta(self.add_entry('c'), [self.secret(), self.rev(importance='critical')]), expect=1)
+        self.commit(self.delta(self.add_entry('d'), [self.secret(), self.rev()]))
+        self.commit(self.delta(self.add_entry('e'), [self.rev('V2')]), expect=1)  # already has a live revelation
+
+    def test_required_truth_warns_until_it_has_three_open_routes(self):
+        e = self.add_entry()
+        (self.root / 'notes/gm/pending.json').write_text(json.dumps(self.delta(e, [
+            self.secret(), self.rev(), self.route('a', 'Mara confesses')])), encoding='utf-8')
+        self.assertIn('V1 is required with 1 open route(s); aim for 3', run(self.root, 'check').stdout)
+        (self.root / 'notes/gm/pending.json').write_text(json.dumps(self.delta(e, [
+            self.secret(), self.rev(), *self.three_routes()])), encoding='utf-8')
+        out = run(self.root, 'check').stdout
+        self.assertNotIn('aim for', out)
+        self.assertEqual(run(self.root, 'commit').returncode, 0)
+        hot = run(self.root, 'hot', '--about', 'harbourmaster').stdout
+        self.assertIn('V1 [required, hidden, truth F9] routes: a) Mara confesses if pressed; b) the back', hot)
+        self.assertIn('[at Harbour office]', hot)
+        self.assertIn('F9 [established, HIDDEN from player]', hot)
+
+    def test_blocking_every_route_is_called_a_dead_end(self):
+        e = self.add_entry()
+        self.commit(self.delta(e, [self.secret(), self.rev(), self.route('a', 'Mara confesses')]))
+        block = {'op': 'block', 'kind': 'revelation', 'id': 'V1', 'route': 'a'}
+        self.commit(self.delta(self.add_entry('a'), [block]), expect=1)  # needs a reason
+        self.commit(self.delta(self.add_entry('b'), [{**block, 'reason': 'Mara left the city'}]))
+        self.assertIn('NO open route: a dead end', run(self.root, 'hot').stdout)
+        self.commit(self.delta(self.add_entry('c'), [{**block, 'reason': 'again'}]), expect=1)  # already blocked
+
+    def test_clue_then_reveal_flips_what_the_player_knows(self):
+        e = self.add_entry()
+        self.commit(self.delta(e, [self.secret(), self.rev(), *self.three_routes()]))
+        clue = {'op': 'clue', 'kind': 'revelation', 'id': 'V1', 'route': 'b'}
+        self.commit(self.delta(self.add_entry('a'), [clue]), expect=1)  # needs a reason
+        self.commit(self.delta(self.add_entry('b'), [{**clue, 'reason': 'the player read the back pages'}]))
+        self.assertEqual(self.state()['revelations']['V1']['status'], 'partial')
+        self.commit(self.delta(self.add_entry('c'), [{'op': 'reveal', 'kind': 'revelation', 'id': 'V1',
+                                                      'how': 'Mara confessed', 'route': 'b'}]), expect=0)
+        state = self.state()
+        self.assertEqual(state['revelations']['V1']['status'], 'revealed')
+        self.assertTrue(state['facts']['F9']['known'])
+        self.assertNotIn('V1', run(self.root, 'hot', '--about', 'harbourmaster').stdout)
+        self.assertNotIn('V1', json.loads(run(self.root, 'state', '--live').stdout)['revelations'])
+        self.commit(self.delta(self.add_entry('d'), [{'op': 'reveal', 'kind': 'revelation', 'id': 'V1', 'how': 'twice'}]), expect=1)
+
+    def test_reveal_needs_a_how_and_a_live_truth(self):
+        self.commit(self.delta(self.add_entry(), [self.secret(), self.rev(), *self.three_routes()]))
+        reveal = {'op': 'reveal', 'kind': 'revelation', 'id': 'V1', 'how': 'Mara confessed'}
+        self.commit(self.delta(self.add_entry('a'), [{**reveal, 'how': ''}]), expect=1)
+        self.commit(self.delta(self.add_entry('b'), [{**reveal, 'route': 'zz'}]), expect=1)
+        self.commit(self.delta(self.add_entry('c'), [{'op': 'replace', 'kind': 'fact', 'id': 'F9', 'new': 'F10',
+                                                      'text': 'It was the clerk.', 'reason': 'twist in scene 8'}]))
+        self.commit(self.delta(self.add_entry('d'), [reveal]), expect=1)  # F9 is outdated: relink first
+        self.assertIn('outdated or discarded: relink', run(self.root, 'hot').stdout)
+
+    def test_relink_discard_and_review(self):
+        self.commit(self.delta(self.add_entry(), [self.secret(), self.rev(), *self.three_routes()]))
+        self.assertIn('V1 [required, hidden, truth F9] routes open 3, used 0, blocked 0', run(self.root, 'review').stdout)
+        self.commit(self.delta(self.add_entry('a'), [{'op': 'update', 'kind': 'revelation', 'id': 'V1',
+                                                      'importance': 'optional'}]))
+        self.commit(self.delta(self.add_entry('b'), [{'op': 'update', 'kind': 'revelation', 'id': 'V1',
+                                                      'fact': 'F1'}]), expect=1)
+        self.commit(self.delta(self.add_entry('c'), [{'op': 'discard', 'kind': 'revelation', 'id': 'V1',
+                                                      'reason': 'the story moved on'}]))
+        self.assertFalse(self.state()['facts']['F9']['known'])
+        self.commit(self.delta(self.add_entry('d'), [self.route('d', 'late idea')]), expect=1)
+
 
 if __name__ == '__main__':
     unittest.main()

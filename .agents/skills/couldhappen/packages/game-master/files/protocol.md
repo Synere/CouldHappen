@@ -4,7 +4,7 @@ Prepare situations, not scripted plots. Track causes and consequences, not trans
 
 Six questions to answer before you write: What must remain true? What matters to the protagonist? What is happening without them? What must not be forgotten? What could they discover? What makes this moment worth playing?
 
-Phase 1 covers the first (what must remain true) and the start of the second. Phase 2 covers the fourth (what must not be forgotten). Phase 3 covers the third (what is happening without them). Later phases add the rest here.
+Phase 1 covers the first (what must remain true) and the start of the second. Phase 2 covers the fourth (what must not be forgotten). Phase 3 covers the third (what is happening without them). Phase 4 covers the fifth (what they could discover). Later phases add the rest here.
 
 ## Each turn
 
@@ -78,6 +78,29 @@ A **pressure** is someone who wants something and will act whether or not the pl
 - **A waiting world is a warning, not an order.** If no pressure has moved for five scenes, `hot` says so. Ask whether any actor has a reason to act now; if not, say nothing.
 - **Time skips.** Before narrating a skip, run `review`: its REFRESH section lists each active pressure, its next action and its trigger. Decide each in turn and leave evidence.
 - **Cast cards.** `{"op": "set", "kind": "npc", "id": "N1", "fields": {"name": "Mara", "want": "...", "fear": "...", "secret": "...", "voice": "...", "attitude": "..."}}`. One short phrase per field. A card is shown in `hot` only while the character is in `present`. Use attitude phrases ("wary, but wants help"), never numeric scores. Keep cards for recurring characters; leave walk-ons uncarded. An NPC's `secret` is their own; a truth the player must be able to discover belongs in a revelation (phase 4).
+
+## Revelations (phase 4): what they could discover
+
+A **revelation** is a hidden truth the player can find out, tracked apart from where or how they find it, so a surprising approach never hits a dead end. The truth itself is an ordinary canon fact with `"known": false`; the revelation holds the routes to it.
+
+```json
+{"op": "add", "kind": "fact", "id": "F9", "status": "established", "source": "story", "known": false,
+ "text": "The harbourmaster forged the ledger.", "tags": ["harbourmaster"]}
+{"op": "add", "kind": "revelation", "id": "V1", "fact": "F9", "importance": "required", "tags": ["harbourmaster"]}
+{"op": "route", "kind": "revelation", "id": "V1", "route": "a", "how": "Mara confesses if pressed"}
+{"op": "route", "kind": "revelation", "id": "V1", "route": "b", "how": "the back pages of the ledger", "where": "Harbour office"}
+{"op": "route", "kind": "revelation", "id": "V1", "route": "c", "how": "the clerk remembers the ink"}
+{"op": "clue", "kind": "revelation", "id": "V1", "route": "b", "reason": "the player read the back pages"}
+{"op": "reveal", "kind": "revelation", "id": "V1", "route": "b", "how": "the player put the pages beside the harbourmaster's own hand"}
+```
+
+- **Required vs optional.** `required` means the story cannot go on without the player learning it; give it three open routes of different kinds (a person, a place or object, a consequence of events). `optional` truths need no minimum.
+- **Routes are adaptable.** A route is a way the truth could surface, not a scripted scene. When the player does something unexpected, use the nearest route or add one (`route`), as long as it does not contradict established facts. If a route is lost (the informant dies, the place burns), `block` it with a reason and add another.
+- **Clues are partial.** `clue` marks a route as used and makes the revelation `partial`: the player has a piece, not the answer. Use it when a route yields something short of the truth.
+- **Reveal only on the page.** `reveal` flips the fact to known and needs a `how` that matches what the prose actually shows. Never reveal in a delta for a scene where the player did not learn it.
+- **If the truth changes** (twist, rewrite), `replace` the fact, then `update` the revelation's `fact` to the new hidden one, with a reason. A revelation pointing at an outdated fact is flagged.
+- **Retire.** `discard` a revelation, with a reason, when the story no longer needs it. The fact stays hidden.
+- **Hidden means hidden.** Everything under "WHAT THE PLAYER COULD DISCOVER" is writer-private. Never state it as narrator knowledge before it is revealed; characters may hint, lie, or be wrong.
 
 ## Self-checks the script cannot do
 

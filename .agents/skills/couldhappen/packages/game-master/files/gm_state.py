@@ -13,7 +13,7 @@ Usage (from the workspace root):  python tools/gm_state.py <command> [--root .]
 
 State is never edited directly. It is the replay of notes/gm/deltas.jsonl, an append-only log in
 which every delta cites the story or Director entry that justifies it. Stdlib only; no network.
-Kinds: contract, situation, fact (phase 1); thread (phase 2); pressure, npc (phase 3). Later phases add handlers in apply_op."""
+Kinds: contract, situation, fact (phase 1); thread (phase 2); pressure, npc (phase 3); revelation (phase 4). Later phases add handlers in apply_op."""
 import argparse
 import copy
 import hashlib
@@ -44,6 +44,9 @@ PRESSURE_MOVES = {'active': {'dormant', 'discarded'}, 'dormant': {'active', 'dis
 BASIS = ('time', 'event', 'action', 'offscreen')
 PRESSURE_OUTCOMES = ('achieved', 'thwarted', 'abandoned')
 NPC_STATUS = ('active', 'dormant')
+REV_LIVE = ('hidden', 'partial')
+IMPORTANCE = ('required', 'optional')
+GOOD_ROUTES = 3
 ID_RE = re.compile(r'^[A-Za-z][A-Za-z0-9_-]{0,31}$')
 UUID_RE = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
 ENTRY_START = re.compile(r'^<!-- couldhappen:entry (\{.*\}) -->$')
@@ -76,7 +79,7 @@ def typed(value, kind):
 
 def new_state():
     return {'contract': {}, 'situation': {}, 'max_day': 0, 'scene_count': 0, 'facts': {},
-            'threads': {}, 'pressures': {}, 'npcs': {}, 'seen': []}
+            'threads': {}, 'pressures': {}, 'npcs': {}, 'revelations': {}, 'seen': []}
 
 
 # ---- applying one delta -------------------------------------------------------------------
@@ -167,6 +170,8 @@ def apply_op(state, op, errs, warns, ctx):
         pressure_resolve(state, op, bad)
     elif kind == 'npc' and verb == 'set':
         npc_set(state, op, bad)
+    elif kind == 'revelation' and verb in REV_VERBS:
+        REV_VERBS[verb](state, op, bad, ctx)
     else:
         bad('unknown kind/op')
 
@@ -474,6 +479,162 @@ def npc_set(state, op, bad):
     npc.update(fields)
 
 
+def rev_get(state, op, bad):
+    rid = fact_id(op, 'id', bad)
+    rev = state['revelations'].get(rid) if rid else None
+    if not rev:
+        bad(f'{rid} does not exist')
+    elif rev['status'] not in REV_LIVE:
+        bad(f'{rid} is {rev["status"]} and cannot change')
+        return None
+    return rev
+
+
+def rev_route_of(rev, op, bad, statuses):
+    route = rev['routes'].get(op.get('route'))
+    if not route:
+        bad(f'{rev["id"]} has no route {op.get("route")}')
+    elif route['status'] not in statuses:
+        bad(f'route {route["id"]} is {route["status"]}')
+        return None
+    return route
+
+
+def rev_add(state, op, bad, ctx):
+    if not keys_ok(op, {'op', 'kind', 'id', 'fact', 'importance', 'tags'}, bad):
+        return
+    rid = fact_id(op, 'id', bad)
+    fields = {k: v for k, v in op.items() if k in ('fact', 'importance', 'tags')}
+    if not rid or not fields_ok(fields, {'fact': str, 'importance': str, 'tags': list}, bad):
+        return
+    if rid in state['revelations']:
+        return bad(f'{rid} already exists')
+    for name in ('fact', 'importance'):
+        if name not in fields:
+            return bad(f'{name} is required')
+    if fields['importance'] not in IMPORTANCE:
+        return bad('importance must be required or optional')
+    fact = state['facts'].get(fields['fact'])
+    if not fact or fact['status'] in TERMINAL_FACT:
+        return bad(f'fact {fields["fact"]} must exist and not be outdated or discarded')
+    if fact['known']:
+        return bad('the player already knows that fact; only a hidden truth (known: false) can be a revelation')
+    if any(r['fact'] == fields['fact'] and r['status'] in REV_LIVE for r in state['revelations'].values()):
+        return bad(f'{fields["fact"]} already has a live revelation')
+    state['revelations'][rid] = {'id': rid, 'tags': [], **fields, 'status': 'hidden', 'routes': {},
+                                 'origin': ctx['entry'], 'revealed_entry': None, 'reveal_how': None}
+
+
+def rev_route(state, op, bad, ctx):
+    if not keys_ok(op, {'op', 'kind', 'id', 'route', 'how', 'where'}, bad):
+        return
+    rev = rev_get(state, op, bad)
+    route = fact_id(op, 'route', bad)
+    if not rev or not route:
+        return
+    if route in rev['routes']:
+        return bad(f'route {route} already exists')
+    for name, kind in (('how', str), ('where', str)):
+        if name in op and not typed(op[name], kind):
+            return bad(f'{name} must be a short text')
+    if 'how' not in op:
+        return bad('how is required: the way the player could find this out')
+    rev['routes'][route] = {'id': route, 'how': op['how'], 'where': op.get('where', ''), 'status': 'open'}
+
+
+def rev_clue(state, op, bad, ctx):
+    if not keys_ok(op, {'op', 'kind', 'id', 'route', 'reason'}, bad):
+        return
+    rev = rev_get(state, op, bad)
+    route = rev and rev_route_of(rev, op, bad, ('open',))
+    if route and reason_ok(op, bad, f'marking route {route["id"]} used'):
+        route['status'] = 'used'
+        rev['status'] = 'partial'
+
+
+def rev_block(state, op, bad, ctx):
+    if not keys_ok(op, {'op', 'kind', 'id', 'route', 'reason'}, bad):
+        return
+    rev = rev_get(state, op, bad)
+    route = rev and rev_route_of(rev, op, bad, ('open',))
+    if route and reason_ok(op, bad, f'blocking route {route["id"]}'):
+        route['status'] = 'blocked'
+
+
+def rev_reveal(state, op, bad, ctx):
+    if not keys_ok(op, {'op', 'kind', 'id', 'how', 'route'}, bad):
+        return
+    rev = rev_get(state, op, bad)
+    if not rev:
+        return
+    if not (typed(op.get('how'), str) and len(op['how'].strip()) >= 5):
+        return bad('how must say how the protagonist learned it (at least 5 characters)')
+    fact = state['facts'].get(rev['fact'])
+    if not fact or fact['status'] in TERMINAL_FACT:
+        return bad(f'its fact {rev["fact"]} is outdated or discarded; relink the revelation first')
+    if 'route' in op:
+        route = rev_route_of(rev, op, bad, ('open', 'used'))
+        if not route:
+            return
+        route['status'] = 'used'
+    fact['known'] = True
+    rev.update(status='revealed', revealed_entry=ctx['entry'], reveal_how=op['how'])
+
+
+def rev_update(state, op, bad, ctx):
+    if not keys_ok(op, {'op', 'kind', 'id', 'fact', 'importance', 'tags', 'reason'}, bad):
+        return
+    rev = rev_get(state, op, bad)
+    fields = {k: v for k, v in op.items() if k in ('fact', 'importance', 'tags')}
+    if not rev:
+        return
+    if not fields:
+        return bad('give at least one of fact, importance, tags')
+    if not fields_ok(fields, {'fact': str, 'importance': str, 'tags': list}, bad):
+        return
+    if fields.get('importance', 'required') not in IMPORTANCE:
+        return bad('importance must be required or optional')
+    if 'fact' in fields:
+        fact = state['facts'].get(fields['fact'])
+        if not fact or fact['status'] in TERMINAL_FACT or fact['known']:
+            return bad('the new fact must exist, be live, and still be hidden from the player')
+        if not reason_ok(op, bad, f'relinking {rev["id"]}'):
+            return
+    rev.update(fields)
+
+
+def rev_discard(state, op, bad, ctx):
+    if not keys_ok(op, {'op', 'kind', 'id', 'reason'}, bad):
+        return
+    rev = rev_get(state, op, bad)
+    if rev and reason_ok(op, bad, f'discarding {rev["id"]}'):
+        rev['status'] = 'discarded'
+
+
+REV_VERBS = {'add': rev_add, 'route': rev_route, 'clue': rev_clue, 'block': rev_block,
+             'reveal': rev_reveal, 'update': rev_update, 'discard': rev_discard}
+
+
+def rev_warnings(state, only=None):
+    """Soft rules: a required mystery should stay discoverable."""
+    out = []
+    for r in state['revelations'].values():
+        if r['status'] not in REV_LIVE or (only is not None and r['id'] not in only):
+            continue
+        fact = state['facts'].get(r['fact'])
+        if not fact or fact['status'] in TERMINAL_FACT:
+            out.append(f'{r["id"]} points at {r["fact"]}, which is outdated or discarded: relink or discard it.')
+        elif fact['known']:
+            out.append(f'{r["id"]}: the player already knows {r["fact"]}; mark it revealed (reveal) or discard it.')
+        viable = sum(1 for x in r['routes'].values() if x['status'] == 'open')
+        if r['importance'] == 'required':
+            if viable == 0:
+                out.append(f'{r["id"]} is required and has NO open route: a dead end. Add a route or reveal it.')
+            elif viable < GOOD_ROUTES:
+                out.append(f'{r["id"]} is required with {viable} open route(s); aim for {GOOD_ROUTES}.')
+    return out
+
+
 def texts_of(delta):
     for op in delta.get('ops', []):
         if not isinstance(op, dict):
@@ -482,6 +643,8 @@ def texts_of(delta):
         yield op.get('resolution')
         yield op.get('due_condition')
         yield op.get('goal')
+        yield op.get('how')
+        yield op.get('where')
         yield op.get('next_action')
         yield op.get('consequence')
         fields = op.get('fields')
@@ -532,6 +695,9 @@ def validate_delta(state, delta, errs, warns, entries=None):
             continue
         apply_op(new, op, errs, warns, ctx)
     moves = sum(1 for op in ops if isinstance(op, dict) and op.get('kind') == 'pressure' and op.get('op') == 'advance')
+    touched = {op.get('id') for op in ops if isinstance(op, dict) and op.get('kind') == 'revelation'}
+    if touched:
+        warns.extend(rev_warnings(new, touched))
     if moves > 2:
         warns.append(f'{moves} pressures advance in one delta. Advance only what this turn justifies, not everything.')
     for text in texts_of(delta):
@@ -666,7 +832,8 @@ def hot(state, about, budget):
         used[0] += len(line) + 1
         return True
 
-    warnings = [w for w in thread_warnings(state) + pressure_warnings(state) if fit('WARN ' + w, 'threads')]
+    warnings = [w for w in thread_warnings(state) + pressure_warnings(state) + rev_warnings(state)
+                if fit('WARN ' + w, 'threads')]
     # threads: overdue first, then due soonest, promises and consequences, then tag-relevant
     day = state['situation'].get('day', state['max_day'])
     live_threads = [t for t in state['threads'].values() if t['status'] in THREAD_LIVE]
@@ -717,6 +884,21 @@ def hot(state, about, budget):
         line = 'also running: ' + '; '.join(running)
         if fit(line, 'threads'):
             pressure_lines.append(line)
+    rev_lines, other_revs = [], []
+    for r in state['revelations'].values():
+        if r['status'] not in REV_LIVE:
+            continue
+        open_routes = [x for x in r['routes'].values() if x['status'] == 'open']
+        if any(t.lower() in context for t in r['tags']) or (r['importance'] == 'required' and r['status'] == 'partial'):
+            routes = '; '.join(f'{x["id"]}) {x["how"]}' + (f' [at {x["where"]}]' if x['where'] else '')
+                               for x in open_routes) or 'NO OPEN ROUTE'
+            line = f'{r["id"]} [{r["importance"]}, {r["status"]}, truth {r["fact"]}] routes: {routes}'
+            if fit(line, 'threads'):
+                rev_lines.append(line)
+        else:
+            other_revs.append(r['id'])
+    if other_revs and fit('also hidden: ' + ', '.join(other_revs), 'threads'):
+        rev_lines.append('also hidden: ' + ', '.join(other_revs))
     live = [f for f in state['facts'].values() if f['status'] not in TERMINAL_FACT]
     shown = [f for f in live if f['pin'] or any(t.lower() in context for t in f['tags'])]
     # pinned first, then known before hidden, established before uncertain, newest first
@@ -742,6 +924,7 @@ def hot(state, about, budget):
     return '\n'.join(head + ['WARN ' + w for w in warnings] + (['THREADS'] + thread_lines if thread_lines else [])
                      + (['CAST HERE'] + npc_lines if npc_lines else [])
                      + (['PRESSURES (the world moves without the player)'] + pressure_lines if pressure_lines else [])
+                     + (['WHAT THE PLAYER COULD DISCOVER (hidden truths and their routes)'] + rev_lines if rev_lines else [])
                      + (['FACTS'] + lines if lines else []) + tail)
 
 
@@ -781,7 +964,7 @@ def review(state):
     out = ['# Review (private)', 'REVIEW what changed and what is still owed']
     threads = [t for t in state['threads'].values() if t['status'] in THREAD_LIVE]
     out += [f'  {t["id"]} [{t["type"]}, {t["status"]}] {t["text"]}' for t in threads] or ['  no live threads']
-    warns = thread_warnings(state) + pressure_warnings(state)
+    warns = thread_warnings(state) + pressure_warnings(state) + rev_warnings(state)
     out += ['  WARN ' + w for w in warns]
     out.append('RETIRE candidates (propose each as a delta with a reason; nothing here is automatic)')
     stale = [t for t in threads if t['status'] != 'dormant' and state['scene_count'] - t['touched'] >= STALE_SCENES]
@@ -792,6 +975,14 @@ def review(state):
             for f in state['facts'].values() if f['status'] == 'rumour']
     done = [t for t in state['threads'].values() if t['status'] == 'resolved']
     out.append(f'  {len(done)} resolved thread(s) are kept as summaries and left out of the hot context.')
+    out.append('DISCOVERY what the player has yet to learn (keep each required truth reachable by several routes)')
+    for r in state['revelations'].values():
+        if r['status'] in REV_LIVE:
+            counts = {s: sum(1 for x in r['routes'].values() if x['status'] == s) for s in ('open', 'used', 'blocked')}
+            out.append(f'  {r["id"]} [{r["importance"]}, {r["status"]}, truth {r["fact"]}] routes open {counts["open"]}, '
+                       f'used {counts["used"]}, blocked {counts["blocked"]}')
+    if not any(r['status'] in REV_LIVE for r in state['revelations'].values()):
+        out.append('  no hidden truths are being tracked')
     out.append('REFRESH what the world is doing (advance only what time, events or the player justify; '
                'after a time skip, decide each actor in turn and leave evidence the protagonist can find)')
     for p in state['pressures'].values():
@@ -916,6 +1107,7 @@ def main():
             state['facts'] = {k: v for k, v in state['facts'].items() if v['status'] not in TERMINAL_FACT}
             state['threads'] = {k: v for k, v in state['threads'].items() if v['status'] in THREAD_LIVE}
             state['pressures'] = {k: v for k, v in state['pressures'].items() if v['status'] in PRESSURE_LIVE}
+            state['revelations'] = {k: v for k, v in state['revelations'].items() if v['status'] in REV_LIVE}
         print(json.dumps(state, indent=2, ensure_ascii=False))
     elif args.cmd == 'review':
         print(review(load(args.root)))
