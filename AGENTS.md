@@ -27,7 +27,7 @@ Never `git push origin main`, never `git push --all` or `--mirror`, never force-
 - deletes a remote branch;
 - carries a commit whose author or committer email is not a `@users.noreply.github.com` address.
 
-It is active through `git config core.hooksPath scripts/git-hooks`. If `git config core.hooksPath` prints nothing, run that command before any push. If the hook refuses, stop and tell the user. Do not work around it.
+It is installed as `.git/hooks/pre-push`, outside the working tree, so it also runs while `publish` is checked out (that branch does not contain `scripts/`). Before any push, check that `.git/hooks/pre-push` exists and matches `scripts/git-hooks/pre-push`; if not, run `cp scripts/git-hooks/pre-push .git/hooks/pre-push` from `main`. Do not set `core.hooksPath`. If the hook refuses, stop and tell the user. Do not work around it.
 
 ## Commit identity
 

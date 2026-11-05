@@ -3,8 +3,9 @@
 #
 # This development repository keeps a private history (on `main`) next to the
 # public one-commit history (on `publish`, pushed to GitHub as `main`). See
-# docs/decisions/0004-publish-with-fresh-history.md. Activate once per clone:
-#     git config core.hooksPath scripts/git-hooks
+# docs/decisions/0004-publish-with-fresh-history.md. Install once per clone, into
+# .git/hooks so it also runs while `publish` (which lacks this file) is checked out:
+#     cp scripts/git-hooks/pre-push .git/hooks/pre-push
 
 PUBLIC_ROOT=535dbae5aa5a30cfd519e7da7f86079ac1644a6c
 ZERO=0000000000000000000000000000000000000000
