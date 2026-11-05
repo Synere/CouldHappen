@@ -20,7 +20,7 @@ This package gives the writer a compact, private memory and a short routine to u
 | 2 Memory | Open threads: promises, mysteries, consequences, relationships, callbacks, each with a lifecycle (open, active, dormant, resolved, discarded), optional due day, and soft warnings for overdue or forgotten ones. A `review` report for scene and chapter boundaries. | **Available** |
 | 3 Living world | Pressures: factions, antagonists and NPCs with a goal, a next action, a trigger and an optional clock, which move only when time, events or the player justify it (an off-screen move must leave evidence). Compact cast cards (want, fear, secret, voice, attitude) shown for whoever is in the scene. | **Available** |
 | 4 Discovery | Hidden truths kept apart from where they are found, each with several routes (aim for three for anything the story needs the player to learn). Routes can be used, blocked or added as the player surprises you, and a truth only becomes known when the story shows how. A required truth with no open route is flagged as a dead end. | **Available** |
-| 5 Narrative quality | Scene rhythm, callbacks, arc coherence, and soft warnings. | Planned |
+| 5 Narrative quality | A scene record (mode, agenda, tension, exit condition, what it serves), a scene-boundary checklist, and soft warnings about pacing: the same mode four times, a scene whose purpose is done, three scenes that serve nothing the protagonist wants. | **Available** |
 
 ## What a player gets
 

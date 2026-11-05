@@ -378,6 +378,78 @@ class GmStateTest(unittest.TestCase):
         self.assertFalse(self.state()['facts']['F9']['known'])
         self.commit(self.delta(self.add_entry('d'), [self.route('d', 'late idea')]), expect=1)
 
+    # ---- phase 5: scenes and pacing ----------------------------------------------------------
+
+    def open_scene(self, sid='s1', **extra):
+        return {'op': 'open', 'kind': 'scene', 'id': sid, 'mode': 'social', 'agenda': 'press Mara about the ledger',
+                'exit_condition': 'Mara talks or leaves', **extra}
+
+    def close_scene(self, sid='s1'):
+        return {'op': 'close', 'kind': 'scene', 'id': sid, 'outcome': 'Mara admitted the debt'}
+
+    def run_scenes(self, modes, serves=None):
+        for n, mode in enumerate(modes, 1):
+            ops = [self.open_scene(f's{n}', mode=mode, **({'serves': serves} if serves else {}))]
+            if n > 1:
+                ops.insert(0, self.close_scene(f's{n - 1}'))
+            self.commit(self.delta(self.add_entry(f'Scene {n}.'), ops, why=f'scene {n} begins'))
+
+    def test_scene_lifecycle_and_required_fields(self):
+        e = self.add_entry()
+        for bad in ({'mode': 'brawl'}, {'tension': 9}, {'serves': ['T404']}, {'agenda': ''}):
+            self.commit(self.delta(self.add_entry('x'), [self.open_scene(**bad)]), expect=1)
+        no_exit = self.open_scene()
+        del no_exit['exit_condition']
+        self.commit(self.delta(e, [no_exit]), expect=1)
+        self.commit(self.delta(e, [self.open_scene(tension=2, participants=['Mara'])]))
+        state = self.state()
+        self.assertEqual((state['open_scene'], state['situation']['scene'], state['scene_count']), ('s1', 's1', 1))
+        self.commit(self.delta(self.add_entry('a'), [self.open_scene('s2')]), expect=1)  # s1 still open
+        self.commit(self.delta(self.add_entry('b'), [self.close_scene('s2')]), expect=1)  # not the open one
+        self.commit(self.delta(self.add_entry('c'), [{**self.close_scene(), 'outcome': ''}]), expect=1)
+        self.commit(self.delta(self.add_entry('d'), [self.close_scene(), self.open_scene('s2')]))
+        self.assertEqual(self.state()['scenes']['s1']['status'], 'closed')
+        self.assertEqual(self.state()['scene_count'], 2)
+
+    def test_scene_serves_must_name_real_live_things(self):
+        self.commit(self.delta(self.add_entry(), [self.thread()]))
+        self.commit(self.delta(self.add_entry('a'), [self.open_scene(serves=['T1', 'want'])]))
+        self.assertIn('serves: T1, want', run(self.root, 'hot').stdout)
+
+    def test_same_mode_run_and_disconnected_run_are_flagged(self):
+        self.run_scenes(['social'] * 4)
+        out = run(self.root, 'hot').stdout
+        self.assertIn('4 scenes in a row are social', out)
+        self.assertIn('3 scenes in a row serve nothing', out)
+
+    def test_variety_and_connection_clear_the_warnings(self):
+        self.run_scenes(['social', 'action', 'social', 'discovery'], serves=['want'])
+        out = run(self.root, 'hot').stdout
+        self.assertNotIn('in a row', out)
+        self.assertIn('recent modes: social, action, social, discovery', out)
+
+    def test_resolved_purpose_is_advice_not_an_order(self):
+        self.commit(self.delta(self.add_entry(), [self.open_scene()]))
+        self.assertNotIn('served its purpose', run(self.root, 'hot').stdout)
+        self.commit(self.delta(self.add_entry('a'), [{'op': 'update', 'kind': 'scene', 'id': 's1', 'resolved': True}]))
+        self.assertIn('scene s1 has served its purpose', run(self.root, 'hot').stdout)
+        self.commit(self.delta(self.add_entry('b'), [self.fact()]))  # a warning never blocks later work
+
+    def test_boundary_report_reads_only_and_names_what_is_owed(self):
+        self.commit(self.delta(self.add_entry(), [self.thread(due_day=2), {k: v for k, v in self.pressure().items() if k != 'clock_max'}]))
+        self.run_scenes(['social', 'social'], serves=['T1'])
+        before = (self.root / 'notes/gm/deltas.jsonl').read_text(encoding='utf-8')
+        out = run(self.root, 'boundary').stdout
+        for expected in ('OPEN scene s2 [social]', 'PACING recent modes: social, social',
+                         'not used in the last three scenes: discovery, action', 'NEXT frame a situation'):
+            self.assertIn(expected, out)
+        self.assertEqual((self.root / 'notes/gm/deltas.jsonl').read_text(encoding='utf-8'), before)
+
+    def test_scene_count_is_not_double_counted_with_a_plain_situation_scene(self):
+        self.commit(self.delta(self.add_entry(), [{'op': 'set', 'kind': 'situation', 'fields': {'scene': 's1'}}]))
+        self.commit(self.delta(self.add_entry('a'), [self.open_scene()]))
+        self.assertEqual(self.state()['scene_count'], 1)
+
 
 if __name__ == '__main__':
     unittest.main()

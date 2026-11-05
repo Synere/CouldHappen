@@ -8,12 +8,13 @@ Usage (from the workspace root):  python tools/gm_state.py <command> [--root .]
   discard                    delete the pending delta
   state [--live]             print the current state as JSON (--live leaves out finished records)
   hot [--about X ...] [--budget N]   print the compact context to read each turn
-  review                     scene/chapter boundary report: stale threads, overdue promises, what to retire
+  boundary                   scene-boundary checklist: is the scene done, pacing, what is owed
+  review                     chapter/session report: stale threads, overdue promises, what to retire
   reconcile [--apply]        find deltas whose entry was withdrawn (Director Undo) and set them aside
 
 State is never edited directly. It is the replay of notes/gm/deltas.jsonl, an append-only log in
 which every delta cites the story or Director entry that justifies it. Stdlib only; no network.
-Kinds: contract, situation, fact (phase 1); thread (phase 2); pressure, npc (phase 3); revelation (phase 4). Later phases add handlers in apply_op."""
+Kinds: contract, situation, fact (phase 1); thread (phase 2); pressure, npc (phase 3); revelation (phase 4); scene (phase 5). Later phases add handlers in apply_op."""
 import argparse
 import copy
 import hashlib
@@ -47,6 +48,10 @@ NPC_STATUS = ('active', 'dormant')
 REV_LIVE = ('hidden', 'partial')
 IMPORTANCE = ('required', 'optional')
 GOOD_ROUTES = 3
+MODES = ('discovery', 'social', 'action', 'reflection', 'exploration', 'other')
+SAME_MODE_RUN, DISCONNECTED_RUN = 4, 3
+SCENE_FIELDS = {'mode': str, 'agenda': str, 'exit_condition': str, 'tension': int, 'participants': list,
+                'serves': list, 'resolved': bool}
 ID_RE = re.compile(r'^[A-Za-z][A-Za-z0-9_-]{0,31}$')
 UUID_RE = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
 ENTRY_START = re.compile(r'^<!-- couldhappen:entry (\{.*\}) -->$')
@@ -79,7 +84,8 @@ def typed(value, kind):
 
 def new_state():
     return {'contract': {}, 'situation': {}, 'max_day': 0, 'scene_count': 0, 'facts': {},
-            'threads': {}, 'pressures': {}, 'npcs': {}, 'revelations': {}, 'seen': []}
+            'threads': {}, 'pressures': {}, 'npcs': {}, 'revelations': {}, 'scenes': {},
+            'scene_order': [], 'open_scene': None, 'seen': []}
 
 
 # ---- applying one delta -------------------------------------------------------------------
@@ -172,6 +178,8 @@ def apply_op(state, op, errs, warns, ctx):
         npc_set(state, op, bad)
     elif kind == 'revelation' and verb in REV_VERBS:
         REV_VERBS[verb](state, op, bad, ctx)
+    elif kind == 'scene' and verb in SCENE_VERBS:
+        SCENE_VERBS[verb](state, op, bad, ctx)
     else:
         bad('unknown kind/op')
 
@@ -635,6 +643,121 @@ def rev_warnings(state, only=None):
     return out
 
 
+def serves_ok(state, serves, bad):
+    live = {**{k: v for k, v in state['threads'].items() if v['status'] in THREAD_LIVE},
+            **{k: v for k, v in state['pressures'].items() if v['status'] in PRESSURE_LIVE},
+            **{k: v for k, v in state['revelations'].items() if v['status'] in REV_LIVE}}
+    for item in serves:
+        if item != 'want' and item not in live:
+            bad(f'serves: "{item}" must be "want" or the id of a live thread, pressure or revelation')
+            return False
+    return True
+
+
+def scene_check_fields(state, fields, bad):
+    if not fields_ok(fields, SCENE_FIELDS, bad):
+        return False
+    if 'mode' in fields and fields['mode'] not in MODES:
+        bad('mode must be one of ' + ', '.join(MODES))
+        return False
+    if fields.get('tension', 0) > 5:
+        bad('tension is 0 to 5')
+        return False
+    return serves_ok(state, fields.get('serves', []), bad)
+
+
+def scene_open(state, op, bad, ctx):
+    if not keys_ok(op, {'op', 'kind', 'id'} | (set(SCENE_FIELDS) - {'resolved'}), bad):
+        return
+    sid = fact_id(op, 'id', bad)
+    fields = {k: v for k, v in op.items() if k in SCENE_FIELDS}
+    if not sid or not scene_check_fields(state, fields, bad):
+        return
+    if sid in state['scenes']:
+        return bad(f'{sid} already exists')
+    if state['open_scene']:
+        return bad(f'scene {state["open_scene"]} is still open; close it first (in the same delta is fine)')
+    for name in ('mode', 'agenda', 'exit_condition'):
+        if name not in fields:
+            return bad(f'{name} is required (what kind of scene, what it is for, what ends it)')
+    state['scenes'][sid] = {'id': sid, 'participants': [], 'serves': [], 'tension': None, **fields,
+                            'resolved': False, 'status': 'open', 'origin': ctx['entry'], 'outcome': None}
+    state['scene_order'].append(sid)
+    state['open_scene'] = sid
+    if state['situation'].get('scene') != sid:
+        state['scene_count'] += 1
+    state['situation']['scene'] = sid
+
+
+def scene_update(state, op, bad, ctx):
+    if not keys_ok(op, {'op', 'kind', 'id'} | set(SCENE_FIELDS), bad):
+        return
+    fields = {k: v for k, v in op.items() if k in SCENE_FIELDS}
+    if op.get('id') != state['open_scene']:
+        return bad(f'{op.get("id")} is not the open scene ({state["open_scene"] or "none open"})')
+    if not fields:
+        return bad('nothing to change')
+    if scene_check_fields(state, fields, bad):
+        state['scenes'][op['id']].update(fields)
+
+
+def scene_close(state, op, bad, ctx):
+    if not keys_ok(op, {'op', 'kind', 'id', 'outcome'}, bad):
+        return
+    if op.get('id') != state['open_scene']:
+        return bad(f'{op.get("id")} is not the open scene ({state["open_scene"] or "none open"})')
+    if not (typed(op.get('outcome'), str) and len(op['outcome'].strip()) >= 5):
+        return bad('outcome must say what changed (at least 5 characters)')
+    scene = state['scenes'][op['id']]
+    scene.update(status='closed', outcome=op['outcome'], closed_entry=ctx['entry'])
+    state['open_scene'] = None
+
+
+SCENE_VERBS = {'open': scene_open, 'update': scene_update, 'close': scene_close}
+
+
+def scene_warnings(state):
+    """Soft rules: pacing and purpose. They never force an event."""
+    out, order = [], [state['scenes'][s] for s in state['scene_order']]
+    now = state['scenes'].get(state['open_scene'])
+    if now and now['resolved']:
+        out.append(f'scene {now["id"]} has served its purpose: end it, or give it a new reason to continue '
+                   '(not while the player is happily engaged).')
+    recent = order[-SAME_MODE_RUN:]
+    if len(recent) == SAME_MODE_RUN and len({s['mode'] for s in recent}) == 1:
+        out.append(f'{SAME_MODE_RUN} scenes in a row are {recent[0]["mode"]}: vary the next unless the story needs it.')
+    recent = order[-DISCONNECTED_RUN:]
+    if len(recent) == DISCONNECTED_RUN and not any(s['serves'] for s in recent):
+        out.append(f'{DISCONNECTED_RUN} scenes in a row serve nothing the protagonist wants or any open thread, '
+                   'pressure or revelation: reconnect the next one.')
+    return out
+
+
+def boundary(state):
+    """Scene-boundary checklist. Reads only; changes nothing."""
+    out = ['# Scene boundary (private)']
+    now = state['scenes'].get(state['open_scene'])
+    if now:
+        out.append(f'OPEN scene {now["id"]} [{now["mode"]}] agenda: {now["agenda"]} | exit: {now["exit_condition"]}'
+                   + (' | PURPOSE RESOLVED' if now['resolved'] else ''))
+        out.append('  Is the exit condition met? If so, close it with an outcome. If the player is engaged, keep going.')
+    else:
+        out.append('no scene open: open the next one (agenda, exit condition, what it serves).')
+    modes = [state['scenes'][s]['mode'] for s in state['scene_order']][-6:]
+    out.append('PACING recent modes: ' + (', '.join(modes) or 'none') + '; tension: '
+               + (', '.join(str(state['scenes'][s]['tension']) for s in state['scene_order'][-6:]
+                            if state['scenes'][s]['tension'] is not None) or 'not set'))
+    unused = [m for m in MODES[:-1] if m not in modes[-3:]]
+    if modes:
+        out.append('  not used in the last three scenes: ' + ', '.join(unused))
+    owed = thread_warnings(state) + pressure_warnings(state) + rev_warnings(state) + scene_warnings(state)
+    out += ['WARN ' + w for w in owed]
+    out.append('CHECK threads you advanced (touch them); pressures whose trigger was met (advance with a basis); '
+               'relationships that changed (update the cast card).')
+    out.append('NEXT frame a situation already in motion that needs a decision. Do not decide the player\'s response.')
+    return '\n'.join(out)
+
+
 def texts_of(delta):
     for op in delta.get('ops', []):
         if not isinstance(op, dict):
@@ -643,6 +766,8 @@ def texts_of(delta):
         yield op.get('resolution')
         yield op.get('due_condition')
         yield op.get('goal')
+        yield op.get('agenda')
+        yield op.get('exit_condition')
         yield op.get('how')
         yield op.get('where')
         yield op.get('next_action')
@@ -698,6 +823,8 @@ def validate_delta(state, delta, errs, warns, entries=None):
     touched = {op.get('id') for op in ops if isinstance(op, dict) and op.get('kind') == 'revelation'}
     if touched:
         warns.extend(rev_warnings(new, touched))
+    if any(isinstance(op, dict) and op.get('kind') == 'scene' for op in ops):
+        warns.extend(scene_warnings(new))
     if moves > 2:
         warns.append(f'{moves} pressures advance in one delta. Advance only what this turn justifies, not everything.')
     for text in texts_of(delta):
@@ -833,7 +960,17 @@ def hot(state, about, budget):
         return True
 
     warnings = [w for w in thread_warnings(state) + pressure_warnings(state) + rev_warnings(state)
-                if fit('WARN ' + w, 'threads')]
+                + scene_warnings(state) if fit('WARN ' + w, 'threads')]
+    scene = state['scenes'].get(state['open_scene'])
+    if scene:
+        recent = ', '.join(state['scenes'][s]['mode'] for s in state['scene_order'][-4:])
+        line = (f'SCENE {scene["id"]} [{scene["mode"]}'
+                + (f', tension {scene["tension"]}' if scene['tension'] is not None else '')
+                + f'] agenda: {scene["agenda"]} | ends when: {scene["exit_condition"]}'
+                + (f' | serves: {", ".join(scene["serves"])}' if scene['serves'] else ' | serves: nothing yet')
+                + f' | recent modes: {recent}')
+        if fit(line, 'threads'):
+            head.append(line)
     # threads: overdue first, then due soonest, promises and consequences, then tag-relevant
     day = state['situation'].get('day', state['max_day'])
     live_threads = [t for t in state['threads'].values() if t['status'] in THREAD_LIVE]
@@ -1082,6 +1219,7 @@ def main():
     p = sub.add_parser('state')
     p.add_argument('--live', action='store_true')
     sub.add_parser('review')
+    sub.add_parser('boundary')
     p = sub.add_parser('hot')
     p.add_argument('--about', nargs='*', default=[])
     p.add_argument('--budget', type=int, default=1000)
@@ -1108,9 +1246,13 @@ def main():
             state['threads'] = {k: v for k, v in state['threads'].items() if v['status'] in THREAD_LIVE}
             state['pressures'] = {k: v for k, v in state['pressures'].items() if v['status'] in PRESSURE_LIVE}
             state['revelations'] = {k: v for k, v in state['revelations'].items() if v['status'] in REV_LIVE}
+            keep = set(state['scene_order'][-8:])
+            state['scenes'] = {k: v for k, v in state['scenes'].items() if k in keep}
         print(json.dumps(state, indent=2, ensure_ascii=False))
     elif args.cmd == 'review':
         print(review(load(args.root)))
+    elif args.cmd == 'boundary':
+        print(boundary(load(args.root)))
     elif args.cmd == 'hot':
         print(hot(load(args.root), args.about, args.budget))
     elif args.cmd == 'reconcile':

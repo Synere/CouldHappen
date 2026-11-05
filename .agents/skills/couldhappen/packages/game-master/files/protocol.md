@@ -4,7 +4,7 @@ Prepare situations, not scripted plots. Track causes and consequences, not trans
 
 Six questions to answer before you write: What must remain true? What matters to the protagonist? What is happening without them? What must not be forgotten? What could they discover? What makes this moment worth playing?
 
-Phase 1 covers the first (what must remain true) and the start of the second. Phase 2 covers the fourth (what must not be forgotten). Phase 3 covers the third (what is happening without them). Phase 4 covers the fifth (what they could discover). Later phases add the rest here.
+Phase 1 covers the first (what must remain true) and the start of the second. Phase 2 covers the fourth (what must not be forgotten). Phase 3 covers the third (what is happening without them). Phase 4 covers the fifth (what they could discover). Phase 5 covers the sixth (what makes the current moment worth playing). Later phases add the rest here.
 
 ## Each turn
 
@@ -102,6 +102,26 @@ A **revelation** is a hidden truth the player can find out, tracked apart from w
 - **Retire.** `discard` a revelation, with a reason, when the story no longer needs it. The fact stays hidden.
 - **Hidden means hidden.** Everything under "WHAT THE PLAYER COULD DISCOVER" is writer-private. Never state it as narrator knowledge before it is revealed; characters may hint, lie, or be wrong.
 
+## Scenes and pacing (phase 5): what makes this moment worth playing
+
+A **scene** is one situation with a purpose. Open each with what kind of scene it is, what it is for, and what ends it; close it when that happens.
+
+```json
+{"op": "open", "kind": "scene", "id": "s4", "mode": "social", "tension": 2,
+ "agenda": "press Mara about the ledger", "exit_condition": "Mara talks or walks out",
+ "participants": ["Mara"], "serves": ["T1", "V1"]}
+{"op": "update", "kind": "scene", "id": "s4", "tension": 4, "resolved": true}
+{"op": "close", "kind": "scene", "id": "s4", "outcome": "Mara admitted the debt and named the clerk"}
+```
+
+- **Modes:** `discovery`, `social`, `action`, `reflection`, `exploration`, `other`. Tension runs 0 to 5.
+- **`serves`** lists `want` (something in the contract's `wants`) and/or the ids of live threads, pressures or revelations the scene moves. A scene that serves nothing is allowed; a run of them is flagged.
+- **Opening a scene sets the situation's scene id** and counts it for the "scenes since" warnings. Close the old scene and open the new one in the same delta.
+- **Soft warnings (advice, never orders):** four scenes in a row of one mode; a scene marked `resolved` still open; three scenes in a row serving nothing. Vary and reconnect when the fiction allows, and ignore a warning when the story is better for it. If the player is happily engaged in a scene whose purpose is spent, keep playing. Do not force a transition.
+- **At each scene boundary run `boundary`.** It shows whether the exit condition is met, recent modes and tension, what is owed (overdue promises, full clocks, dead-end secrets) and a reminder to frame the next situation already in motion, without deciding the player's response.
+- **Callbacks and foreshadowing** are threads of type `callback`: plant one when you mention a detail worth echoing, `touch` it when it returns, and resolve it when it pays off. Foreshadowing is a hidden fact plus a revelation route that has not been used yet.
+- **Arc coherence is judgment.** The script cannot tell whether a story is going anywhere. At chapter boundaries run `review`, compare the live threads and pressures with the contract's promises, and ask whether the next stretch delivers what was promised.
+
 ## Self-checks the script cannot do
 
 Before you deliver, ask yourself:
@@ -111,6 +131,8 @@ Before you deliver, ask yourself:
 - Did I let a rumour or a character's belief read as narrator fact?
 - Does my delta describe what the final prose actually shows, no more and no less?
 - Does anything cross the contract's boundaries?
+- Did I dump exposition the player cannot act on, or let a scene run on after its purpose was spent?
+- Did an off-screen move, a clue or a reveal actually appear in the prose, in a form the protagonist could notice?
 
 ## After an Undo
 

@@ -2,7 +2,7 @@
 
 Follow this only after the Director has agreed (see "Director packages" in the skill). Read [PACKAGE.md](PACKAGE.md) first. Tell the Director in a sentence or two what you will add: a private state script, a short routine each turn, and a session-zero conversation. Say what it costs (a little extra work per turn, no money, no keys) and that it changes no public file, so no restart is needed.
 
-This package is built in phases. This file covers **Phase 1, Continuity** (sections 1 to 4), **Phase 2, Memory** (section 5) **Phase 3, Living world** (section 6) and **Phase 4, Discovery** (section 7); section 8 verifies whichever you applied. If later phases have been added to the package folder, apply them one at a time, each only after the previous one has been used in play, and each with the Director's go-ahead.
+This package is built in phases. This file covers **Phase 1, Continuity** (sections 1 to 4), **Phase 2, Memory** (section 5) **Phase 3, Living world** (section 6) **Phase 4, Discovery** (section 7) and **Phase 5, Narrative quality** (section 8); section 9 verifies whichever you applied. If later phases have been added to the package folder, apply them one at a time, each only after the previous one has been used in play, and each with the Director's go-ahead.
 
 Use the usual workspace rules: pause before appending to public logs, validate and release, record where a fresh session finds it from `START_HERE.md`, commit, and keep a standing wait running after every turn. Private notes under `notes/` need no pause. On Windows set `PYTHONIOENCODING=utf-8 PYTHONUTF8=1` when generating entries and avoid non-ASCII characters in heredocs.
 
@@ -75,7 +75,17 @@ Apply this after Phase 3 has been used in play and the Director agrees. No new f
 4. From now on: when the player surprises you, check the routes before improvising; when a route is lost, `block` it and add another; when the player learns something, `clue` or `reveal` in the same delta as the scene that shows it.
 5. Update the "Game master" section of `START_HERE.md` and `notes/packages.md` (phase 4 applied, date).
 
-## 8. Verify and report
+## 8. Phase 5: narrative quality (scenes and pacing)
+
+Apply this after Phase 4 has been used in play and the Director agrees. No new files: refresh `tools/gm_state.py` and `notes/gm/protocol.md` from `files/` if yours are older (the log format is unchanged).
+
+1. Read the "Scenes and pacing" section of the protocol.
+2. Open a scene for the current moment (mode, agenda, exit condition, `serves`). If the story is already underway, one `open` is enough; you do not need to backfill past scenes.
+3. From now on, close and open scenes as the story moves, and run `python tools/gm_state.py boundary` at each scene boundary. Treat its warnings as advice: vary the mode, reconnect to what the protagonist wants, but never force a change the player does not want.
+4. Run `review` at chapter and session boundaries and judge arc coherence against the contract's promises (the script cannot).
+5. Update the "Game master" section of `START_HERE.md` and `notes/packages.md` (phase 5 applied, date).
+
+## 9. Verify and report
 
 1. `python tools/gm_state.py hot` prints a compact context of roughly 1,000 tokens or less. If it is longer, you tagged or pinned too much; trim.
 2. Make a deliberately bad delta in a scratch file (for example, an established fact with its text edited) and confirm `check --file` rejects it. Delete the scratch file.
