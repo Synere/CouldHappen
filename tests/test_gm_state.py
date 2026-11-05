@@ -450,6 +450,44 @@ class GmStateTest(unittest.TestCase):
         self.commit(self.delta(self.add_entry('a'), [self.open_scene()]))
         self.assertEqual(self.state()['scene_count'], 1)
 
+    # ---- layers: switch any phase on or off at any time -------------------------------------
+
+    def test_layers_default_to_all_on_and_continuity_cannot_be_switched_off(self):
+        out = run(self.root, 'layers').stdout
+        self.assertEqual(out.count('ON'), 5)
+        self.assertNotEqual(run(self.root, 'layers', '--off', '1').returncode, 0)
+        self.assertNotEqual(run(self.root, 'layers', '--on', '9').returncode, 0)
+
+    def test_a_layer_that_is_off_rejects_its_records_and_hides_its_output(self):
+        run(self.root, 'layers', '--off', '2', '3', '4', '5')
+        out = run(self.root, 'layers').stdout
+        self.assertIn('1 continuity: ON', out)
+        self.assertIn('2 memory: off', out)
+        for ops in ([self.thread()], [self.pressure()], [self.secret(), self.rev()], [self.open_scene()]):
+            self.commit(self.delta(self.add_entry(), ops), expect=1)
+        result = run(self.root, 'check')
+        self.assertIn('which is off. Switch it on first', result.stdout)
+        self.commit(self.delta(self.add_entry('ok'), [self.fact()]))  # continuity still works
+        self.assertIn('layers on: 1 continuity', run(self.root, 'hot').stdout)
+
+    def test_switching_a_layer_on_again_restores_what_was_recorded_before(self):
+        self.commit(self.delta(self.add_entry(), [self.thread(), self.pressure()]))
+        run(self.root, 'layers', '--off', '2', '3')
+        hot = run(self.root, 'hot', '--about', 'Mara', 'guild').stdout
+        self.assertNotIn('THREADS', hot)
+        self.assertNotIn('PRESSURES', hot)
+        self.assertEqual(self.state()['threads'], {})
+        run(self.root, 'layers', '--on', '2')
+        back = run(self.root, 'hot', '--about', 'guild').stdout
+        self.assertIn('T1', back)  # layer 2 is on again, with the thread recorded earlier
+        self.assertNotIn('PRESSURES', back)  # layer 3 is still off
+
+    def test_a_bad_layers_file_is_reported_not_ignored(self):
+        (self.root / 'notes/gm/layers.json').write_text('{"active": [7]}', encoding='utf-8')
+        result = run(self.root, 'hot')
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('layers.json', result.stderr)
+
 
 if __name__ == '__main__':
     unittest.main()

@@ -12,9 +12,9 @@ cost: none. No network, no keys. A little extra work each turn (about 800 to 1,2
 
 Prepare situations, not scripted plots. Track causes and consequences, not transcripts. Let the player's choices decide the outcome.
 
-This package gives the writer a compact, private memory and a short routine to use it every turn. It is built in phases; each phase works on its own, and the Director can stop after any of them.
+This package gives the writer a compact, private memory and a short routine to use it every turn. It is five layers, each building on the one below. The Director chooses which are on, and can switch any of them on or off at any time (`python tools/gm_state.py layers`). Layer 1 is the foundation and is always on; layers 2 to 5 each need only layer 1. A layer that is off is invisible and the script refuses its records, so switching it back on restores exactly what was recorded. More layers means more bookkeeping each turn, so a light start is fine.
 
-| Phase | Adds | Status |
+| Layer | Adds | Status |
 | --- | --- | --- |
 | 1 Continuity | The contract (genre, tone, limits, what the player wants), canon facts with a status and a source, the current situation, and a validated, append-only record of every change. | **Available** |
 | 2 Memory | Open threads: promises, mysteries, consequences, relationships, callbacks, each with a lifecycle (open, active, dormant, resolved, discarded), optional due day, and soft warnings for overdue or forgotten ones. A `review` report for scene and chapter boundaries. | **Available** |

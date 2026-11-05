@@ -8,6 +8,7 @@ Usage (from the workspace root):  python tools/gm_state.py <command> [--root .]
   discard                    delete the pending delta
   state [--live]             print the current state as JSON (--live leaves out finished records)
   hot [--about X ...] [--budget N]   print the compact context to read each turn
+  layers [--on N ...] [--off N ...]   show or switch the five layers (1 continuity is always on)
   boundary                   scene-boundary checklist: is the scene done, pacing, what is owed
   review                     chapter/session report: stale threads, overdue promises, what to retire
   reconcile [--apply]        find deltas whose entry was withdrawn (Director Undo) and set them aside
@@ -913,10 +914,42 @@ def replay(deltas):
     return state, good, bad
 
 
+KIND_LAYER = {'contract': 1, 'situation': 1, 'fact': 1, 'thread': 2, 'pressure': 3, 'npc': 3,
+              'revelation': 4, 'scene': 5}
+LAYER_KEYS = {2: ['threads'], 3: ['pressures', 'npcs'], 4: ['revelations'], 5: ['scenes']}
+LAYER_NAMES = {1: 'continuity', 2: 'memory', 3: 'living world', 4: 'discovery', 5: 'pacing'}
+
+
+def layers_path(root):
+    return paths(root)[0] / 'layers.json'
+
+
+def read_layers(root):
+    """The layers that are switched on. With no layers.json, all five are (older installs)."""
+    path = layers_path(root)
+    if not path.exists():
+        return {1, 2, 3, 4, 5}
+    try:
+        active = set(json.loads(path.read_text(encoding='utf-8'))['active'])
+        if not active <= set(LAYER_NAMES):
+            raise ValueError
+    except (ValueError, KeyError, TypeError):
+        sys.exit(f'{path}: expected {{"active": [1, 2, ...]}} with numbers from 1 to 5.')
+    return active | {1}
+
+
 def load(root):
     _, deltas_path, _, _ = paths(root)
     deltas = read_lines(deltas_path)
     state, _, bad = replay(deltas)
+    active = read_layers(root)
+    state['layers'] = sorted(active)
+    for layer, keys in LAYER_KEYS.items():  # a layer that is off is invisible; its records stay in the log
+        if layer not in active:
+            for key in keys:
+                state[key] = {}
+            if layer == 5:
+                state['scene_order'], state['open_scene'] = [], None
     entries = read_entries(root)
     gone = [d for d in deltas if d.get('entry') not in entries]
     if gone:
@@ -933,7 +966,8 @@ def load(root):
 
 def hot(state, about, budget):
     c, s = state['contract'], state['situation']
-    head = ['# GM state (private; cite entry ids in deltas)']
+    head = ['# GM state (private; cite entry ids in deltas) | layers on: '
+            + ', '.join(f'{n} {LAYER_NAMES[n]}' for n in state.get('layers', sorted(LAYER_NAMES)))]
     if c:
         parts = [f'{k}: {v if isinstance(v, str) else "; ".join(v)}' for k, v in c.items()
                  if v and k != 'banned_terms']
@@ -1160,6 +1194,11 @@ def cmd_check(args, commit=False):
     state = load(args.root)
     delta = load_pending(args.root, getattr(args, 'file', None))
     errs, warns = [], []
+    for op in delta.get('ops', []) if isinstance(delta, dict) and isinstance(delta.get('ops'), list) else []:
+        layer = KIND_LAYER.get(op.get('kind')) if isinstance(op, dict) else None
+        if layer and layer not in state['layers']:
+            errs.append(f'{op["kind"]} belongs to layer {layer} ({LAYER_NAMES[layer]}), which is off. '
+                        f'Switch it on first: python tools/gm_state.py layers --on {layer}')
     entries = read_entries(args.root) if commit else None
     new = validate_delta(state, delta, errs, warns, entries)
     prose = getattr(args, 'prose', None)
@@ -1225,6 +1264,9 @@ def main():
     p.add_argument('--live', action='store_true')
     sub.add_parser('review')
     sub.add_parser('boundary')
+    p = sub.add_parser('layers')
+    p.add_argument('--on', nargs='*', type=int, default=[])
+    p.add_argument('--off', nargs='*', type=int, default=[])
     p = sub.add_parser('hot')
     p.add_argument('--about', nargs='*', default=[])
     p.add_argument('--budget', type=int, default=1000)
@@ -1258,6 +1300,16 @@ def main():
         print(review(load(args.root)))
     elif args.cmd == 'boundary':
         print(boundary(load(args.root)))
+    elif args.cmd == 'layers':
+        active = read_layers(args.root)
+        bad_numbers = [n for n in args.on + args.off if n not in LAYER_NAMES]
+        if bad_numbers or 1 in args.off:
+            sys.exit('Layers are numbered 1 to 5, and layer 1 (continuity) is the foundation and stays on.')
+        if args.on or args.off:
+            active = (active | set(args.on)) - set(args.off)
+            write_text(layers_path(args.root), json.dumps({'active': sorted(active)}) + '\n')
+        for n, name in LAYER_NAMES.items():
+            print(f'{n} {name}: {"ON" if n in active else "off"}')
     elif args.cmd == 'hot':
         print(hot(load(args.root), args.about, args.budget))
     elif args.cmd == 'reconcile':

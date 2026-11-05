@@ -1,27 +1,36 @@
 # Applying game-master
 
-Follow this only after the Director has agreed (see "Director packages" in the skill). Read [PACKAGE.md](PACKAGE.md) first. Tell the Director in a sentence or two what you will add: a private state script, a short routine each turn, and a session-zero conversation. Say what it costs (a little extra work per turn, no money, no keys) and that it changes no public file, so no restart is needed.
+Follow this only after the Director has agreed (see "Director packages" in the skill). Read [PACKAGE.md](PACKAGE.md) first.
 
-This package is built in phases. This file covers **Phase 1, Continuity** (sections 1 to 4), **Phase 2, Memory** (section 5) **Phase 3, Living world** (section 6) **Phase 4, Discovery** (section 7) and **Phase 5, Narrative quality** (section 8); section 9 verifies whichever you applied. If later phases have been added to the package folder, apply them one at a time, each only after the previous one has been used in play, and each with the Director's go-ahead.
+## 0. What to tell the Director
 
-Use the usual workspace rules: pause before appending to public logs, validate and release, record where a fresh session finds it from `START_HERE.md`, commit, and keep a standing wait running after every turn. Private notes under `notes/` need no pause. On Windows set `PYTHONIOENCODING=utf-8 PYTHONUTF8=1` when generating entries and avoid non-ASCII characters in heredocs.
+When the Director asks for the package, say plainly, in a few sentences and before you change anything:
 
-## 1. Install
+- It is five **layers**, each building on the one below and each switchable on or off **at any time**: 1 continuity (what is true), 2 memory (promises and open questions), 3 living world (factions that act on their own, cast cards), 4 discovery (hidden truths with several ways to find them), 5 pacing (scene rhythm and quality warnings).
+- Layer 1 is the foundation. Switching on any layer also switches on layer 1.
+- More layers means more bookkeeping each turn. A light start is fine: say what you would pick for this story and why (for example 1 and 2 for a slow character piece, 1 to 4 for a mystery), and let them decide. "All of them" is a valid answer.
+- Cost: no money, no keys, a little extra work per turn. It changes no public file, so no restart is needed.
+
+Then ask which layers they want on. Do not install anything until they answer. If they say "you decide", propose a set and wait for a yes.
+
+Throughout, use the usual workspace rules: pause before appending to public logs, validate and release, record where a fresh session finds it from `START_HERE.md`, commit, and keep a standing wait running after every turn. Private notes under `notes/` need no pause. On Windows set `PYTHONIOENCODING=utf-8 PYTHONUTF8=1` when generating entries and avoid non-ASCII characters in heredocs.
+
+## 1. Install (once)
 
 1. Copy [files/gm_state.py](files/gm_state.py) to `tools/gm_state.py` (create `tools/` if needed).
-2. Run `python tools/gm_state.py init`. It creates `notes/gm/deltas.jsonl` and `notes/gm/withdrawn.jsonl`.
-3. Copy [files/protocol.md](files/protocol.md) to `notes/gm/protocol.md`. Read it in full; you will follow it every turn.
+2. Run `python tools/gm_state.py init`, then set the layers the Director chose: `python tools/gm_state.py layers --on 2 3` (and `--off` for any you do not want; with no `layers.json` all five are on, so always set it). `python tools/gm_state.py layers` shows the state.
+3. Copy [files/protocol.md](files/protocol.md) to `notes/gm/protocol.md`. Read the opening, "Each turn", and the sections for the layers that are on. Follow only those; a layer that is off is not yours to maintain, and the script refuses its records.
 
-## 2. Session zero (with the Director)
+## 2. Layer 1, continuity: session zero (always)
 
-Ask in Director, briefly and in plain language. Offer your own suggestions drawn from the story so far so the Director can just say yes. Do not turn it into a questionnaire; two or three questions at a time is plenty.
+Ask in Director, briefly and in plain language. Offer your own suggestions drawn from the story so far so the Director can just say yes. Two or three questions at a time is plenty.
 
 - **Genre and tone.** What kind of story is this, and how should it feel (grim, wry, tender, tense)?
 - **Boundaries.** Anything to avoid, soften, or only hint at? Any literal words or topics that must never appear (these become `banned_terms`)?
 - **Promises.** What does the story promise to deliver (mystery solved, slow-burn romance, earned victories, real danger)?
 - **What the player wants.** The protagonist's goals, loyalties, flaws, or hooks you should keep feeding back to them (`wants`).
 
-Do not guess boundaries. If the story already has a clear voice and the Director says "you decide," propose a contract and ask them to confirm it.
+Do not guess boundaries. If the story already has a clear voice and the Director says "you decide," propose a contract and ask them to confirm it. Mark the entry `addressed` and wait; the contract is written when they answer, so this spans at least two turns.
 
 Then write the contract as the first delta, citing the Director entry in which they answered:
 
@@ -33,63 +42,34 @@ Then write the contract as the first delta, citing the Director entry in which t
 
 Write it to `notes/gm/pending.json`, then `check` and `commit`. Revisit the contract only when the Director's preferences change.
 
-## 3. Seed the state if the story is already underway
+If the story is already underway, seed the state: the current situation and at most about twenty facts that would hurt if contradicted, citing the entry where each became true (a writer entry for events, a Director entry for what they told you). Mark `established` only what the fiction has actually shown; mark what characters merely say or believe `rumour` and your own unshown ideas `provisional`. Tag every fact with the names and places it concerns. Set `known` to false for anything the protagonist has not learned. Do it in two or three deltas, not one.
 
-Read the story and your notes. Add only what the next scenes need: the current situation, and at most about twenty facts that would hurt if contradicted. Cite the entry where each became true (a writer entry for events, a Director entry for what they told you). Mark `established` only what the fiction has actually shown. Mark what characters merely say or believe `rumour`, and your own unshown ideas `provisional`. Tag every fact with the names and places it concerns. Do the seed in two or three deltas, not one.
+## 3. Switching on a further layer
 
-Set `known` to false for anything the protagonist has not learned. That is what keeps a secret out of the player's view later.
+Do this whenever the Director asks, at any point in the story, or when you have proposed it and they said yes. Run `python tools/gm_state.py layers --on N`, refresh `tools/gm_state.py` and `notes/gm/protocol.md` from `files/` if your copies are older (the log format never changes), read that layer's section of the protocol, then do its setup:
 
-## 4. Wire it into play
+- **Layer 2, memory.** Open threads for the promises, mysteries and consequences the story has already taken on (at most about ten; the ones that would hurt if forgotten). Cite the entry where each began; give promises with a clear deadline a `due_day`. From then on `touch` threads that advance and run `review` at chapter or session boundaries.
+- **Layer 3, living world.** Design the opposition with the story's tone in mind: two to four pressures (goal, next action, trigger, and where a deadline helps a clock and consequence), preferring one that already threatens something the player cares about. Add cast cards for the three to six recurring characters, one short phrase per field; leave a field out until the fiction supplies it. At every scene boundary ask "who wants something and is not getting it?", and run `review` before narrating a time skip.
+- **Layer 4, discovery.** List the truths the player must learn. Add each as a hidden fact (`known: false`) and a `required` revelation with three routes of different kinds. Add optional truths only if they are worth the bookkeeping. When the player surprises you, check the routes first; when one is lost, `block` it and add another.
+- **Layer 5, pacing.** Open a scene for the current moment (mode, agenda, exit condition, `serves`); you do not need to backfill past scenes. From then on close and open scenes as the story moves and run `boundary` at each boundary. Treat its warnings as advice, never as orders.
 
-1. Add a short "Game master" section to `START_HERE.md`: what the package is, that every turn follows `notes/gm/protocol.md`, the commands (`hot`, `check`, `commit`, `reconcile`), and that Phase 1 does not enforce meaning-level checks.
-2. Record the package in `notes/packages.md` (name, version, date, phase applied, what you chose not to do).
-3. From now on follow the protocol each turn. After a Director Undo, run `reconcile`, then `reconcile --apply`, as part of the "Reconcile" step of the Undo procedure (`references/recovery.md`), before the next turn. Note that in `notes/packages.md` so a fresh session does it too.
+Say in one line what you switched on and what you will now do differently.
 
-## 5. Phase 2: memory (threads)
+## 4. Switching a layer off
 
-Apply this once Phase 1 has been in use and the Director agrees. It needs no new files: the script you installed already includes threads and `review`. If you installed an older copy of `tools/gm_state.py`, replace it with [files/gm_state.py](files/gm_state.py) (the log format is unchanged, so existing state keeps replaying) and refresh `notes/gm/protocol.md` from [files/protocol.md](files/protocol.md).
+Run `python tools/gm_state.py layers --off N` when the Director asks, or when you judge a layer is costing more than it gives (and tell them). The layer's records stay in the log but disappear from `hot`, warnings and `state`, and the script refuses new ones; switching it on again restores them exactly. You stop maintaining that layer. Layer 1 cannot be switched off.
 
-1. Read the "Threads" section of the protocol.
-2. Backfill: open threads for the promises, mysteries and consequences the story has already taken on (at most about ten; the ones that would hurt if forgotten). Cite the entry where each began. Give promises with a clear deadline a `due_day`.
-3. From now on, at each scene boundary, `touch` the threads that advanced, and at each chapter or session boundary run `review` and retire what has run its course.
-4. Update the "Game master" section of `START_HERE.md` and the entry in `notes/packages.md` (phase 2 applied, date).
-5. Verify: `python tools/gm_state.py hot` shows the threads under the contract and situation; `review` runs.
+## 5. Record it
 
-## 6. Phase 3: living world (pressures and cast)
+1. Add or update a short "Game master" section in `START_HERE.md`: what the package is, which layers are on (`python tools/gm_state.py layers`), that every turn follows `notes/gm/protocol.md`, the commands (`hot`, `check`, `commit`, `boundary`, `review`, `reconcile`, `layers`), and that meaning-level checks are yours.
+2. Record the package in `notes/packages.md` (name, version, date, layers on, changes to the layer set with dates). A fresh session reads this before proposing anything.
+3. After a Director Undo, run `reconcile`, then `reconcile --apply`, as part of the "Reconcile" step of the Undo procedure (`references/recovery.md`), before the next turn. Note that in `notes/packages.md` so a fresh session does it too.
 
-Apply this after Phase 2 has been used in play and the Director agrees. Again no new files: replace `tools/gm_state.py` and `notes/gm/protocol.md` with the current copies from `files/` if yours are older (the log format is unchanged).
+## 6. Verify and report
 
-1. Read the "Pressures and cast" section of the protocol.
-2. Design the opposition with the Director's tone in mind. Add two to four pressures: the actors who want something the protagonist touches. For each give a goal, a next action, a trigger, and (where a deadline helps) a clock and a consequence. Prefer one pressure that already threatens something the player cares about (see the contract's `wants`) over several distant ones.
-3. Add cast cards for the three to six recurring characters, one short phrase per field. Do not invent secrets just to fill the field; leave it out until the fiction supplies one.
-4. Add the rule to your routine: at every scene boundary, ask "who wants something and is not getting it?" and advance a pressure only with a basis and a reason. Run `review` before narrating a time skip.
-5. Update the "Game master" section of `START_HERE.md` and `notes/packages.md` (phase 3 applied, date).
-
-## 7. Phase 4: discovery (revelations)
-
-Apply this after Phase 3 has been used in play and the Director agrees. No new files: refresh `tools/gm_state.py` and `notes/gm/protocol.md` from `files/` if yours are older (the log format is unchanged).
-
-1. Read the "Revelations" section of the protocol.
-2. List the truths the story needs the player to learn (a culprit, a location, a motive). Add each as a hidden fact (`known: false`) and a `required` revelation with three routes of different kinds. Add optional truths only if they are worth the bookkeeping.
-3. Do not invent routes that depend on events you have not yet decided; a route can be as small as a phrase.
-4. From now on: when the player surprises you, check the routes before improvising; when a route is lost, `block` it and add another; when the player learns something, `clue` or `reveal` in the same delta as the scene that shows it.
-5. Update the "Game master" section of `START_HERE.md` and `notes/packages.md` (phase 4 applied, date).
-
-## 8. Phase 5: narrative quality (scenes and pacing)
-
-Apply this after Phase 4 has been used in play and the Director agrees. No new files: refresh `tools/gm_state.py` and `notes/gm/protocol.md` from `files/` if yours are older (the log format is unchanged).
-
-1. Read the "Scenes and pacing" section of the protocol.
-2. Open a scene for the current moment (mode, agenda, exit condition, `serves`). If the story is already underway, one `open` is enough; you do not need to backfill past scenes.
-3. From now on, close and open scenes as the story moves, and run `python tools/gm_state.py boundary` at each scene boundary. Treat its warnings as advice: vary the mode, reconnect to what the protagonist wants, but never force a change the player does not want.
-4. Run `review` at chapter and session boundaries and judge arc coherence against the contract's promises (the script cannot).
-5. Update the "Game master" section of `START_HERE.md` and `notes/packages.md` (phase 5 applied, date).
-
-## 9. Verify and report
-
-1. `python tools/gm_state.py hot` prints a compact context of roughly 1,000 tokens or less. If it is longer, you tagged or pinned too much; trim.
+1. `python tools/gm_state.py hot` prints a compact context of roughly 1,000 tokens or less, and its first line lists the layers on. If it is longer, you tagged or pinned too much; trim.
 2. Make a deliberately bad delta in a scratch file (for example, an established fact with its text edited) and confirm `check --file` rejects it. Delete the scratch file.
 3. Run `python -m unittest discover -s tests -p "test_*.py"`.
 4. Commit the notes and tool. Start a fresh standing wait.
 
-Report briefly to the Director what now works, which rules the script enforces (structure, status changes, reasons, time order, banned terms, cited entry exists), and which it cannot (contradiction of canon, unauthorised protagonist decisions, prose matching state). Those stay with you as self-checks.
+Report briefly to the Director what now works, which rules the script enforces (structure, status changes, reasons, time order, banned terms, cited entry exists, and for the layers on their own rules), and which it cannot (contradiction of canon, unauthorised protagonist decisions, prose matching state, whether a clue or off-screen move actually reached the page). Those stay with you as self-checks.

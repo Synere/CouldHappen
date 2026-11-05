@@ -4,7 +4,7 @@ Prepare situations, not scripted plots. Track causes and consequences, not trans
 
 Six questions to answer before you write: What must remain true? What matters to the protagonist? What is happening without them? What must not be forgotten? What could they discover? What makes this moment worth playing?
 
-Phase 1 covers the first (what must remain true) and the start of the second. Phase 2 covers the fourth (what must not be forgotten). Phase 3 covers the third (what is happening without them). Phase 4 covers the fifth (what they could discover). Phase 5 covers the sixth (what makes the current moment worth playing). Later phases add the rest here.
+Five layers, each switchable on or off at any time (`python tools/gm_state.py layers`); follow only the ones that are on. Layer 1 (continuity) covers the first question and the start of the second. Layer 2 covers the fourth (what must not be forgotten), layer 3 the third (what is happening without them), layer 4 the fifth (what they could discover), layer 5 the sixth (what makes the current moment worth playing).
 
 ## Each turn
 
@@ -38,7 +38,7 @@ Fact status: `established` (true in the fiction), `rumour` (said or believed, no
 
 Changing an established fact is a story event: use `replace` with a reason (it records the old one as outdated). Promoting a rumour needs a reason. Time may not move backwards unless the scene is a flashback (`"flashback": true`).
 
-## Threads (phase 2): what must not be forgotten
+## Layer 2, threads: what must not be forgotten
 
 A thread is an obligation the story has taken on. Types: `promise` (someone said they would), `mystery` (a question the player wants answered), `consequence` (something the player did that the world will answer), `relationship` (a bond that is changing), `callback` (a detail worth echoing later). Open one only when it will change what you write; skip incidental detail.
 
@@ -56,7 +56,7 @@ A thread is an obligation the story has taken on. Types: `promise` (someone said
 - **Retire on purpose.** At a scene or chapter boundary run `python tools/gm_state.py review` (Review, Retire, Refresh, Reopen). Park, resolve or discard what has run its course, and discard provisional facts you never used (`"status": "discarded"`, with a reason).
 - **Consequences first.** Promises and consequences stay in the hot context even when their tags do not match the scene, because those are the ones a good game master never lets slip.
 
-## Pressures and cast (phase 3): what is happening without the player
+## Layer 3, pressures and cast: what is happening without the player
 
 A **pressure** is someone who wants something and will act whether or not the player is watching: a faction, an antagonist, a rival, a frightened witness. Give each a `goal`, a `next_action`, a `trigger` (what makes them move) and, if it helps, a `clock_max` (2 to 12 steps toward `consequence`, what happens if nobody stops them).
 
@@ -77,9 +77,9 @@ A **pressure** is someone who wants something and will act whether or not the pl
 - **Lifecycle.** `active` ↔ `dormant` (with a reason), then `resolved` (outcome `achieved`, `thwarted` or `abandoned`) or `discarded`. Dormant pressures cannot advance until woken.
 - **A waiting world is a warning, not an order.** If no pressure has moved for five scenes, `hot` says so. Ask whether any actor has a reason to act now; if not, say nothing.
 - **Time skips.** Before narrating a skip, run `review`: its REFRESH section lists each active pressure, its next action and its trigger. Decide each in turn and leave evidence.
-- **Cast cards.** `{"op": "set", "kind": "npc", "id": "N1", "fields": {"name": "Mara", "want": "...", "fear": "...", "secret": "...", "voice": "...", "attitude": "..."}}`. One short phrase per field. A card is shown in `hot` only while the character is in `present`. Use attitude phrases ("wary, but wants help"), never numeric scores. Keep cards for recurring characters; leave walk-ons uncarded. An NPC's `secret` is their own; a truth the player must be able to discover belongs in a revelation (phase 4).
+- **Cast cards.** `{"op": "set", "kind": "npc", "id": "N1", "fields": {"name": "Mara", "want": "...", "fear": "...", "secret": "...", "voice": "...", "attitude": "..."}}`. One short phrase per field. A card is shown in `hot` only while the character is in `present`. Use attitude phrases ("wary, but wants help"), never numeric scores. Keep cards for recurring characters; leave walk-ons uncarded. An NPC's `secret` is their own; a truth the player must be able to discover belongs in a revelation (layer 4).
 
-## Revelations (phase 4): what they could discover
+## Layer 4, revelations: what they could discover
 
 A **revelation** is a hidden truth the player can find out, tracked apart from where or how they find it, so a surprising approach never hits a dead end. The truth itself is an ordinary canon fact with `"known": false`; the revelation holds the routes to it.
 
@@ -102,7 +102,7 @@ A **revelation** is a hidden truth the player can find out, tracked apart from w
 - **Retire.** `discard` a revelation, with a reason, when the story no longer needs it. The fact stays hidden.
 - **Hidden means hidden.** Everything under "WHAT THE PLAYER COULD DISCOVER" is writer-private. Never state it as narrator knowledge before it is revealed; characters may hint, lie, or be wrong.
 
-## Scenes and pacing (phase 5): what makes this moment worth playing
+## Layer 5, scenes and pacing: what makes this moment worth playing
 
 A **scene** is one situation with a purpose. Open each with what kind of scene it is, what it is for, and what ends it; close it when that happens.
 
