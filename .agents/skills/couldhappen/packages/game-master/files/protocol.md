@@ -11,7 +11,7 @@ Phase 1 covers the first (what must remain true) and the start of the second. Ph
 Run these around the usual exchange in `references/writing.md` (pause, write, validate, release). Do not skip a step because the turn is short.
 
 1. **Interpret.** What is the player attempting? Never invent a consequential choice for the protagonist (who they trust, what they promise, what they give up). Offer, ask, or let the world press.
-2. **Read.** `python tools/gm_state.py hot` (add `--about <names>` for people or places that are not in the scene). Read the contract, the situation and the relevant facts. Trust the output; do not reread whole logs.
+2. **Read.** `python tools/gm_state.py hot` (add `--about <names>` for people or places that are not in the scene). Read the contract, the situation and the relevant facts. Trust the output; do not reread whole logs, and do not read `state` whole in play (it grows by roughly 1 KB a turn; `state --live` still carries everything unfinished). Use `hot --about` for what you need.
 3. **Choose the world's response.** One of: reveal, react, offer, complicate, warn, resolve, transition. A good response gives the player something to act on.
 4. **Draft the prose.** Respect established facts. Treat rumours and provisional facts as what characters believe, never as narrator truth.
 5. **Propose the delta.** Generate the writer entry first (`entry --role writer --body-file ...` prints its id) so you can cite it. Write `notes/gm/pending.json` for only what became true this turn: new facts, a replaced fact, a changed situation. Skip the delta on a turn where nothing durable changed.

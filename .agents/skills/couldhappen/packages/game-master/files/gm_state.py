@@ -949,7 +949,7 @@ def hot(state, about, budget):
             head.append('PROBLEM ' + s['problem'])
     context = ' '.join([s.get('location', ''), s.get('problem', ''), s.get('scene', ''),
                         ' '.join(s.get('present', [])), *about]).lower()
-    used = [sum(len(h) + 1 for h in head)]
+    used = [sum(len(h) + 1 for h in head) + 320]  # reserve room for section headers and the footer
     omitted = {'threads': 0, 'facts': 0}
 
     def fit(line, group):
@@ -1068,7 +1068,7 @@ def hot(state, about, budget):
 def thread_warnings(state):
     """Soft rules only: they inform your judgment and never force an event."""
     day = state['situation'].get('day', state['max_day'])
-    out = []
+    out, stale = [], []
     for t in state['threads'].values():
         if t['status'] not in THREAD_LIVE:
             continue
@@ -1077,8 +1077,13 @@ def thread_warnings(state):
                        'fulfil, break, release or explain it.')
         quiet = state['scene_count'] - t['touched']
         if t['status'] != 'dormant' and quiet >= STALE_SCENES:
-            out.append(f'{t["id"]} ({t["type"]}) untouched for {quiet} scenes: advance it, make it dormant, '
-                       'or resolve it.')
+            stale.append((t, quiet))
+    if len(stale) > 2:  # a pile of identical warnings costs context and gets ignored
+        out.append(f'{len(stale)} threads untouched for {STALE_SCENES}+ scenes ({", ".join(t["id"] for t, _ in stale)}): '
+                   'advance, park or resolve them (run review).')
+    else:
+        out += [f'{t["id"]} ({t["type"]}) untouched for {q} scenes: advance it, make it dormant, or resolve it.'
+                for t, q in stale]
     return out
 
 
