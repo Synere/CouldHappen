@@ -23,6 +23,13 @@ Do not run a durable story in this repository. Test from a workspace unpacked fr
 3. **Fresh-context continuation.** After reentry from files alone, continue the fiction through browser input and compare it against the maintained records.
 4. **Drift report.** Run `egm-drift-report` over the [design](designs/couldhappen.md), [distribution design](designs/distribution-and-workspaces.md), and [public contract](public-contract.md) before a wider release.
 5. **Publish.** Follow the checklist in [ADR 0004](decisions/0004-publish-with-fresh-history.md): drift report, tree audit, 0.1.7, fresh history.
+6. **Writing-style package (idea, not started).** A general `writing-style` director package that steers the writer's prose, like SillyTavern presets but without per-prompt injection. Design sketch:
+   - A distilled active guide (about 500 tokens: voice, POV and tense, rhythm, banned phrases, two or three voice anchors) in `notes/style/guide.md`, linked from `START_HERE.md`.
+   - A per-turn step to re-read it before each writer entry, plus a rule to re-read the full guide when unsure the style still holds (context swamped, fresh session, after compaction).
+   - A `tools/style_check.py` lint run on the entry body file before append: banned phrases, repeated openers, long paragraphs, POV or tense slips. It cannot judge taste, and the package says so.
+   - No bundled style. If the player asks to use a SillyTavern-style preset, the writer imports it as data: keep only enabled prose-style blocks, drop samplers, prefill, jailbreaks, depth settings and regex scripts, turn macros into plain wording, show the Director what was kept and dropped, and write the guide only after they confirm. Optional preset modules become switchable style modules, like the `game-master` layers.
+   - Content boundaries from the `game-master` contract win over the style guide in a conflict.
+   - Open: the cap on guide size, and whether it shares the per-turn routine with `game-master`.
 
 ## Open gaps
 
