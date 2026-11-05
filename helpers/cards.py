@@ -106,6 +106,50 @@ def extract_png(data):
     return card, fmt, warnings
 
 
+TEXT_FIELDS = ('description', 'personality', 'scenario', 'system_prompt', 'post_history_instructions',
+               'first_mes', 'mes_example', 'creator_notes')
+
+
+def _text(value):
+    return value if isinstance(value, str) else json.dumps(value, ensure_ascii=False, indent=1)
+
+
+def readable(card):
+    """A lossless plain-text reading copy of a card (every field, every lorebook entry, verbatim).
+
+    It adds no interpretation and prescribes nothing; it only spares the writer from reading
+    hundreds of kilobytes of escaped JSON. card.json remains the source of truth.
+    """
+    data = card.get('data') if card.get('spec') in ('chara_card_v2', 'chara_card_v3') else card
+    used = set(TEXT_FIELDS) | {'name', 'alternate_greetings', 'character_book'}
+    out = [f"# {data['name']}\n"]
+    for key in TEXT_FIELDS:
+        if data.get(key):
+            out.append(f'## {key}\n\n{_text(data[key])}\n')
+    prompt = (data.get('extensions') or {}).get('depth_prompt') or {}
+    if prompt.get('prompt'):
+        out.append(f"## depth_prompt (role {prompt.get('role')}, depth {prompt.get('depth')})\n\n{prompt['prompt']}\n")
+    for number, greeting in enumerate(data.get('alternate_greetings') or [], 1):
+        out.append(f'## alternate_greeting {number}\n\n{_text(greeting)}\n')
+    book = data.get('character_book') or {}
+    entries = book.get('entries') or []
+    entries = list(entries.values()) if isinstance(entries, dict) else entries
+    if book:
+        meta = {k: v for k, v in book.items() if k != 'entries'}
+        out.append(f'## lorebook ({len(entries)} entries)\n\n{json.dumps(meta, ensure_ascii=False)}\n')
+    for number, entry in enumerate(entries, 1):
+        if not isinstance(entry, dict):
+            out.append(f'### lorebook entry {number}\n\n{_text(entry)}\n')
+            continue
+        title = entry.get('comment') or entry.get('name') or f'entry {number}'
+        flags = {k: v for k, v in entry.items() if k not in ('content', 'comment', 'name')}
+        out.append(f"### lorebook: {title}\n\n{json.dumps(flags, ensure_ascii=False)}\n\n{_text(entry.get('content', ''))}\n")
+    rest = {k: v for k, v in data.items() if k not in used}
+    if rest:
+        out.append(f'## other fields\n\n{json.dumps(rest, ensure_ascii=False, indent=1)}\n')
+    return '\n'.join(out)
+
+
 def import_card(root, source):
     source = Path(source).resolve()
     data = bounded(source)
@@ -124,8 +168,9 @@ def import_card(root, source):
         raise Invalid('Existing content-addressed source differs')
     atomic(target, data)
     write_json(folder / 'card.json', card)
+    atomic(folder / 'card.md', readable(card).encode('utf-8'))
     receipt = {'source_sha256': sha, 'format': fmt, 'result': 'extracted', 'warnings': warnings,
-               'source_name': source.name, 'source_file': target.name}
+               'source_name': source.name, 'source_file': target.name, 'readable_file': 'card.md'}
     write_json(folder / 'import.json', receipt)
     return {'path': str(folder), 'source_path': str(target), **receipt}
 

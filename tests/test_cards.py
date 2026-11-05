@@ -53,6 +53,24 @@ class Cards(unittest.TestCase):
             json_source.write_bytes(data)
             self.assertEqual(cards.import_card(root, json_source)['format'], fmt)
 
+    def test_readable_copy_keeps_every_field_and_lorebook_entry(self):
+        temp, root = workspace()
+        self.addCleanup(temp.cleanup)
+        card = {'spec': 'chara_card_v3', 'data': {
+            'name': 'S', 'description': 'Line one\nline "two" ✦', 'scenario': 'A dorm', 'first_mes': 'Hi',
+            'alternate_greetings': ['Alt one', 'Alt two'], 'custom_field': {'kept': 1},
+            'extensions': {'depth_prompt': {'role': 'system', 'depth': 4, 'prompt': 'Track the gap'}},
+            'character_book': {'name': 'Book', 'entries': [
+                {'comment': 'Moons', 'keys': ['moon'], 'secondary_keys': ['night'], 'selectiveLogic': 3,
+                 'constant': False, 'content': 'Two moons\nrise.'}]}}}
+        source = root / 'card.json'
+        source.write_text(json.dumps(card), encoding='utf-8')
+        result = cards.import_card(root, source)
+        text = (root / 'imports' / result['source_sha256'] / result['readable_file']).read_text(encoding='utf-8')
+        for piece in ('Line one\nline "two" ✦', 'A dorm', 'Hi', 'Alt one', 'Alt two', 'Track the gap',
+                      'Two moons\nrise.', 'Moons', '"moon"', '"night"', 'custom_field'):
+            self.assertIn(piece, text)
+
     def test_malformed_preferred_crc_and_limits(self):
         good = base64.b64encode(b'{"name":"legacy"}')
         for data in (png([(b'chara', good), (b'ccv3', b'broken')]), png([])[:-3], png([])[:-1]+b'x',
