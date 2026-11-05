@@ -12,6 +12,7 @@ This is the development and packaging repository, not a story workspace. **Do no
 * **Documentation index:** [docs/README.md](docs/README.md).
 * **Design:** [approved design](docs/designs/couldhappen.md), [design system](DESIGN.md), [product context](PRODUCT.md).
 * **Evidence:** [validation results](docs/validation-results.md).
+* **Contributing:** [CONTRIBUTING.md](CONTRIBUTING.md); agents read [AGENTS.md](AGENTS.md).
 
 Source lives in `helpers/` (Python standard library only) and `web/` (Svelte/Vite). Opt-in native checkpoint examples live in `integrations/`. The Impeccable design hooks in `.codex/` are local development configuration: untracked, not published, and not part of the application.
 <!-- /dev-only -->

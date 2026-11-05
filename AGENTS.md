@@ -10,7 +10,7 @@ These instructions are for agents working on CouldHappen itself, the development
 - Keep LF line endings. Run the checks in [docs/setup.md](docs/setup.md#development-checks) before proposing a change.
 - The license is AGPL-3.0-or-later. Contributions are made under it.
 
-**Contributors:** work on a branch of your own fork and open a pull request against `main` on [github.com/Synere/CouldHappen](https://github.com/Synere/CouldHappen). Nothing below applies to you; your clone has one ordinary history.
+**Contributors:** follow [CONTRIBUTING.md](CONTRIBUTING.md): work on a branch of your own fork and open a pull request against `main` on [github.com/Synere/CouldHappen](https://github.com/Synere/CouldHappen). Nothing below applies to you; your clone has one ordinary history.
 
 ## Maintainer's local clone only
 
