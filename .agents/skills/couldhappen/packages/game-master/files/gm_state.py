@@ -13,7 +13,7 @@ Usage (from the workspace root):  python tools/gm_state.py <command> [--root .]
 
 State is never edited directly. It is the replay of notes/gm/deltas.jsonl, an append-only log in
 which every delta cites the story or Director entry that justifies it. Stdlib only; no network.
-Kinds: contract, situation, fact (phase 1); thread (phase 2). Later phases add handlers in apply_op."""
+Kinds: contract, situation, fact (phase 1); thread (phase 2); pressure, npc (phase 3). Later phases add handlers in apply_op."""
 import argparse
 import copy
 import hashlib
@@ -38,6 +38,12 @@ THREAD_MOVES = {'open': {'active', 'dormant', 'discarded'}, 'active': {'dormant'
                 'dormant': {'open', 'active', 'discarded'}}
 OUTCOMES = ('fulfilled', 'broken', 'released')
 STALE_SCENES = 5
+PRESSURE_STATUS = ('active', 'dormant', 'resolved', 'discarded')
+PRESSURE_LIVE = ('active', 'dormant')
+PRESSURE_MOVES = {'active': {'dormant', 'discarded'}, 'dormant': {'active', 'discarded'}}
+BASIS = ('time', 'event', 'action', 'offscreen')
+PRESSURE_OUTCOMES = ('achieved', 'thwarted', 'abandoned')
+NPC_STATUS = ('active', 'dormant')
 ID_RE = re.compile(r'^[A-Za-z][A-Za-z0-9_-]{0,31}$')
 UUID_RE = re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$')
 ENTRY_START = re.compile(r'^<!-- couldhappen:entry (\{.*\}) -->$')
@@ -51,6 +57,10 @@ SITUATION_FIELDS = {'day': int, 'time': str, 'location': str, 'present': list,
 FACT_FIELDS = {'text': str, 'status': str, 'source': str, 'known': bool, 'tags': list, 'pin': bool}
 THREAD_FIELDS = {'type': str, 'text': str, 'status': str, 'due_condition': str, 'due_day': int,
                  'tags': list}
+PRESSURE_FIELDS = {'actor': str, 'goal': str, 'next_action': str, 'trigger': str, 'consequence': str,
+                   'clock_max': int, 'status': str, 'tags': list}
+NPC_FIELDS = {'name': str, 'want': str, 'fear': str, 'secret': str, 'voice': str, 'attitude': str,
+              'status': str, 'tags': list}
 
 
 def typed(value, kind):
@@ -66,7 +76,7 @@ def typed(value, kind):
 
 def new_state():
     return {'contract': {}, 'situation': {}, 'max_day': 0, 'scene_count': 0, 'facts': {},
-            'threads': {}, 'seen': []}
+            'threads': {}, 'pressures': {}, 'npcs': {}, 'seen': []}
 
 
 # ---- applying one delta -------------------------------------------------------------------
@@ -147,6 +157,16 @@ def apply_op(state, op, errs, warns, ctx):
         thread_update(state, op, bad)
     elif kind == 'thread' and verb == 'resolve':
         thread_resolve(state, op, bad, ctx)
+    elif kind == 'pressure' and verb == 'add':
+        pressure_add(state, op, bad, warns, ctx)
+    elif kind == 'pressure' and verb == 'advance':
+        pressure_advance(state, op, bad, warns)
+    elif kind == 'pressure' and verb == 'update':
+        pressure_update(state, op, bad)
+    elif kind == 'pressure' and verb == 'resolve':
+        pressure_resolve(state, op, bad)
+    elif kind == 'npc' and verb == 'set':
+        npc_set(state, op, bad)
     else:
         bad('unknown kind/op')
 
@@ -324,6 +344,136 @@ def thread_resolve(state, op, bad, ctx):
                   touched=state['scene_count'])
 
 
+def pressure_add(state, op, bad, warns, ctx):
+    if not keys_ok(op, {'op', 'kind', 'id'} | set(PRESSURE_FIELDS), bad):
+        return
+    pid = fact_id(op, 'id', bad)
+    fields = {k: v for k, v in op.items() if k in PRESSURE_FIELDS}
+    if not pid or not fields_ok(fields, PRESSURE_FIELDS, bad):
+        return
+    if pid in state['pressures']:
+        return bad(f'{pid} already exists')
+    for name in ('actor', 'goal', 'next_action', 'trigger'):
+        if name not in fields:
+            return bad(f'{name} is required (who, what they want, what they do next, what makes them move)')
+    if fields.setdefault('status', 'active') not in PRESSURE_LIVE:
+        return bad('a new pressure starts active or dormant')
+    if 'clock_max' in fields and not 2 <= fields['clock_max'] <= 12:
+        return bad('clock_max must be between 2 and 12')
+    state['pressures'][pid] = {'id': pid, 'consequence': '', 'clock_max': None, 'tags': [], **fields,
+                               'clock': 0, 'origin': ctx['entry'], 'last_moved': state['scene_count'],
+                               'evidence': None, 'resolution': None, 'outcome': None}
+    if not state['pressures'][pid]['tags']:
+        warns.append(f'{pid} has no tags: it will show in full only when its clock is full.')
+
+
+def live_pressure(state, op, bad, name='id'):
+    pid = fact_id(op, name, bad)
+    pressure = state['pressures'].get(pid) if pid else None
+    if not pressure:
+        bad(f'{pid} does not exist')
+    elif pressure['status'] not in PRESSURE_LIVE:
+        bad(f'{pid} is {pressure["status"]} and cannot change')
+        return None
+    return pressure
+
+
+def pressure_advance(state, op, bad, warns):
+    if not keys_ok(op, {'op', 'kind', 'id', 'steps', 'basis', 'evidence', 'reason', 'next_action'}, bad):
+        return
+    pressure = live_pressure(state, op, bad)
+    if not pressure:
+        return
+    if pressure['status'] != 'active':
+        return bad(f'{pressure["id"]} is dormant; wake it first (update status: active, with a reason)')
+    basis = op.get('basis')
+    if basis not in BASIS:
+        return bad('basis must say why it moves: ' + ', '.join(BASIS))
+    if not reason_ok(op, bad, f'advancing {pressure["id"]}'):
+        return
+    evidence = op.get('evidence')
+    if basis == 'offscreen' and not (typed(evidence, str) and len(evidence.strip()) >= 5):
+        return bad('an off-screen move needs evidence: what the protagonist could later observe')
+    if evidence is not None and not typed(evidence, str):
+        return bad('evidence must be a short text')
+    steps = op.get('steps', 1 if pressure['clock_max'] else 0)
+    if not typed(steps, int):
+        return bad('steps must be a whole number')
+    if steps and not pressure['clock_max']:
+        return bad(f'{pressure["id"]} has no clock; omit steps')
+    if pressure['clock_max'] and pressure['clock'] + steps > pressure['clock_max']:
+        return bad(f'{pressure["id"]} clock is {pressure["clock"]}/{pressure["clock_max"]}; {steps} more step(s) would overflow it')
+    if 'next_action' in op:
+        if not typed(op['next_action'], str):
+            return bad('next_action must be a short text')
+        pressure['next_action'] = op['next_action']
+    pressure['clock'] += steps
+    pressure['last_moved'] = state['scene_count']
+    if evidence:
+        pressure['evidence'] = evidence
+    if pressure['clock_max'] and pressure['clock'] == pressure['clock_max']:
+        warns.append(f'{pressure["id"]} clock is full: let the consequence land, or resolve it as thwarted.')
+
+
+def pressure_update(state, op, bad):
+    allowed = {'op', 'kind', 'id', 'reason', 'touch'} | (set(PRESSURE_FIELDS) - {'actor', 'clock_max'})
+    if not keys_ok(op, allowed, bad):
+        return
+    fields = {k: v for k, v in op.items() if k in PRESSURE_FIELDS}
+    touch = op.get('touch', False)
+    if fields and not fields_ok(fields, PRESSURE_FIELDS, bad):
+        return
+    if not isinstance(touch, bool):
+        return bad('touch must be true or false')
+    if not fields and not touch:
+        return bad('nothing to change')
+    pressure = live_pressure(state, op, bad)
+    if not pressure:
+        return
+    new_status = fields.pop('status', None)
+    if new_status and new_status != pressure['status']:
+        if new_status not in PRESSURE_MOVES[pressure['status']]:
+            return bad(f'{pressure["id"]}: {pressure["status"]} cannot become {new_status}'
+                       + ('; use resolve to finish one' if new_status == 'resolved' else ''))
+        if not reason_ok(op, bad, f'{pressure["id"]} becoming {new_status}'):
+            return
+        pressure['status'] = new_status
+    pressure.update(fields)
+    if touch and pressure['status'] == 'active':
+        pressure['last_moved'] = state['scene_count']
+
+
+def pressure_resolve(state, op, bad):
+    if not keys_ok(op, {'op', 'kind', 'id', 'resolution', 'outcome'}, bad):
+        return
+    pressure = live_pressure(state, op, bad)
+    if not pressure:
+        return
+    resolution = op.get('resolution')
+    if not (typed(resolution, str) and len(resolution.strip()) >= 5):
+        return bad('resolution must say what happened (at least 5 characters)')
+    if op.get('outcome') not in PRESSURE_OUTCOMES:
+        return bad('outcome must be one of ' + ', '.join(PRESSURE_OUTCOMES))
+    pressure.update(status='resolved', resolution=resolution, outcome=op['outcome'])
+
+
+def npc_set(state, op, bad):
+    if not keys_ok(op, {'op', 'kind', 'id', 'fields'}, bad):
+        return
+    nid = fact_id(op, 'id', bad)
+    fields = op.get('fields')
+    if not nid or not fields_ok(fields, NPC_FIELDS, bad):
+        return
+    if fields.get('status', 'active') not in NPC_STATUS:
+        return bad('status must be active or dormant')
+    npc = state['npcs'].get(nid)
+    if not npc:
+        if 'name' not in fields:
+            return bad(f'{nid} is new: name is required')
+        npc = state['npcs'][nid] = {'id': nid, 'status': 'active', 'tags': []}
+    npc.update(fields)
+
+
 def texts_of(delta):
     for op in delta.get('ops', []):
         if not isinstance(op, dict):
@@ -331,6 +481,9 @@ def texts_of(delta):
         yield op.get('text')
         yield op.get('resolution')
         yield op.get('due_condition')
+        yield op.get('goal')
+        yield op.get('next_action')
+        yield op.get('consequence')
         fields = op.get('fields')
         if isinstance(fields, dict):
             for key, value in fields.items():
@@ -378,6 +531,9 @@ def validate_delta(state, delta, errs, warns, entries=None):
             errs.append('each operation must be an object')
             continue
         apply_op(new, op, errs, warns, ctx)
+    moves = sum(1 for op in ops if isinstance(op, dict) and op.get('kind') == 'pressure' and op.get('op') == 'advance')
+    if moves > 2:
+        warns.append(f'{moves} pressures advance in one delta. Advance only what this turn justifies, not everything.')
     for text in texts_of(delta):
         for term in banned_in(new, text):
             errs.append(f'contains the banned term "{term}" (see the contract)')
@@ -510,7 +666,7 @@ def hot(state, about, budget):
         used[0] += len(line) + 1
         return True
 
-    warnings = [w for w in thread_warnings(state) if fit('WARN ' + w, 'threads')]
+    warnings = [w for w in thread_warnings(state) + pressure_warnings(state) if fit('WARN ' + w, 'threads')]
     # threads: overdue first, then due soonest, promises and consequences, then tag-relevant
     day = state['situation'].get('day', state['max_day'])
     live_threads = [t for t in state['threads'].values() if t['status'] in THREAD_LIVE]
@@ -535,6 +691,32 @@ def hot(state, about, budget):
         line = f'{t["id"]} [{t["type"]}, {t["status"]}{due}] {t["text"]}'
         if fit(line, 'threads'):
             thread_lines.append(line)
+    present = {p.lower() for p in state['situation'].get('present', [])}
+    npc_lines = []
+    for n in state['npcs'].values():
+        if n['status'] == 'active' and (n.get('name', '').lower() in present
+                                         or any(t.lower() in present for t in n['tags'])):
+            parts = [f'{k} {n[k]}' for k in ('want', 'fear', 'secret', 'voice', 'attitude') if n.get(k)]
+            line = f'{n["name"]} ({n["id"]}): ' + ' | '.join(parts)
+            if fit(line, 'threads'):
+                npc_lines.append(line)
+    pressure_lines, running = [], []
+    for p in state['pressures'].values():
+        if p['status'] != 'active':
+            continue
+        full = p['clock_max'] and p['clock'] >= p['clock_max']
+        if full or any(t.lower() in context for t in p['tags']):
+            clock = f', clock {p["clock"]}/{p["clock_max"]}' if p['clock_max'] else ''
+            line = (f'{p["id"]} [{p["actor"]}{clock}] goal: {p["goal"]} | next: {p["next_action"]} | '
+                    f'moves when: {p["trigger"]}' + (f' | if unopposed: {p["consequence"]}' if p['consequence'] else ''))
+            if fit(line, 'threads'):
+                pressure_lines.append(line)
+        else:
+            running.append(f'{p["id"]} {p["actor"]}')
+    if running:
+        line = 'also running: ' + '; '.join(running)
+        if fit(line, 'threads'):
+            pressure_lines.append(line)
     live = [f for f in state['facts'].values() if f['status'] not in TERMINAL_FACT]
     shown = [f for f in live if f['pin'] or any(t.lower() in context for t in f['tags'])]
     # pinned first, then known before hidden, established before uncertain, newest first
@@ -558,6 +740,8 @@ def hot(state, about, budget):
     if hidden:
         tail.append(f'({hidden} other live facts not shown; use --about <name> or the state command)')
     return '\n'.join(head + ['WARN ' + w for w in warnings] + (['THREADS'] + thread_lines if thread_lines else [])
+                     + (['CAST HERE'] + npc_lines if npc_lines else [])
+                     + (['PRESSURES (the world moves without the player)'] + pressure_lines if pressure_lines else [])
                      + (['FACTS'] + lines if lines else []) + tail)
 
 
@@ -578,12 +762,26 @@ def thread_warnings(state):
     return out
 
 
+def pressure_warnings(state):
+    """Soft rules only."""
+    out, active = [], [p for p in state['pressures'].values() if p['status'] == 'active']
+    for p in active:
+        if p['clock_max'] and p['clock'] >= p['clock_max']:
+            out.append(f'{p["id"]} ({p["actor"]}) clock is full: let the consequence land, or resolve it as thwarted.')
+    if active:
+        quiet = state['scene_count'] - max(p['last_moved'] for p in active)
+        if quiet >= STALE_SCENES:
+            out.append(f'no pressure has moved in {quiet} scenes: has the world been waiting for the player? '
+                       'Consider whether any actor has a reason to act (see review).')
+    return out
+
+
 def review(state):
     """Scene/chapter boundary report: Review, Retire, Refresh, Reopen. Reads only; changes nothing."""
     out = ['# Review (private)', 'REVIEW what changed and what is still owed']
     threads = [t for t in state['threads'].values() if t['status'] in THREAD_LIVE]
     out += [f'  {t["id"]} [{t["type"]}, {t["status"]}] {t["text"]}' for t in threads] or ['  no live threads']
-    warns = thread_warnings(state)
+    warns = thread_warnings(state) + pressure_warnings(state)
     out += ['  WARN ' + w for w in warns]
     out.append('RETIRE candidates (propose each as a delta with a reason; nothing here is automatic)')
     stale = [t for t in threads if t['status'] != 'dormant' and state['scene_count'] - t['touched'] >= STALE_SCENES]
@@ -594,8 +792,15 @@ def review(state):
             for f in state['facts'].values() if f['status'] == 'rumour']
     done = [t for t in state['threads'].values() if t['status'] == 'resolved']
     out.append(f'  {len(done)} resolved thread(s) are kept as summaries and left out of the hot context.')
-    out += ['REFRESH check that each live thread and each pressure still has a reason to move',
-            'REOPEN plan a strong next opening: a situation already in motion, not a recap of what happened']
+    out.append('REFRESH what the world is doing (advance only what time, events or the player justify; '
+               'after a time skip, decide each actor in turn and leave evidence the protagonist can find)')
+    for p in state['pressures'].values():
+        if p['status'] == 'active':
+            clock = f' clock {p["clock"]}/{p["clock_max"]}' if p['clock_max'] else ''
+            out.append(f'  {p["id"]} {p["actor"]}{clock}: next "{p["next_action"]}" when "{p["trigger"]}"')
+    if not any(p['status'] == 'active' for p in state['pressures'].values()):
+        out.append('  no active pressures: who wants something the player is not giving them?')
+    out += ['REOPEN plan a strong next opening: a situation already in motion, not a recap of what happened']
     return '\n'.join(out)
 
 
@@ -710,6 +915,7 @@ def main():
         if args.live:
             state['facts'] = {k: v for k, v in state['facts'].items() if v['status'] not in TERMINAL_FACT}
             state['threads'] = {k: v for k, v in state['threads'].items() if v['status'] in THREAD_LIVE}
+            state['pressures'] = {k: v for k, v in state['pressures'].items() if v['status'] in PRESSURE_LIVE}
         print(json.dumps(state, indent=2, ensure_ascii=False))
     elif args.cmd == 'review':
         print(review(load(args.root)))

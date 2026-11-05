@@ -213,6 +213,84 @@ class GmStateTest(unittest.TestCase):
             self.assertIn(expected, out)
         self.assertEqual((self.root / 'notes/gm/deltas.jsonl').read_text(encoding='utf-8'), before)
 
+    # ---- phase 3: living pressures and cast -------------------------------------------------
+
+    def pressure(self, pid='P1', **extra):
+        return {'op': 'add', 'kind': 'pressure', 'id': pid, 'actor': 'Harbour guild', 'goal': 'seize the ledger',
+                'next_action': 'send a bailiff to Mara', 'trigger': 'the player is seen with the ledger',
+                'consequence': 'Mara is arrested', 'clock_max': 4, 'tags': ['guild'], **extra}
+
+    def advance(self, pid='P1', **extra):
+        return {'op': 'advance', 'kind': 'pressure', 'id': pid, 'basis': 'event',
+                'reason': 'the player was seen at the pier', **extra}
+
+    def test_pressure_moves_only_with_a_basis_a_reason_and_room_on_the_clock(self):
+        self.commit(self.delta(self.add_entry(), [self.pressure()]))
+        for i, bad in enumerate([{'basis': 'whim'}, {'reason': ''}, {'steps': 5}, {'steps': 'two'}]):
+            self.commit(self.delta(self.add_entry(f'try {i}'), [self.advance(**bad)]), expect=1)
+        self.commit(self.delta(self.add_entry('ok'), [self.advance(steps=3)]))
+        self.assertEqual(self.state()['pressures']['P1']['clock'], 3)
+        self.commit(self.delta(self.add_entry('over'), [self.advance(steps=2)]), expect=1)
+
+    def test_offstage_moves_need_evidence_the_protagonist_can_find(self):
+        self.commit(self.delta(self.add_entry(), [self.pressure()]))
+        offscreen = self.advance(basis='offscreen', reason='three days passed in the countryside')
+        self.commit(self.delta(self.add_entry('a'), [offscreen]), expect=1)
+        self.commit(self.delta(self.add_entry('b'), [{**offscreen, 'evidence': 'guild posters on every door'}]))
+        self.assertEqual(self.state()['pressures']['P1']['evidence'], 'guild posters on every door')
+
+    def test_full_clock_warns_and_advancing_everything_at_once_is_flagged(self):
+        self.commit(self.delta(self.add_entry(), [self.pressure('P1'), self.pressure('P2'), self.pressure('P3')]))
+        (self.root / 'notes/gm/pending.json').write_text(json.dumps(self.delta(self.add_entry('all'), [
+            self.advance('P1', steps=4), self.advance('P2'), self.advance('P3')])), encoding='utf-8')
+        out = run(self.root, 'check').stdout
+        self.assertIn('3 pressures advance in one delta', out)
+        self.assertIn('P1 clock is full', out)
+        self.assertEqual(run(self.root, 'commit').returncode, 0)
+        self.assertIn('P1 (Harbour guild) clock is full', run(self.root, 'hot').stdout)
+
+    def test_a_world_that_waits_is_flagged_and_a_move_clears_it(self):
+        clockless = {k: v for k, v in self.pressure().items() if k != 'clock_max'}
+        self.commit(self.delta(self.add_entry(), [clockless]))
+        for n in range(1, 6):
+            self.scene(n)
+        self.assertIn('no pressure has moved in 5 scenes', run(self.root, 'hot').stdout)
+        self.commit(self.delta(self.add_entry('steps'), [self.advance(steps=1)]), expect=1)  # no clock to step
+        self.commit(self.delta(self.add_entry('move'), [self.advance()]))
+        self.assertNotIn('no pressure has moved', run(self.root, 'hot').stdout)
+
+    def test_pressure_lifecycle_and_resolution(self):
+        self.commit(self.delta(self.add_entry(), [self.pressure()]))
+        sleep = {'op': 'update', 'kind': 'pressure', 'id': 'P1', 'status': 'dormant'}
+        self.commit(self.delta(self.add_entry('a'), [sleep]), expect=1)
+        self.commit(self.delta(self.add_entry('b'), [{**sleep, 'reason': 'the guild lost interest'}]))
+        self.commit(self.delta(self.add_entry('c'), [self.advance()]), expect=1)  # dormant cannot advance
+        self.commit(self.delta(self.add_entry('d'), [{'op': 'update', 'kind': 'pressure', 'id': 'P1',
+                                                      'status': 'active', 'reason': 'a new bailiff arrived'}]))
+        resolve = {'op': 'resolve', 'kind': 'pressure', 'id': 'P1', 'outcome': 'thwarted', 'resolution': 'The ledger burned.'}
+        self.commit(self.delta(self.add_entry('e'), [{**resolve, 'outcome': 'won'}]), expect=1)
+        self.commit(self.delta(self.add_entry('f'), [resolve]))
+        self.commit(self.delta(self.add_entry('g'), [self.advance()]), expect=1)
+        self.assertNotIn('P1', json.loads(run(self.root, 'state', '--live').stdout)['pressures'])
+
+    def test_cast_cards_appear_only_for_present_characters_and_need_a_name(self):
+        self.commit(self.delta(self.add_entry(), [{'op': 'set', 'kind': 'npc', 'id': 'N1', 'fields': {'want': 'safety'}}]), expect=1)
+        self.commit(self.delta(self.add_entry('a'), [
+            {'op': 'set', 'kind': 'npc', 'id': 'N1', 'fields': {'name': 'Mara', 'want': 'safety', 'secret': 'she forged the ledger',
+                                                                'voice': 'clipped', 'attitude': 'wary'}},
+            {'op': 'set', 'kind': 'npc', 'id': 'N2', 'fields': {'name': 'Orsk', 'want': 'coin'}},
+            {'op': 'set', 'kind': 'situation', 'fields': {'present': ['Mara']}}]))
+        out = run(self.root, 'hot').stdout
+        self.assertIn('Mara (N1): want safety | secret she forged the ledger | voice clipped | attitude wary', out)
+        self.assertNotIn('Orsk', out)
+        self.commit(self.delta(self.add_entry('b'), [{'op': 'set', 'kind': 'npc', 'id': 'N1', 'fields': {'attitude': 'grateful'}}]))
+        self.assertIn('attitude grateful', run(self.root, 'hot').stdout)
+
+    def test_review_lists_pressures_to_consider_after_a_time_skip(self):
+        self.commit(self.delta(self.add_entry(), [self.pressure()]))
+        out = run(self.root, 'review').stdout
+        self.assertIn('P1 Harbour guild clock 0/4: next "send a bailiff to Mara"', out)
+
 
 if __name__ == '__main__':
     unittest.main()

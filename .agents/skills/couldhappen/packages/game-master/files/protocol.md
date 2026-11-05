@@ -4,7 +4,7 @@ Prepare situations, not scripted plots. Track causes and consequences, not trans
 
 Six questions to answer before you write: What must remain true? What matters to the protagonist? What is happening without them? What must not be forgotten? What could they discover? What makes this moment worth playing?
 
-Phase 1 covers the first (what must remain true) and the start of the second. Phase 2 covers the fourth (what must not be forgotten). Later phases add the rest here.
+Phase 1 covers the first (what must remain true) and the start of the second. Phase 2 covers the fourth (what must not be forgotten). Phase 3 covers the third (what is happening without them). Later phases add the rest here.
 
 ## Each turn
 
@@ -55,6 +55,29 @@ A thread is an obligation the story has taken on. Types: `promise` (someone said
 - **Warnings are advice.** An overdue promise or a thread untouched for five scenes shows as `WARN` at the top of `hot`. You decide what the fiction needs: pay it off, complicate it, let it lapse with a consequence, or park it. A warning never forces an event.
 - **Retire on purpose.** At a scene or chapter boundary run `python tools/gm_state.py review` (Review, Retire, Refresh, Reopen). Park, resolve or discard what has run its course, and discard provisional facts you never used (`"status": "discarded"`, with a reason).
 - **Consequences first.** Promises and consequences stay in the hot context even when their tags do not match the scene, because those are the ones a good game master never lets slip.
+
+## Pressures and cast (phase 3): what is happening without the player
+
+A **pressure** is someone who wants something and will act whether or not the player is watching: a faction, an antagonist, a rival, a frightened witness. Give each a `goal`, a `next_action`, a `trigger` (what makes them move) and, if it helps, a `clock_max` (2 to 12 steps toward `consequence`, what happens if nobody stops them).
+
+```json
+{"op": "add", "kind": "pressure", "id": "P1", "actor": "Harbour guild", "goal": "seize the ledger",
+ "next_action": "send a bailiff to Mara", "trigger": "the player is seen with the ledger",
+ "consequence": "Mara is arrested", "clock_max": 4, "tags": ["guild", "Mara"]}
+{"op": "advance", "kind": "pressure", "id": "P1", "steps": 1, "basis": "event",
+ "reason": "the player was seen at the pier", "next_action": "the bailiff waits outside Mara's door"}
+{"op": "advance", "kind": "pressure", "id": "P1", "basis": "offscreen", "steps": 1,
+ "reason": "three days passed", "evidence": "guild notices nailed to every door"}
+{"op": "resolve", "kind": "pressure", "id": "P1", "outcome": "thwarted", "resolution": "The ledger burned."}
+```
+
+- **Advance only what is justified.** `basis` is `time`, `event`, `action` or `offscreen`, always with a reason. Never advance everything on a whim; advancing more than two in one delta draws a warning.
+- **Off-screen means observable.** An off-screen move needs `evidence`: the sign the protagonist can later find. If the world moved and nothing shows it, the player cannot feel it.
+- **Full clocks come due.** When a clock fills, `hot` warns. Let the consequence land, or resolve the pressure as thwarted with an explanation. Do not leave it hanging.
+- **Lifecycle.** `active` ↔ `dormant` (with a reason), then `resolved` (outcome `achieved`, `thwarted` or `abandoned`) or `discarded`. Dormant pressures cannot advance until woken.
+- **A waiting world is a warning, not an order.** If no pressure has moved for five scenes, `hot` says so. Ask whether any actor has a reason to act now; if not, say nothing.
+- **Time skips.** Before narrating a skip, run `review`: its REFRESH section lists each active pressure, its next action and its trigger. Decide each in turn and leave evidence.
+- **Cast cards.** `{"op": "set", "kind": "npc", "id": "N1", "fields": {"name": "Mara", "want": "...", "fear": "...", "secret": "...", "voice": "...", "attitude": "..."}}`. One short phrase per field. A card is shown in `hot` only while the character is in `present`. Use attitude phrases ("wary, but wants help"), never numeric scores. Keep cards for recurring characters; leave walk-ons uncarded. An NPC's `secret` is their own; a truth the player must be able to discover belongs in a revelation (phase 4).
 
 ## Self-checks the script cannot do
 

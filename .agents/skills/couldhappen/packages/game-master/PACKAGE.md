@@ -18,7 +18,7 @@ This package gives the writer a compact, private memory and a short routine to u
 | --- | --- | --- |
 | 1 Continuity | The contract (genre, tone, limits, what the player wants), canon facts with a status and a source, the current situation, and a validated, append-only record of every change. | **Available** |
 | 2 Memory | Open threads: promises, mysteries, consequences, relationships, callbacks, each with a lifecycle (open, active, dormant, resolved, discarded), optional due day, and soft warnings for overdue or forgotten ones. A `review` report for scene and chapter boundaries. | **Available** |
-| 3 Living world | Pressures: factions and NPCs who pursue goals and clocks that move when events justify it. | Planned |
+| 3 Living world | Pressures: factions, antagonists and NPCs with a goal, a next action, a trigger and an optional clock, which move only when time, events or the player justify it (an off-screen move must leave evidence). Compact cast cards (want, fear, secret, voice, attitude) shown for whoever is in the scene. | **Available** |
 | 4 Discovery | Secrets kept apart from where they are found, with several routes to each required one. | Planned |
 | 5 Narrative quality | Scene rhythm, callbacks, arc coherence, and soft warnings. | Planned |
 

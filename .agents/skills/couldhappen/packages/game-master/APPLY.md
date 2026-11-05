@@ -2,7 +2,7 @@
 
 Follow this only after the Director has agreed (see "Director packages" in the skill). Read [PACKAGE.md](PACKAGE.md) first. Tell the Director in a sentence or two what you will add: a private state script, a short routine each turn, and a session-zero conversation. Say what it costs (a little extra work per turn, no money, no keys) and that it changes no public file, so no restart is needed.
 
-This package is built in phases. This file covers **Phase 1, Continuity** (sections 1 to 4) and **Phase 2, Memory** (section 5); section 6 verifies whichever you applied. If later phases have been added to the package folder, apply them one at a time, each only after the previous one has been used in play, and each with the Director's go-ahead.
+This package is built in phases. This file covers **Phase 1, Continuity** (sections 1 to 4), **Phase 2, Memory** (section 5) and **Phase 3, Living world** (section 6); section 7 verifies whichever you applied. If later phases have been added to the package folder, apply them one at a time, each only after the previous one has been used in play, and each with the Director's go-ahead.
 
 Use the usual workspace rules: pause before appending to public logs, validate and release, record where a fresh session finds it from `START_HERE.md`, commit, and keep a standing wait running after every turn. Private notes under `notes/` need no pause. On Windows set `PYTHONIOENCODING=utf-8 PYTHONUTF8=1` when generating entries and avoid non-ASCII characters in heredocs.
 
@@ -55,7 +55,17 @@ Apply this once Phase 1 has been in use and the Director agrees. It needs no new
 4. Update the "Game master" section of `START_HERE.md` and the entry in `notes/packages.md` (phase 2 applied, date).
 5. Verify: `python tools/gm_state.py hot` shows the threads under the contract and situation; `review` runs.
 
-## 6. Verify and report
+## 6. Phase 3: living world (pressures and cast)
+
+Apply this after Phase 2 has been used in play and the Director agrees. Again no new files: replace `tools/gm_state.py` and `notes/gm/protocol.md` with the current copies from [files/](files/) if yours are older (the log format is unchanged).
+
+1. Read the "Pressures and cast" section of the protocol.
+2. Design the opposition with the Director's tone in mind. Add two to four pressures: the actors who want something the protagonist touches. For each give a goal, a next action, a trigger, and (where a deadline helps) a clock and a consequence. Prefer one pressure that already threatens something the player cares about (see the contract's `wants`) over several distant ones.
+3. Add cast cards for the three to six recurring characters, one short phrase per field. Do not invent secrets just to fill the field; leave it out until the fiction supplies one.
+4. Add the rule to your routine: at every scene boundary, ask "who wants something and is not getting it?" and advance a pressure only with a basis and a reason. Run `review` before narrating a time skip.
+5. Update the "Game master" section of `START_HERE.md` and `notes/packages.md` (phase 3 applied, date).
+
+## 7. Verify and report
 
 1. `python tools/gm_state.py hot` prints a compact context of roughly 1,000 tokens or less. If it is longer, you tagged or pinned too much; trim.
 2. Make a deliberately bad delta in a scratch file (for example, an established fact with its text edited) and confirm `check --file` rejects it. Delete the scratch file.
