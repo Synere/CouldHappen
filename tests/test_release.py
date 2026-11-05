@@ -55,7 +55,8 @@ class ReleaseBuild(unittest.TestCase):
                                      or name.startswith('.claude/settings') for name in names))
                 for forbidden in ('.git', '.impeccable', 'docs/history', 'docs/research', 'docs/reviews',
                                   'docs/decisions', 'docs/designs', 'PRODUCT.md', 'release/README.md',
-                                  'scripts/build_release.py', 'tests/test_release.py'):
+                                  'scripts/build_release.py', 'tests/test_release.py', 'AGENTS.md', 'CLAUDE.md',
+                                  'scripts/git-hooks'):
                     self.assertFalse(any(name == forbidden or name.startswith(forbidden + '/') for name in names), forbidden)
                 config = json.loads(archive.read('couldhappen.json'))
                 self.assertIsNone(config['workspace_id'])

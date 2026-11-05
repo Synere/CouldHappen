@@ -102,6 +102,8 @@
     "docs/reference-hosts.md"
   ],
   "forbidden": [
+    "AGENTS.md",
+    "CLAUDE.md",
     ".git/**",
     ".impeccable/**",
     "docs/history/**",
