@@ -1,0 +1,82 @@
+name: Release
+
+# Pushing a tag like v0.1.8 builds the release ZIP from that tagged public commit, smoke-tests it,
+# and attaches the ZIP and its .sha256 to a GitHub release. Run it by hand (Actions tab) for a dry run:
+# it builds and smoke-tests the selected branch and uploads the ZIP as a workflow artifact, with no release.
+
+on:
+  push:
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Read the manifest version
+        id: manifest
+        run: echo "version=$(python -c "import json; print(json.load(open('release.manifest.json'))['version'])")" >> "$GITHUB_OUTPUT"
+
+      - name: Check the tag
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          if [ "$GITHUB_REF_NAME" != "v${{ steps.manifest.outputs.version }}" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match release.manifest.json version ${{ steps.manifest.outputs.version }}"; exit 1
+          fi
+          git fetch origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "The tagged commit is not on the public main branch"; exit 1
+          fi
+
+      - name: Unit tests
+        run: python -m unittest discover -s tests -p "test_*.py"
+
+      - name: Build the release ZIP
+        run: python scripts/build_release.py --ref "$GITHUB_SHA"
+
+      - name: Install Chromium for the smoke test
+        run: npx --yes playwright@1.64.1 install --with-deps chromium
+
+      - name: Smoke-test the ZIP
+        run: python scripts/smoke_release.py "release/dist/couldhappen-${{ steps.manifest.outputs.version }}.zip"
+
+      - name: Keep the ZIP from a dry run
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v4
+        with:
+          name: couldhappen-${{ steps.manifest.outputs.version }}
+          path: |
+            release/dist/couldhappen-${{ steps.manifest.outputs.version }}.zip
+            release/dist/couldhappen-${{ steps.manifest.outputs.version }}.zip.sha256
+
+      - name: Create the GitHub release
+        if: startsWith(github.ref, 'refs/tags/v')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            "release/dist/couldhappen-${{ steps.manifest.outputs.version }}.zip" \
+            "release/dist/couldhappen-${{ steps.manifest.outputs.version }}.zip.sha256" \
+            --title "CouldHappen ${{ steps.manifest.outputs.version }}" \
+            --notes "SHA-256 of couldhappen-${{ steps.manifest.outputs.version }}.zip: \`$(cut -d' ' -f1 "release/dist/couldhappen-${{ steps.manifest.outputs.version }}.zip.sha256")\`" \
+            --generate-notes --verify-tag
