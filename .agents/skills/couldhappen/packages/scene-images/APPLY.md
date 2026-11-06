@@ -35,7 +35,7 @@ Add a quick action: put `{"label": "Picture scene", "body": "Picture the current
 
 ## 4. Cast portraits and the portrait button
 
-Set `"portrait_button": true` in `public/cast.json` (a top-level boolean beside `characters`). The Cast panel then shows a "Make portrait" button on every character ("New portrait" once one exists), disabled whenever Director saving is closed. Pressing it saves one Director entry: `Make a portrait for <name> (cast id <id>).` The reader never retries it; after an uncertain save it tells the player to check the Director channel.
+Set `"portrait_button": true` in `public/cast.json` (a top-level boolean beside `characters`). The Cast panel then shows a "Make portrait" button on every character except the legacy `scene` entry ("New portrait" once one exists), disabled whenever Director saving is closed. Pressing it saves one Director entry: `Make a portrait for <name> (cast id <id>).` The reader never retries it; after an uncertain save it tells the player to check the Director channel.
 
 When such an entry arrives:
 

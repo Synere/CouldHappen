@@ -37,7 +37,7 @@
         {/if}
         <h3>{character.name}</h3>
         {#if character.description}<p>{character.description}</p>{/if}
-        {#if cast.portrait_button}
+        {#if cast.portrait_button && character.id !== 'scene'}
           <div class="portrait-ask">
             <button type="button" class="ask" disabled={!canRequest || notes[character.id] === 'Saving…'} aria-describedby={'ask-note-' + character.id} onclick={() => onrequest(character)}>{character.portrait ? 'New portrait' : 'Make portrait'}<span class="visually-hidden"> for {character.name}</span></button>
             <small id={'ask-note-' + character.id} role="status">{notes[character.id] || (canRequest ? '' : 'Unavailable while saving is paused.')}</small>
