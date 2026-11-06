@@ -2,7 +2,7 @@
 
 CouldHappen turns your existing coding agent into a storyteller and game master, with a browser UI built for play. You play your character and the writer handles everyone else, develops the world, remembers what happens, and lets your choices have consequences.
 
-[Download the latest release](https://github.com/Synere/CouldHappen/releases/latest) and extract it to a folder. That folder is your story. Open it with your coding agent, tell it to **set up**, and start playing.
+[Download the latest release](https://github.com/Synere/CouldHappen/releases/latest) and extract it to a folder. That folder is your story. Open it with your coding agent, tell it to **set up**, and start playing. Not sure what to ask for? Start by asking the Director **"What can you do?"** (what the writer answers is in [what this can do](.agents/skills/couldhappen/references/what-this-can-do.md)).
 
 <!-- dev-only -->
 <p align="center">
@@ -20,6 +20,7 @@ CouldHappen turns your existing coding agent into a storyteller and game master,
 * **Meet characters naturally.** The Cast panel follows the scene, showing characters, portraits, and descriptions when they're introduced. No spoilers from characters you haven't met.
 * **Bring your favorites.** Import PNG or JSON character cards, including common SillyTavern formats. The writer adapts them to your world without forcing them into the story prematurely.
 * **Make it your kind of story.** Want portraits, scene illustrations, RPG stats, or a custom theme? Your writer can add them using its available tools. Pure prose works too.
+* **Start another story.** Ask the Director for a new story. It explains what will happen, creates a clean sibling folder, and closes this game so you can open the new folder in a fresh agent session.
 * **Undo a bad turn.** Ask the Director to roll it back using available Git checkpoints, keeping your feedback and useful improvements where possible.
 
 <!-- dev-only -->

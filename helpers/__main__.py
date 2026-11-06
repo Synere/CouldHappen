@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 import sys
 
-from . import cards, checkpoints, files, runtime
+from . import cards, checkpoints, files, runtime, stories
 
 
 def main():
@@ -35,6 +35,9 @@ def main():
     switch.add_argument('--on', action='store_true')
     switch.add_argument('--off', action='store_true')
     sub.add_argument('--previous-writer-stopped', action='store_true')
+    sub = commands.add_parser('new-story')
+    sub.add_argument('--root', default='.')
+    sub.add_argument('--destination', required=True)
     sub = commands.add_parser('stop')
     sub.add_argument('--root', default='.')
     sub = commands.add_parser('checkpoint')
@@ -60,6 +63,8 @@ def main():
             result, code = runtime.wait(args.root, args.timeout)
         elif args.command in ('import-card', 'portrait'):
             result = (cards.import_card if args.command == 'import-card' else cards.portrait)(args.root, args.source)
+        elif args.command == 'new-story':
+            result = stories.new_story(args.root, args.destination)
         elif args.command == 'stop':
             result = runtime.stop(args.root)
             code = 0 if result['status'] == 'stopped' else 2
