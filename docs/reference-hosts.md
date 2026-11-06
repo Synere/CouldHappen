@@ -10,9 +10,9 @@ All hosts are **experimental**. None is certified, and there is no required test
 
 | Host | Status | Skill discovery | Observed so far |
 | --- | --- | --- | --- |
-| opencode | Experimental — one successful story-workspace test | Finds the skill in `.agents/skills/` | Setup, background standing wait, card import, play, Undo, reset, and fresh-context reentry. |
+| opencode | Experimental — one story workspace, two sessions, went well | Finds the skill in `.agents/skills/` | Setup, background standing wait, card import, play, Undo, reset, and fresh-context reentry. |
 | Codex interactive CLI | Experimental — not yet tested | `.agents/skills/couldhappen/` | Nothing yet. |
-| Claude Code interactive CLI | Experimental — one session | `.claude/skills/couldhappen/SKILL.md`, an entry point that hands off to the canonical skill | Skill discovery and a standing background wait (0.1.4, Sonnet 5.5). A host restart ends the wait silently. |
+| Claude Code interactive CLI | Experimental — four story workspaces, went well | `.claude/skills/couldhappen/SKILL.md`, an entry point that hands off to the canonical skill | Skill discovery and a standing background wait across four workspaces (0.1.4, 0.1.8 twice, 0.1.10; Sonnet 5.5, desktop app). Long play with imported cards, Director packages (RPG mechanics, scene images, game master), generated pictures, a writer-built sheet and theme, and recovery from a context reset mid-fight using only the workspace files. A host restart ends the wait silently. |
 | Pi with OpenRouter | Experimental — not yet tested | Not verified; if the skill is not listed, ask Pi to read `.agents/skills/couldhappen/SKILL.md` | Nothing yet. |
 
 On any host, asking the agent to read `.agents/skills/couldhappen/SKILL.md` explicitly always works; automatic discovery is a convenience. Edit only the canonical skill under `.agents/`.

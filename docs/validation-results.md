@@ -111,13 +111,25 @@ The author ran one session in `couldhappen-0.1.4-test`, unpacked from the 0.1.4 
 | Card handling and notes | Card treated as source material; `START_HERE.md` updated after every turn, spoilers in a private note. |
 | Closing, Undo, native hooks | Not exercised. |
 
+## Story-workspace test sessions — 2026-11-05 to 2026-11-06 (Claude Code, 0.1.8 and 0.1.10)
+
+The author ran further Claude Code (desktop app, Sonnet 5.5) sessions in unpacked releases: `couldhappen-0.1.8-hanasaki`, `couldhappen-0.1.8-romance` (two commits only), and `couldhappen-0.1.10-dnd` (54 commits, one imported card, all three Director packages). With the earlier opencode and 0.1.4 runs this makes five story workspaces; the author reports they worked to great effect. Evidence: the workspaces' Git history and notes, not a line-by-line transcript review.
+
+| Observation | Outcome |
+| --- | --- |
+| Packages in play | rpg-mechanics, scene-images and game-master were all applied by the writer and used over many turns (dice, sheet panel, themed reader, "Picture scene", GM ledger). Packages remain experimental. |
+| Undo | In the hanasaki workspace the Director undid to the start; the writer archived the withdrawn story, kept its rules, sheet and picture button, and awaited direction. |
+| Context reset | The 0.1.10 writer resumed mid-fight from its notes and the GM ledger without drift. |
+| Pictures | Scene pictures were checked against the scene and regenerated when wrong; scene-images 0.1.12 (pictures attached to a turn, Make portrait button, reference portraits) was merged and exercised. |
+| Writer feedback | The 0.1.10 writer left developer feedback in `notes/feedback-for-developers.md` (non-atomic turns, duplicated state, `wait` returning only ids); not yet triaged here. |
+
 ## Host and creative observations
 
 | Host / creative observation | Status |
 | --- | --- |
 | opencode story-workspace test (2026-11-05) | Run, largely successful; see the section above. Standing-wait failure found and fixed in the skill; not re-run after the fix. Host status: experimental. |
 | Codex interactive CLI browser loop, waits/renewals, trusted native checkpoint execution | Experimental; not run. Python wrapper tests are not native-host activation evidence. |
-| Claude Code interactive CLI equivalent | Experimental; one largely successful 0.1.4 session (Sonnet 5.5, desktop app). Skill discovery observed. |
+| Claude Code interactive CLI equivalent | Experimental; four story workspaces (0.1.4 to 0.1.10, Sonnet 5.5, desktop app) reported as working well. Skill discovery observed. |
 | Pi 1.5.0 + human-selected native OpenRouter model | Experimental; not run; published extension docs/types inspected, extension not compiled/loaded in Pi. |
 | Actual prompt/card short scene and Director discussion | Not run; assets/prompt not supplied. |
 | Actual fresh-context continuation using maintained files alone | Run once on opencode (2026-11-05): accurate read-only report from files alone. Fiction was not continued in that session. |

@@ -1,6 +1,65 @@
 # CouldHappen
 
-A portable fiction workspace for an existing agent. The agent is the writer and game master; the browser is your reading and discussion interface. CouldHappen supplies a browser reader with separate Story and Director conversations, a small local helper, durable story knowledge, and Git-supported recovery. No provider SDK or model client is included: your agent owns model calls, tools, permissions, and execution.
+CouldHappen turns your existing coding agent into a storyteller and game master, with a browser UI built for play. You play your character and the writer handles everyone else, develops the world, remembers what happens, and lets your choices have consequences.
+
+Open the folder with your agent, tell it to **set up**, and start playing.
+
+<!-- dev-only -->
+<p align="center">
+  <img src="docs/images/story-cast.png" alt="The Story tab showing prose, a scene illustration, a character portrait, description, and stats." width="900">
+</p>
+
+<p align="center"><sub>A story in progress. The writer chose the theme, created the artwork, and added the stats for this particular session.</sub></p>
+<!-- /dev-only -->
+
+## What you can do
+
+* **Play.** Speak, explore, investigate, fight, or try something the writer never anticipated. It runs the cast and the world, not just the next reply.
+* **Step out of character.** The **Story** tab is for playing. The separate **Director** tab lets you discuss ideas, change preferences, tell the agent to change the UI, request corrections, or steer the story without interrupting the scene.
+* **Keep a story going.** The writer maintains lasting knowledge of characters, events, secrets, and possibilities. Even a fresh agent session can pick up where the story left off.
+* **Meet characters naturally.** The Cast panel follows the scene, showing characters, portraits, and descriptions when they're introduced. No spoilers from characters you haven't met.
+* **Bring your favorites.** Import PNG or JSON character cards, including common SillyTavern formats. The writer adapts them to your world without forcing them into the story prematurely.
+* **Make it your kind of story.** Want portraits, scene illustrations, RPG stats, or a custom theme? Your writer can add them using its available tools. Pure prose works too.
+* **Undo a bad turn.** Ask the Director to roll it back using available Git checkpoints, keeping your feedback and useful improvements where possible.
+
+<!-- dev-only -->
+<p align="center">
+  <img src="docs/images/director.png" alt="The Director tab for out-of-character discussion." width="440">
+  <img src="docs/images/story-empty.png" alt="The Story tab waiting for its first move." width="440">
+</p>
+
+<p align="center"><sub>Talk to the writer in Director, then live the story in Story.</sub></p>
+<!-- /dev-only -->
+
+## A writer with freedom to create
+
+Your agent decides how to track characters, remember events, plan mysteries, manage relationships, or keep the world consistent. It can develop its own notes, systems, tools, and creative techniques as the story grows, rather than following a rigid framework.
+
+It can even improve its own approach along the way. If a story needs something new, the writer has room to build it.
+
+**The writer figures out how to make it work.**
+
+## Give your writer more to work with
+
+CouldHappen includes optional **Director packages**: ready-made starting points for capabilities you want in your story. Ask your writer to apply one, customize it, or build something entirely different.
+
+| Package | What it adds |
+|---|---|
+| **[RPG Mechanics](.agents/skills/couldhappen/packages/rpg-mechanics/PACKAGE.md)** | Visible dice rolls, custom rules, stats, and optional character sheets. |
+| **[Scene Images](.agents/skills/couldhappen/packages/scene-images/PACKAGE.md)** | In-story illustrations, character portraits, visual consistency, and optional themes. Requires an image provider key. |
+| **[Game Master](.agents/skills/couldhappen/packages/game-master/PACKAGE.md)** | Stronger continuity, persistent memory, a living world, meaningful discovery, and deliberate pacing. |
+
+**These packages are experimental and still need testing.** They're not locked-in systems. Your writer can freely inspect, adapt, extend, or replace them during play to better suit your story.
+
+You can also ask the writer to create new packages of its own ([how packages are made](.agents/skills/couldhappen/packages/AUTHORING.md)). Nothing here is required to enjoy CouldHappen.
+
+## Your agent. Your story. Your files.
+
+CouldHappen doesn't come with an agent, a subscription, or a fixed game system. It supplies the browser, local tools, persistent story knowledge, and Git-supported recovery. Your existing agent does the writing and decides how best to run the adventure.
+
+Everything lives in your own folder. There's no CouldHappen account or hosted story service, and you choose the agent and model you trust with your story.
+
+The experience depends on the capabilities of your chosen agent, and support for different hosts is still experimental. See [host integrations](docs/reference-hosts.md) for details.
 
 <!-- dev-only -->
 ## Development repository
