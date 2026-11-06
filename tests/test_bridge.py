@@ -102,6 +102,24 @@ class Bridge(unittest.TestCase):
             self.bridge.control({'operation': 'release', 'token': token})
         self.assertTrue(self.bridge.state['paused'])
 
+    def test_invalidate_requires_ownership(self):
+        runtime.control(self.root, 'claim')
+        token = runtime.control(self.root, 'pause')['token']
+        self.bridge.state['owner'] = False  # ownership lost while the token is still held
+        generation = self.bridge.generation
+        with self.assertRaises(files.Invalid):
+            self.bridge.control({'operation': 'invalidate', 'token': token})
+        self.assertEqual(self.bridge.generation, generation)
+
+    def test_close_refuses_while_paused(self):
+        runtime.control(self.root, 'claim')
+        token = runtime.control(self.root, 'pause')['token']
+        with self.assertRaises(files.Invalid):
+            self.bridge.control({'operation': 'close'})
+        self.assertTrue(self.bridge.state['owner'])
+        self.assertTrue(self.bridge.state['paused'])
+        runtime.control(self.root, 'release', token=token)
+
     def test_close_refuses_invalid_public_records_without_disarming(self):
         runtime.control(self.root, 'claim')
         story = self.root / 'public/story.md'

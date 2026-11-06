@@ -188,12 +188,16 @@ class Bridge:
                     raise files.Invalid('Claim safe writer ownership first')
                 self.state['production'] = bool(data['on'])
             elif op == 'invalidate':
+                if not self.state['owner'] or self.closing:
+                    raise files.Invalid('Claim safe writer ownership first')
                 if not self.token or data.get('token') != self.token:
                     raise files.Invalid('Invalidation requires the owned pause token')
                 self.generation = str(uuid4())
                 self.publish_connection()
             elif op == 'close':
                 from .checkpoints import check
+                if self.state['paused']:
+                    raise files.Invalid('Release the edit pause before closing')
                 self.closing = True
                 while self.accepted:
                     self.condition.wait()

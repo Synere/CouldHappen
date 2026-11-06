@@ -168,6 +168,12 @@ class Files(unittest.TestCase):
         with self.assertRaises(files.Invalid):
             files.snapshot(root)
 
+    def test_picture_line_fixture(self):
+        """The reader's splitBody (web/tests/session.test.js) runs the same fixture; the two patterns must agree."""
+        for case in json.loads((REPO / 'tests/fixtures/picture_lines.json').read_text(encoding='utf-8')):
+            with self.subTest(line=case['line'][:60]):
+                self.assertEqual(files.pictures(case['line']), [case['name']] if case['name'] else [])
+
     def test_portrait_button_must_be_boolean(self):
         temp, root = workspace()
         self.addCleanup(temp.cleanup)

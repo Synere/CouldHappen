@@ -63,6 +63,8 @@ The initial mechanism is a **release ZIP**:
 9. run `python -m helpers checkpoint check --root .`; it must be clean;
 10. start a standing wait for the player's first entry before reporting setup complete.
 
+A second path starts another story from an existing story workspace: `python -m helpers new-story --root . --destination <folder>` extracts that workspace's root (baseline) commit into a new, separate folder with a null `workspace_id`, no Git history, and none of the first story's records, imports, assets or edits. The new folder then follows steps 3 to 10 above. Only `validate` checks it (the command runs it before reporting success); the confirmation checklist below is written for the ZIP and applies to the new folder from step 6 on. The command needs a workspace with exactly one root commit, which the ZIP flow guarantees.
+
 The release ZIP itself contains `couldhappen.json` with `workspace_id: null`. The **story workspace's first commit** contains the initialized UUID. There is no separate pre-setup baseline commit. The workspace must not be initialized inside an enclosing Git repository; `git rev-parse --show-toplevel` must resolve to the story workspace. Setup checks this before the baseline commit in step 8; the helpers themselves tolerate a nested repository, and the check keeps setup from committing into an enclosing one.
 
 A created story workspace must contain:
@@ -86,13 +88,13 @@ The builder must:
 4. remove `<!-- dev-only -->` … `<!-- /dev-only -->` blocks from selected Markdown, refusing unclosed, nested, or inline markers; replace the data files listed under `templates` with their release variants in `release/`;
 5. verify every `required` path is present and every `forbidden` path is absent;
 6. scan text files for configured secret/private markers;
-7. verify every relative inline Markdown link (`[text](path)`) resolves inside the ZIP; reference-style links, autolinks, and links in code spans are not checked;
+7. verify every relative inline Markdown link (`[text](path)`) resolves inside the ZIP, including one written inside a code span or fence, so example link syntax in shipped text is avoided; reference-style links and autolinks are not checked;
 8. write a deterministic ZIP with sorted paths and fixed timestamps;
 9. include `release.json` with schema version, package version, contract version, source commit, source date, manifest hash, and file count;
 10. write a `.sha256` sidecar outside the ZIP;
 11. print a JSON result containing the source commit, output path, file count, and archive hash.
 
-The release is not “offline self-contained”: `npm ci` requires the npm registry, and the setup verifies the actual runtime. It is provider-neutral and independent of the development Git history.
+The release is not “offline self-contained”: `npm ci` requires the npm registry, and the setup verifies the actual runtime. Python 3.11.4 or later is required. It is provider-neutral and independent of the development Git history.
 
 ## Distribution contents
 
@@ -100,7 +102,7 @@ The manifest is authoritative. The following summarizes it.
 
 ### Include
 
-* `.agents/skills/couldhappen/` — portable writer skill and references.
+* `.agents/skills/couldhappen/` — portable writer skill, references, and optional Director packages (`packages/`, never applied by themselves; see the skill's package index). A package script may send text such as a scene description to a third-party provider the Director chooses, with a key from the writer's own environment; the package says so before use, and the workspace stores no key.
 * `.claude/skills/couldhappen/SKILL.md` — Claude Code discovery entry point that hands off to the canonical skill.
 * `helpers/` — local file, card, wait, and checkpoint operations.
 * `web/` — reader source, fonts and OFL licenses, configuration, tests, and the editable-reader README; excludes generated dependencies/build/test output.
@@ -154,7 +156,7 @@ Deliberate closure validates the public records before disarming and refuses inv
 
 * Story workspaces are private/local by default. Do not publish one unless the user deliberately chooses to.
 * Do not add the development repository as a remote or merge its history into a story.
-* Imports, portraits, private records, and story history are tracked because the story workspace is the archive unit. A public remote exposes them.
+* Imports, portraits, private records, and story history are tracked because the story workspace is the archive unit. A public remote exposes them. A Director package that calls an outside service (for example `scene-images`) sends the text it needs to that provider; the provider and cost are the Director's choice and are stated before use.
 * A redacted/shareable export is **not implemented in v1**. Users who need one should copy only the public conversations/cast/assets they intend to publish.
 * The development repository is published with a fresh history: one new root commit of the audited current tree, never the private history ([ADR 0004](../decisions/0004-publish-with-fresh-history.md)). Development evidence (`.research/`, `goldfish_reviews/`, `.impeccable/`) is untracked and stays local; the approved Woven references live in `docs/designs/woven/`. The current repository contains no real story or imported cards; that is not a permanent guarantee.
 * The license covers the package source, not the user's story or third-party imported card material. Imported cards retain their own provenance and terms.

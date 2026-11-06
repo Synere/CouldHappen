@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { Session } from '../src/lib/session.js';
 
 const storage = () => { const data = new Map(); return { getItem: key => data.get(key), setItem: (key, value) => data.set(key, value) }; };
@@ -80,4 +81,11 @@ test('a passage version is revealed once, so switching channels does not replay 
   assert.equal(firstReveal('a:1'), true);
   assert.equal(firstReveal('a:1'), false);
   assert.equal(firstReveal('a:2'), true);
+});
+
+test('splitBody agrees with the Python picture-line fixture (tests/fixtures/picture_lines.json)', () => {
+  const cases = JSON.parse(readFileSync(new URL('../../tests/fixtures/picture_lines.json', import.meta.url), 'utf8'));
+  for (const { line, name } of cases) {
+    assert.deepEqual(splitBody(line).pictures.map(picture => picture.name), name ? [name] : [], line.slice(0, 60));
+  }
 });

@@ -6,7 +6,7 @@ Open this workspace with an existing capable agent and ask it to read `.agents/s
 > **Development repository.** Do not run a durable story here. Real stories run in a clean workspace created from the release ZIP; for a smoke test, build a release and unpack it outside this repository (see [Distribution and workspaces](designs/distribution-and-workspaces.md)). The release copy of this file is this text with the marked development-only blocks removed by `scripts/build_release.py`.
 <!-- /dev-only -->
 
-Target Python 3.11+, Node 24+, npm, and Git. Verify the actual `python --version`, `node --version`, `npm --version`, and `git --version` in the agent's environment; install missing prerequisites through normal permitted mechanisms, then recheck. No pip install is needed.
+Target Python 3.11.4+ (`new-story` needs the `tarfile` extraction filters added in that patch release), Node 24+, npm, and Git. Verify the actual `python --version`, `node --version`, `npm --version`, and `git --version` in the agent's environment; install missing prerequisites through normal permitted mechanisms, then recheck. No pip install is needed.
 
 1. In `web/`, run `npm ci`. The included fonts are self-hosted OFL assets; no font network request is needed during play.
 2. At the workspace root, run `python -m helpers validate --root .`. Setup does not recreate existing files.

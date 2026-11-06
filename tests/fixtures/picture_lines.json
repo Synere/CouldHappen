@@ -1,0 +1,70 @@
+[
+ {
+  "line": "![A doorway](/api/assets/scene-1.png)",
+  "name": "scene-1.png"
+ },
+ {
+  "line": "![](/api/assets/a.png)",
+  "name": "a.png"
+ },
+ {
+  "line": "![x](/api/assets/a.png)   ",
+  "name": "a.png"
+ },
+ {
+  "line": "![cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc](/api/assets/a.png)",
+  "name": "a.png"
+ },
+ {
+  "line": "![ccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc](/api/assets/a.png)",
+  "name": null
+ },
+ {
+  "line": "![bad ] caption](/api/assets/a.png)",
+  "name": null
+ },
+ {
+  "line": " ![x](/api/assets/a.png)",
+  "name": null
+ },
+ {
+  "line": "text ![x](/api/assets/a.png)",
+  "name": null
+ },
+ {
+  "line": "![x](/api/assets/a.png) trailing",
+  "name": null
+ },
+ {
+  "line": "![x](/api/assets/.hidden.png)",
+  "name": null
+ },
+ {
+  "line": "![x](/api/assets/UPPER.PNG)",
+  "name": null
+ },
+ {
+  "line": "![x](/api/assets/sub/a.png)",
+  "name": null
+ },
+ {
+  "line": "![x](/api/assets/a.png?v=1)",
+  "name": null
+ },
+ {
+  "line": "![x](/api/assets/a.jpg)",
+  "name": null
+ },
+ {
+  "line": "![x](/api/assets/nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn.png)",
+  "name": "nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn.png"
+ },
+ {
+  "line": "![x](/api/assets/nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn.png)",
+  "name": null
+ },
+ {
+  "line": "![x](https://example.com/a.png)",
+  "name": null
+ }
+]

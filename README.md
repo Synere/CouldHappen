@@ -81,7 +81,7 @@ Source lives in `helpers/` (Python standard library only) and `web/` (Svelte/Vit
 
 > **You don't need to run these steps yourself.** Unpack the release, open the folder with your coding agent, and tell it to **set up**. It reads the writer skill, installs what is needed, starts the reader, and tells you when to open the browser. The steps below are what it does, for reference or if you prefer to do it by hand.
 
-Prerequisites: Python 3.11+, Node 24+, npm, Git.
+Prerequisites: Python 3.11.4+, Node 24+, npm, Git.
 
 1. Unpack the release into a private or local directory.
 2. Install the reader dependencies:
