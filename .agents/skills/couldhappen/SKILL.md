@@ -32,6 +32,7 @@ For illustrations when choosing or improving a method, see [optional creative pr
 5. **Keep the human's words.** Never change the body of a human entry, and never change any entry's ID. A Director Undo may withdraw *writer* entries (keep a private copy); human entries stay, marked `deferred` where appropriate. An addressed preference can still apply later.
 6. **Keep knowledge findable.** Record what a fresh session would need, and link it from `START_HERE.md`. A new session must be able to continue from the files alone, without your chat history.
 7. **Portray the whole cast** and let the player's choices have believable consequences. A new character needs no card or portrait.
+8. **Keep the Cast panel to who matters now.** Add a character to `public/cast.json` once the player has actually met them or learned of them in the story, never before (a hidden enemy stays off). When the story moves on and a character is no longer in the scene, set `"present": false` on them in the same pause: the reader hides them but keeps the entry, portrait and id, and you set `"present": true` (or delete the field) when they return. Remove a character entirely only when they are gone for good, such as dead or permanently out of the story. Update the cast in the same pause as the story entry that causes the change. Details: Records and imports, "Keeping the cast current".
 
 ## Never
 

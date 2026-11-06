@@ -1,7 +1,7 @@
 /** @typedef {'story'|'director'} Channel */
 /** @typedef {{schema_version:number,workspace_id:string,generation:string,channel:Channel,id:string,body:string}} Submission */
 /** @typedef {{id:string,role:'human'|'writer',status?:string,body:string,body_hash:string}} Entry */
-/** @typedef {{id:string,name:string,description?:string,portrait?:string}} Character */
+/** @typedef {{id:string,name:string,description?:string,portrait?:string,present?:boolean}} Character */
 /** @typedef {{schema_version:number,workspace_id:string,generation:string,revision:string,poll_interval_ms:number,story:Entry[],director:Entry[],cast:{schema_version:number,characters:Character[],portrait_button?:boolean},assets:Record<string,string>,work:{mode:string,director_question_id:string|null},permissions:Record<Channel,{allowed:boolean,reason:string|null}>,validation_error:string|null}} Snapshot */
 /** @typedef {Record<Channel,Record<string,string>>} Changes */
 

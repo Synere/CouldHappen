@@ -59,7 +59,8 @@ def main():
         files.atomic(root / 'public/assets/fixture.png', png([]))
         files.write_json(root / 'public/cast.json', {'schema_version': 1, 'portrait_button': True, 'characters': [
             {'id': 'fixture', 'name': 'Synthetic cast fixture', 'description': 'A test image; no real card was supplied.', 'portrait': 'fixture.png'},
-            {'id': 'no-portrait', 'name': 'Character without portrait'}]})
+            {'id': 'no-portrait', 'name': 'Character without portrait'},
+            {'id': 'away', 'name': 'Character who left', 'present': False}]})
         files.atomic(root / 'private.md', 'PRIVATE_BOUNDARY_FIXTURE')
         origin = f'http://127.0.0.1:{port()}'
         env = {**os.environ, 'COULDHAPPEN_ROOT': str(root), 'COULDHAPPEN_TEST_ROOT': str(root),

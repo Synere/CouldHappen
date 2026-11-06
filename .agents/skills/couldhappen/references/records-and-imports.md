@@ -37,4 +37,14 @@ Importing a card does not reveal the character to the player. When you decide to
 1. Run `python -m helpers portrait --root . --source <path>` to make a public PNG with all metadata stripped. The path can be the `source_path` that `import-card` printed, its import folder, or the original card file once it has been imported. `portrait` always reads the preserved copy and never imports by itself.
 2. It prints `{"portrait": "<sha256>.png", ...}`; that file is now in `public/assets/`. Under a pause, add a character to `public/cast.json` with only the fields you intend to disclose (`id`, `name`, optional `description`) and set `portrait` to that filename.
 
-Characters without a card or portrait are fine. Keep source originals. Never fetch remote assets or run scripts embedded in a card.
+Characters without a card or portrait are fine. Keep source originals.
+
+## Keeping the cast current
+
+The Cast panel is for people the player has actually met or heard of, and who matter right now. Update it in the same pause as the story entry that changes it:
+
+- **Add** a character when the story first shows them to the player, or the player learns they exist. Do not add someone who is only planned, hidden or unnamed to the player (an ambush enemy, a secret ally). Add them when they appear.
+- **Hide, do not delete, when they leave the scene.** If a character is no longer here (the player left the place, the enemy fled or was escaped from, the ally went away but may come back), set `"present": false`. The reader hides them. Keep their id, description and portrait so they return unchanged. Set `"present": true`, or remove the field, when they are back.
+- **Delete** only when they are gone for good: dead, destroyed, or permanently out of the story. Delete their portrait file too unless a story picture still uses it.
+- **Check at every scene change**, and whenever the player enters or leaves a place, defeats or escapes a foe, or parts ways with someone: read `public/cast.json` and make it match the scene.
+- A hidden character is still public data in `cast.json`; hiding is for the reader's panel, not for secrecy. Never put anything in `cast.json` that the player has not learned. Never fetch remote assets or run scripts embedded in a card.

@@ -168,7 +168,7 @@ def snapshot(root):
         raise Invalid('Unsupported cast format')
     cast_ids, assets = set(), {}
     for character in cast['characters']:
-        if not isinstance(character, dict) or set(character) - {'id', 'name', 'description', 'portrait'}:
+        if not isinstance(character, dict) or set(character) - {'id', 'name', 'description', 'portrait', 'present'}:
             raise Invalid('Invalid disclosed cast fields')
         cid = character.get('id')
         if not isinstance(cid, str) or not cid or cid in cast_ids or not isinstance(character.get('name'), str) or not character['name'].strip():
@@ -176,6 +176,8 @@ def snapshot(root):
         cast_ids.add(cid)
         if 'description' in character and not isinstance(character['description'], str):
             raise Invalid('Invalid cast description')
+        if 'present' in character and not isinstance(character['present'], bool):
+            raise Invalid('Invalid cast present flag')
         if character.get('portrait') is not None:
             assets[character['portrait']] = digest(public_asset(root, character['portrait']))
     if 'portrait_button' in cast and not isinstance(cast['portrait_button'], bool):

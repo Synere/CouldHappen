@@ -177,3 +177,16 @@ class Files(unittest.TestCase):
         files.write_json(root / 'public/cast.json', {**cast, 'portrait_button': 'yes'})
         with self.assertRaises(files.Invalid):
             files.snapshot(root)
+
+    def test_present_flag_must_be_boolean(self):
+        temp, root = workspace()
+        self.addCleanup(temp.cleanup)
+        cast = files.read_json(root / 'public/cast.json')
+        for value, valid in ((False, True), (True, True), ('no', False), (0, False)):
+            with self.subTest(value=value):
+                files.write_json(root / 'public/cast.json', {**cast, 'characters': [{'id': 'x', 'name': 'X', 'present': value}]})
+                if valid:
+                    self.assertEqual(files.snapshot(root)['cast']['characters'][0]['present'], value)
+                else:
+                    with self.assertRaises(files.Invalid):
+                        files.snapshot(root)

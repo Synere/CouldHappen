@@ -199,6 +199,7 @@ test('a story picture enlarges and cast members can ask for a portrait', async (
   if (await toggle.isVisible()) await toggle.click();
   const ask =page.getByRole('button', { name: /portrait for Character without portrait/i });
   await expect(ask).toBeEnabled();
+  await expect(page.getByRole('heading', { name: 'Character who left' })).toHaveCount(0);
   await ask.click();
   await expect(page.getByRole('status').filter({ hasText: 'Requested' })).toBeVisible();
   expect(readFileSync(resolve(root, 'public/director.md'), 'utf8')).toContain('Make a portrait for Character without portrait (cast id no-portrait).');

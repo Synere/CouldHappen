@@ -3,6 +3,8 @@
   let { cast, assets, open = false, onclose = () => {}, canRequest = false, notes = {}, onrequest = () => {} } = $props();
   /** @type {HTMLButtonElement|undefined} */
   let closeButton;
+  /** Characters marked present: false are hidden until the writer brings them back. */
+  const visible = $derived(cast.characters.filter(character => character.present !== false));
   $effect(() => { if (open) closeButton?.focus(); });
   /** @param {Event} event */
   function loaded(event) {
@@ -24,8 +26,8 @@
         <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" focusable="false"><path d="M3 3l10 10M13 3L3 13" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg>
       </button>
     </div>
-    {#if cast.characters.length === 0}<p class="empty-cast">People will appear here as the story reveals them.</p>{/if}
-    {#each cast.characters as character (character.id)}
+    {#if visible.length === 0}<p class="empty-cast">People will appear here as the story reveals them.</p>{/if}
+    {#each visible as character (character.id)}
       <section class="character">
         {#if character.portrait}
           {#key character.portrait}
