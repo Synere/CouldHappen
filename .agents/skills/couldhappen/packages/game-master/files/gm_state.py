@@ -8,6 +8,7 @@ Usage (from the workspace root):  python tools/gm_state.py <command> [--root .]
   discard                    delete the pending delta
   state [--live]             print the current state as JSON (--live leaves out finished records)
   hot [--about X ...] [--budget N]   print the compact context to read each turn
+  schema                     list every kind, op and field (use "id": "auto" for the next free id)
   layers [--on N ...] [--off N ...]   show or switch the five layers (1 continuity is always on)
   boundary                   scene-boundary checklist: is the scene done, pacing, what is owed
   review                     chapter/session report: stale threads, overdue promises, what to retire
@@ -89,6 +90,66 @@ def new_state():
             'scene_order': [], 'open_scene': None, 'seen': []}
 
 
+OPS = {'contract': ['set'], 'situation': ['set'], 'fact': ['add', 'update', 'replace'],
+       'thread': ['add', 'update', 'resolve'], 'pressure': ['add', 'advance', 'update', 'resolve'],
+       'npc': ['set'], 'revelation': ['add', 'route', 'clue', 'block', 'reveal', 'update', 'discard'],
+       'scene': ['open', 'update', 'close']}
+AUTO_PREFIX = {('fact', 'add'): ('F', 'facts'), ('thread', 'add'): ('T', 'threads'),
+               ('pressure', 'add'): ('P', 'pressures'), ('revelation', 'add'): ('V', 'revelations'),
+               ('scene', 'open'): ('s', 'scenes'), ('fact', 'replace'): ('F', 'facts')}
+LONG_FACT = 180
+
+
+def resolve_auto(state, delta):
+    """Replace "id": "auto" (and "new": "auto" for replace) with the next free id. Returns the ids given."""
+    given, taken = [], {}
+    for op in delta.get('ops', []) if isinstance(delta, dict) and isinstance(delta.get('ops'), list) else []:
+        if not isinstance(op, dict):
+            continue
+        prefix = AUTO_PREFIX.get((op.get('kind'), op.get('op')))
+        key = 'new' if op.get('op') == 'replace' else 'id'
+        if prefix and op.get(key) == 'auto':
+            letter, coll = prefix
+            used = [int(k[len(letter):]) for k in list(state[coll]) + taken.setdefault(coll, [])
+                    if k.startswith(letter) and k[len(letter):].isdigit()]
+            op[key] = f'{letter}{max(used, default=0) + 1}'
+            taken[coll].append(op[key])
+            given.append(op[key])
+    return given
+
+
+def schema_text():
+    lines = ['Every delta: {"entry": "<uuid of the entry that shows it>", "why": "<what happened>", "ops": [...]}',
+             'Give "id": "auto" on a fact, thread, pressure, revelation or scene to get the next free id.',
+             f'Texts are at most {MAX_TEXT} characters; lists at most {MAX_LIST} items; at most {MAX_OPS} ops.', '']
+    spec = {
+        ('contract', 'set'): 'fields: ' + ', '.join(CONTRACT_FIELDS),
+        ('situation', 'set'): 'fields: ' + ', '.join(SITUATION_FIELDS) + '; flashback',
+        ('fact', 'add'): 'id, ' + ', '.join(FACT_FIELDS) + ' (status, text and source required)',
+        ('fact', 'update'): 'id, reason, ' + ', '.join(set(FACT_FIELDS) - {'source'}),
+        ('fact', 'replace'): 'id, new, reason, text, ' + ', '.join(set(FACT_FIELDS) - {'status', 'text'}),
+        ('thread', 'add'): 'id, ' + ', '.join(THREAD_FIELDS) + f' (type: {"|".join(THREAD_TYPES)})',
+        ('thread', 'update'): 'id, reason, touch, ' + ', '.join(set(THREAD_FIELDS) - {'type'}),
+        ('thread', 'resolve'): 'id, resolution, outcome (promises: ' + '|'.join(OUTCOMES) + ')',
+        ('pressure', 'add'): 'id, ' + ', '.join(PRESSURE_FIELDS) + ' (actor, goal, next_action, trigger required)',
+        ('pressure', 'advance'): f'id, basis ({"|".join(BASIS)}), reason, steps, evidence, next_action',
+        ('pressure', 'update'): 'id, reason, touch, ' + ', '.join(set(PRESSURE_FIELDS) - {'actor', 'clock_max'}),
+        ('pressure', 'resolve'): f'id, resolution, outcome ({"|".join(PRESSURE_OUTCOMES)})',
+        ('npc', 'set'): 'id, fields: ' + ', '.join(NPC_FIELDS) + ' (name required for a new one; this is also how to update)',
+        ('revelation', 'add'): f'id, fact, importance ({"|".join(IMPORTANCE)}), tags',
+        ('revelation', 'route'): 'id, route, how, where',
+        ('revelation', 'clue'): 'id, route, reason', ('revelation', 'block'): 'id, route, reason',
+        ('revelation', 'reveal'): 'id, how, route', ('revelation', 'update'): 'id, reason, fact, importance, tags',
+        ('revelation', 'discard'): 'id, reason',
+        ('scene', 'open'): f'id, mode ({"|".join(MODES)}), agenda, exit_condition, tension 0-5, participants, serves',
+        ('scene', 'update'): 'id, resolved, ' + ', '.join(set(SCENE_FIELDS) - {'resolved'}),
+        ('scene', 'close'): 'id, outcome'}
+    for kind, verbs in OPS.items():
+        lines.append(f'{kind} (layer {KIND_LAYER[kind]}):')
+        lines += [f'  {{"op": "{v}", "kind": "{kind}", {spec[(kind, v)]}}}' for v in verbs]
+    return '\n'.join(lines)
+
+
 # ---- applying one delta -------------------------------------------------------------------
 
 def fields_ok(fields, spec, bad):
@@ -98,18 +159,32 @@ def fields_ok(fields, spec, bad):
     ok = True
     for key, value in fields.items():
         if key not in spec:
-            bad(f'unknown field {key}')
+            bad(f'unknown field {key} (allowed: {", ".join(sorted(spec))})')
             ok = False
         elif not typed(value, spec[key]):
-            bad(f'field {key} has the wrong type, is empty, or is too long (max {MAX_TEXT} chars, {MAX_LIST} items)')
+            bad(f'field {key} must be ' + why_untyped(value, spec[key]))
             ok = False
     return ok
+
+
+def why_untyped(value, kind):
+    if kind is int:
+        return 'a whole number, 0 or more'
+    if kind is bool:
+        return 'true or false'
+    if kind is list:
+        if not isinstance(value, list):
+            return f'a list of short texts (up to {MAX_LIST} items)'
+        return f'a list of {MAX_LIST} or fewer non-empty texts of at most {MAX_TEXT} characters'
+    if not isinstance(value, str) or not value:
+        return 'a non-empty text'
+    return f'at most {MAX_TEXT} characters (this one is {len(value)}); keep one durable idea per record'
 
 
 def keys_ok(op, allowed, bad):
     extra = set(op) - allowed
     if extra:
-        bad('unknown keys: ' + ', '.join(sorted(extra)))
+        bad('unknown keys: ' + ', '.join(sorted(extra)) + ' (allowed: ' + ', '.join(sorted(allowed)) + ')')
     return not extra
 
 
@@ -182,7 +257,10 @@ def apply_op(state, op, errs, warns, ctx):
     elif kind == 'scene' and verb in SCENE_VERBS:
         SCENE_VERBS[verb](state, op, bad, ctx)
     else:
-        bad('unknown kind/op')
+        if kind in OPS:
+            bad(f'"{verb}" is not an op for {kind}; use one of: {", ".join(OPS[kind])} (python tools/gm_state.py schema)')
+        else:
+            bad(f'unknown kind "{kind}"; use one of: {", ".join(OPS)} (python tools/gm_state.py schema)')
 
 
 def fact_id(op, name, bad):
@@ -213,6 +291,9 @@ def apply_add(state, op, bad, warns):
     state['facts'][fid] = fact
     if not fact['tags'] and not fact['pin']:
         warns.append(f'{fid} has no tags and is not pinned: it will not appear in the hot context. Add tags (names, places).')
+    if len(fact['text']) > LONG_FACT:
+        warns.append(f'{fid} is {len(fact["text"])} characters. A fact is one lasting truth, not a summary of the turn: '
+                     'the story already holds what happened. Keep only what must stay true, and split the rest.')
 
 
 def apply_update(state, op, bad):
@@ -421,6 +502,9 @@ def pressure_advance(state, op, bad, warns):
         if not typed(op['next_action'], str):
             return bad('next_action must be a short text')
         pressure['next_action'] = op['next_action']
+    if 'next_action' not in op:
+        warns.append(f'{pressure["id"]} advanced without a new next_action: is "{pressure["next_action"]}" still what '
+                     'this actor will do, given what just happened?')
     pressure['clock'] += steps
     pressure['last_moved'] = state['scene_count']
     if evidence:
@@ -753,6 +837,10 @@ def boundary(state):
         out.append('  not used in the last three scenes: ' + ', '.join(unused))
     owed = thread_warnings(state) + pressure_warnings(state) + rev_warnings(state) + scene_warnings(state)
     out += ['WARN ' + w for w in owed]
+    for p in state['pressures'].values():
+        if p['status'] == 'active':
+            out.append(f'STILL TRUE? {p["id"]} {p["actor"]} next: "{p["next_action"]}". If this scene changed it '
+                       '(someone died, a plan failed), update next_action.')
     out.append('CHECK threads you advanced (touch them); pressures whose trigger was met (advance with a basis); '
                'relationships that changed (update the cast card).')
     out.append('NEXT frame a situation already in motion that needs a decision. Do not decide the player\'s response.')
@@ -1194,6 +1282,9 @@ def cmd_check(args, commit=False):
     state = load(args.root)
     delta = load_pending(args.root, getattr(args, 'file', None))
     errs, warns = [], []
+    given = resolve_auto(state, delta)
+    if given:
+        print('ids assigned: ' + ', '.join(given))
     for op in delta.get('ops', []) if isinstance(delta, dict) and isinstance(delta.get('ops'), list) else []:
         layer = KIND_LAYER.get(op.get('kind')) if isinstance(op, dict) else None
         if layer and layer not in state['layers']:
@@ -1264,6 +1355,7 @@ def main():
     p.add_argument('--live', action='store_true')
     sub.add_parser('review')
     sub.add_parser('boundary')
+    sub.add_parser('schema')
     p = sub.add_parser('layers')
     p.add_argument('--on', nargs='*', type=int, default=[])
     p.add_argument('--off', nargs='*', type=int, default=[])
@@ -1300,6 +1392,8 @@ def main():
         print(review(load(args.root)))
     elif args.cmd == 'boundary':
         print(boundary(load(args.root)))
+    elif args.cmd == 'schema':
+        print(schema_text())
     elif args.cmd == 'layers':
         active = read_layers(args.root)
         bad_numbers = [n for n in args.on + args.off if n not in LAYER_NAMES]

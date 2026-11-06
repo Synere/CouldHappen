@@ -20,6 +20,11 @@ Run these around the usual exchange in `references/writing.md` (pause, write, va
 
 ## What belongs in a delta
 
+- **Facts are lasting truths, not turn summaries.** The story entry already records what happened; do not copy it into a fact. Add a fact only for something that must stay true and could be contradicted later ("Ash's left shoulder has four bite holes", "the old camp is empty"). One idea per fact, a sentence or two. If you find yourself writing one fact per turn that retells the turn, stop: put the lasting consequence in a fact, a thread or a pressure, and leave the rest to the log. A fact over 180 characters draws a warning for this reason.
+- **Never type a new id by hand.** Use `"id": "auto"` on a fact, thread, pressure, revelation or scene and the script assigns the next free one when you `check` (it prints them) and `commit`. Use explicit ids only when another op in the same delta must refer to the new record. `python tools/gm_state.py schema` lists every kind, op and field.
+- **Check before you append.** Run `check` on the pending delta and fix every error *before* you append the story entry to the public log, so a rejected delta never leaves prose without state. `check` does not need the entry to exist yet; only `commit` does.
+- **Keep next actions true.** When something happens that changes what a pressure's actor will do (they died, the plan failed, the player intervened), set a new `next_action` on the `advance` or with `update`. `boundary` asks about every active pressure.
+
 - `entry`: the id of the entry that shows it happening (yours, or the Director's for something they told you).
 - `why`: one line naming the event or player action. No state change without one.
 - `ops`: at most 12, each short. Facts are one sentence. Tag every fact with the names and places it concerns, or it will never come back into your hot context. Pin only what must stay in view.

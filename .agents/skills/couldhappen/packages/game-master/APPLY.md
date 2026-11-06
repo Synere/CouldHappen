@@ -61,7 +61,7 @@ Run `python tools/gm_state.py layers --off N` when the Director asks, or when yo
 
 ## 5. Record it
 
-1. Add or update a short "Game master" section in `START_HERE.md`: what the package is, which layers are on (`python tools/gm_state.py layers`), that every turn follows `notes/gm/protocol.md`, the commands (`hot`, `check`, `commit`, `boundary`, `review`, `reconcile`, `layers`), and that meaning-level checks are yours.
+1. Add or update a short "Game master" section in `START_HERE.md`: what the package is, which layers are on (`python tools/gm_state.py layers`), that every turn follows `notes/gm/protocol.md`, the commands (`hot`, `check`, `commit`, `schema`, `boundary`, `review`, `reconcile`, `layers`), and that meaning-level checks are yours.
 2. Record the package in `notes/packages.md` (name, version, date, layers on, changes to the layer set with dates). A fresh session reads this before proposing anything.
 3. After a Director Undo, run `reconcile`, then `reconcile --apply`, as part of the "Reconcile" step of the Undo procedure (`references/recovery.md`), before the next turn. Note that in `notes/packages.md` so a fresh session does it too.
 

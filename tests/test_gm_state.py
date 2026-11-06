@@ -488,6 +488,67 @@ class GmStateTest(unittest.TestCase):
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('layers.json', result.stderr)
 
+    # ---- feedback from a real campaign ---------------------------------------------------------
+
+    def test_errors_say_what_is_allowed_and_schema_lists_everything(self):
+        e = self.add_entry()
+        (self.root / 'notes/gm/pending.json').write_text(json.dumps(self.delta(e, [
+            {'op': 'update', 'kind': 'npc', 'id': 'N1', 'fields': {'want': 'x'}},
+            {'op': 'add', 'kind': 'monster', 'id': 'M1'}])), encoding='utf-8')
+        out = run(self.root, 'check').stdout
+        self.assertIn('"update" is not an op for npc; use one of: set', out)
+        self.assertIn('unknown kind "monster"; use one of: contract, situation, fact', out)
+        schema = run(self.root, 'schema').stdout
+        for expected in ('"id": "auto"', '{"op": "advance", "kind": "pressure"', 'scene (layer 5)', '{"op": "set", "kind": "npc"'):
+            self.assertIn(expected, schema)
+        (self.root / 'notes/gm/pending.json').write_text(json.dumps(self.delta(e, [
+            self.fact(mood='x'), self.fact('F2', text='x' * 400)])), encoding='utf-8')
+        out = run(self.root, 'check').stdout
+        self.assertIn('unknown keys: mood (allowed:', out)
+        self.assertIn('at most 300 characters (this one is 400)', out)
+
+    def test_auto_ids_are_assigned_at_commit_and_are_stable(self):
+        auto = lambda **kw: self.fact('auto', **kw)  # noqa: E731
+        self.commit(self.delta(self.add_entry(), [auto(), auto(text='Second.'), self.thread('auto'),
+                                                  self.pressure('auto'), self.open_scene('auto')]))
+        state = self.state()
+        self.assertEqual(sorted(state['facts']), ['F1', 'F2'])
+        self.assertEqual((list(state['threads']), list(state['pressures']), list(state['scenes'])), (['T1'], ['P1'], ['s1']))
+        self.commit(self.delta(self.add_entry('b'), [auto(text='Third.')]))
+        self.assertIn('F3', self.state()['facts'])
+        deltas = (self.root / 'notes/gm/deltas.jsonl').read_text(encoding='utf-8')
+        self.assertNotIn('"auto"', deltas)  # the log holds real ids only
+
+    def test_auto_id_also_works_for_a_replacement(self):
+        self.commit(self.delta(self.add_entry(), [self.fact()]))
+        self.commit(self.delta(self.add_entry('b'), [{'op': 'replace', 'kind': 'fact', 'id': 'F1', 'new': 'auto',
+                                                      'text': 'Changed.', 'reason': 'it changed in the story'}]))
+        self.assertEqual(self.state()['facts']['F1']['replaced_by'], 'F2')
+
+    def test_a_long_fact_is_called_a_summary_not_a_fact(self):
+        e = self.add_entry()
+        (self.root / 'notes/gm/pending.json').write_text(json.dumps(self.delta(e, [
+            self.fact(text='Ash did many things in the scene. ' * 7)])), encoding='utf-8')
+        out = run(self.root, 'check').stdout
+        self.assertIn('characters. A fact is one lasting truth, not a summary of the turn', out)
+        self.assertEqual(run(self.root, 'commit').returncode, 0)  # advice only
+
+    def test_a_pressure_advanced_without_new_next_action_asks_if_it_is_still_true(self):
+        self.commit(self.delta(self.add_entry(), [self.pressure()]))
+        e = self.add_entry('b')
+        (self.root / 'notes/gm/pending.json').write_text(json.dumps(self.delta(e, [self.advance()])), encoding='utf-8')
+        self.assertIn('advanced without a new next_action: is "send a bailiff to Mara" still', run(self.root, 'check').stdout)
+        (self.root / 'notes/gm/pending.json').write_text(json.dumps(self.delta(e, [
+            self.advance(next_action='the bailiff waits outside')])), encoding='utf-8')
+        self.assertNotIn('without a new next_action', run(self.root, 'check').stdout)
+        self.commit(self.delta(self.add_entry('c'), [{'op': 'update', 'kind': 'pressure', 'id': 'P1',
+                                                      'next_action': 'the guild regroups'}]))
+        self.assertEqual(self.state()['pressures']['P1']['next_action'], 'the guild regroups')
+
+    def test_boundary_asks_whether_each_next_action_is_still_true(self):
+        self.commit(self.delta(self.add_entry(), [self.pressure()]))
+        self.assertIn('STILL TRUE? P1 Harbour guild next: "send a bailiff to Mara"', run(self.root, 'boundary').stdout)
+
 
 if __name__ == '__main__':
     unittest.main()
