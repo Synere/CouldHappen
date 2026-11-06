@@ -2,7 +2,7 @@
 
 CouldHappen turns your existing coding agent into a storyteller and game master, with a browser UI built for play. You play your character and the writer handles everyone else, develops the world, remembers what happens, and lets your choices have consequences.
 
-Open the folder with your agent, tell it to **set up**, and start playing.
+[Download the latest release](https://github.com/Synere/CouldHappen/releases/latest) and extract it to a folder. That folder is your story. Open it with your coding agent, tell it to **set up**, and start playing.
 
 <!-- dev-only -->
 <p align="center">
