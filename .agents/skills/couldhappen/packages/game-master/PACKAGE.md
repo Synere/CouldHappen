@@ -1,6 +1,6 @@
 ---
 name: game-master
-summary: Makes the writer run the story like an expert tabletop game master: continuity it can check, a world that moves on its own, and promises and secrets it does not forget.
+summary: Makes the writer run the story like an expert tabletop game master, with continuity it can check, a world that moves on its own, and promises and secrets it does not forget.
 couldhappen: 0.1.9
 includes: method
 requires: nothing

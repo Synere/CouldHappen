@@ -38,6 +38,25 @@ class SkillDocs(unittest.TestCase):
         missing = [c for c in commands if f'helpers {c}' not in text]
         self.assertEqual(missing, [], 'helper commands not described in the skill, contract or setup')
 
+    def test_front_matter_values_are_valid_unquoted_yaml(self):
+        """A ': ' or ' #' inside an unquoted value breaks YAML parsers that read these headers."""
+        pages = [SKILL / 'SKILL.md', REPO / '.claude/skills/couldhappen/SKILL.md', *sorted((SKILL / 'packages').glob('*/PACKAGE.md'))]
+        for page in pages:
+            lines = page.read_text(encoding='utf-8').splitlines()
+            self.assertEqual(lines[0], '---', page)
+            for number, line in enumerate(lines[1:], 2):
+                if line == '---':
+                    break
+                key, sep, value = line.partition(': ')
+                self.assertTrue(sep, f'{page.name}:{number} is not "key: value"')
+                value = value.strip()
+                if value[:1] in ('"', "'"):
+                    continue
+                self.assertNotIn(': ', value, f'{page.parent.name}/{page.name}:{number} has an unquoted ": " in {key}')
+                self.assertNotIn(' #', value, f'{page.parent.name}/{page.name}:{number} has an unquoted " #" in {key}')
+            else:
+                self.fail(f'{page} front matter is not closed')
+
 
 if __name__ == '__main__':
     unittest.main()
