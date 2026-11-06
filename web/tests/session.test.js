@@ -64,3 +64,12 @@ test('closed saves retain draft; only exact confirmed body clears', () => {
   session.receipt('story', 'id2');
   assert.equal(session.drafts.story, '');
 });
+
+import { splitBody } from '../src/lib/markdown.js';
+
+test('splitBody lifts standalone picture lines and ignores code fences', () => {
+  const { text, pictures } = splitBody('Before.\n\n![A doorway](/api/assets/scene-1.png)\n\nAfter.\n\n```\n![x](/api/assets/no.png)\n```');
+  assert.deepEqual(pictures, [{ alt: 'A doorway', name: 'scene-1.png' }]);
+  assert.ok(!text.includes('scene-1.png'));
+  assert.ok(text.includes('/api/assets/no.png'));
+});

@@ -184,6 +184,26 @@ test('reading position, keyboard, narrow cast, recovery waiting, reduced motion 
   command('writer', 'release', '--token', modeToken);
 });
 
+test('a story picture enlarges and cast members can ask for a portrait', async ({ page }) => {
+  await page.goto('/');
+  const figure = page.locator('figure.plate').last();
+  await expect(figure.locator('figcaption')).toHaveText('A synthetic lit doorway');
+  await figure.getByRole('button').click();
+  const dialog = page.getByRole('dialog', { name: /doorway/i });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole('button', { name: /close/i })).toBeFocused();
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expect(figure.getByRole('button')).toBeFocused();
+  const toggle = page.getByRole('button', { name: 'Cast', exact: true });
+  if (await toggle.isVisible()) await toggle.click();
+  const ask =page.getByRole('button', { name: /portrait for Character without portrait/i });
+  await expect(ask).toBeEnabled();
+  await ask.click();
+  await expect(page.getByRole('status').filter({ hasText: 'Requested' })).toBeVisible();
+  expect(readFileSync(resolve(root, 'public/director.md'), 'utf8')).toContain('Make a portrait for Character without portrait (cast id no-portrait).');
+});
+
 test('first setup empty states remain useful and do not invent a scene', async ({ page }) => {
   const token = command('writer', 'pause').token;
   writeFileSync(resolve(root, 'public/story.md'), '# Story\n');

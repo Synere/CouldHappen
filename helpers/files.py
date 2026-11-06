@@ -139,6 +139,21 @@ def public_asset(root, relative):
     return data
 
 
+PICTURE = re.compile(r'^!\[[^\]\n]{0,200}\]\(/api/assets/([A-Za-z0-9][A-Za-z0-9._-]{0,120}\.png)\)\s*$')
+
+
+def pictures(body):
+    """Names of the pictures attached to a passage: lines of the form ![caption](/api/assets/name.png) outside code fences."""
+    names, fenced = [], False
+    for line in body.split('\n'):
+        if re.match(r'^\s*(```|~~~)', line):
+            fenced = not fenced
+        match = None if fenced else PICTURE.match(line)
+        if match:
+            names.append(match.group(1))
+    return names
+
+
 def snapshot(root):
     root = Path(root)
     logs, ids = {}, set()
@@ -163,6 +178,16 @@ def snapshot(root):
             raise Invalid('Invalid cast description')
         if character.get('portrait') is not None:
             assets[character['portrait']] = digest(public_asset(root, character['portrait']))
+    if 'portrait_button' in cast and not isinstance(cast['portrait_button'], bool):
+        raise Invalid('Invalid portrait_button')
+    for channel in ('story', 'director'):
+        for item in logs[channel]:
+            for name in pictures(item['body']):
+                if name not in assets:
+                    try:
+                        assets[name] = digest(public_asset(root, name))
+                    except Invalid:
+                        raise Invalid(f'{channel}: entry {item["id"]} attaches a missing or invalid picture ({name})') from None
     work = read_json(root / 'public/work.json')
     if not isinstance(work, dict) or set(work) != {'schema_version', 'mode', 'director_question_id'} or work['schema_version'] != 1 or work['mode'] not in ('play', 'awaiting_director'):
         raise Invalid('Unsupported work format')

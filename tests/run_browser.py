@@ -52,11 +52,12 @@ def main():
         story = '# Story\n\n'
         for n in range(18):
             story += files.entry(f'Synthetic browser fixture, passage {n+1}.\n\nThe door stands open beside the river. This text tests sustained reading and is not a supplied scene. ' * 3)
+        story += files.entry('Picture fixture passage.\n\n![A synthetic lit doorway](/api/assets/fixture.png)')
         files.atomic(root / 'public/story.md', story)
         files.atomic(root / 'public/director.md', '# Director\n')
         files.write_json(root / 'public/work.json', {'schema_version': 1, 'mode': 'play', 'director_question_id': None})
         files.atomic(root / 'public/assets/fixture.png', png([]))
-        files.write_json(root / 'public/cast.json', {'schema_version': 1, 'characters': [
+        files.write_json(root / 'public/cast.json', {'schema_version': 1, 'portrait_button': True, 'characters': [
             {'id': 'fixture', 'name': 'Synthetic cast fixture', 'description': 'A test image; no real card was supplied.', 'portrait': 'fixture.png'},
             {'id': 'no-portrait', 'name': 'Character without portrait'}]})
         files.atomic(root / 'private.md', 'PRIVATE_BOUNDARY_FIXTURE')

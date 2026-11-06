@@ -153,3 +153,27 @@ class Files(unittest.TestCase):
                 files.write_json(root / 'public/work.json', work)
                 with self.assertRaises(files.Invalid):
                     files.snapshot(root)
+
+    def test_story_pictures_are_exposed_as_assets_and_must_exist(self):
+        temp, root = workspace()
+        self.addCleanup(temp.cleanup)
+        (root / 'public/assets').mkdir(parents=True, exist_ok=True)
+        (root / 'public/assets/scene-1.png').write_bytes(png([]))
+        body = 'The door opens.\n\n![A lit doorway](/api/assets/scene-1.png)\n\n```\n![code](/api/assets/ignored.png)\n```'
+        self.assertEqual(files.pictures(body), ['scene-1.png'])
+        files.atomic(root / 'public/story.md', '# Story\n\n' + files.entry(body))
+        snap = files.snapshot(root)
+        self.assertEqual(set(snap['assets']), {'scene-1.png'})
+        files.atomic(root / 'public/story.md', '# Story\n\n' + files.entry('![x](/api/assets/missing.png)'))
+        with self.assertRaises(files.Invalid):
+            files.snapshot(root)
+
+    def test_portrait_button_must_be_boolean(self):
+        temp, root = workspace()
+        self.addCleanup(temp.cleanup)
+        cast = files.read_json(root / 'public/cast.json')
+        files.write_json(root / 'public/cast.json', {**cast, 'portrait_button': True})
+        self.assertTrue(files.snapshot(root)['cast']['portrait_button'])
+        files.write_json(root / 'public/cast.json', {**cast, 'portrait_button': 'yes'})
+        with self.assertRaises(files.Invalid):
+            files.snapshot(root)

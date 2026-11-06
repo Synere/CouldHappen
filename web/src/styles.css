@@ -158,3 +158,24 @@ article { padding-top: .3rem; margin-bottom: 1.9rem; }
   .send { width: 100%; }
 }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: 0s !important; transition-duration: 0s !important; scroll-behavior: auto !important; } }
+
+/* A picture attached to a passage: a quiet plate under the prose card. */
+.plate { margin: .55rem 0 0; padding: .55rem; background: var(--surface); border: 1px solid var(--line-soft); border-radius: 9px; }
+.plate-open { display: grid; place-items: center; width: 100%; aspect-ratio: 3 / 2; padding: 0; overflow: hidden; background: var(--panel-deep); border: 0; border-radius: 6px; cursor: zoom-in; }
+.plate-open img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.plate figcaption { margin: .5rem .2rem .1rem; color: var(--muted); font-size: .95rem; line-height: 1.45; max-width: 68ch; overflow-wrap: anywhere; }
+.lightbox { position: fixed; inset: 0; z-index: 30; display: grid; place-items: center; padding: 3.5rem 1rem 1rem; background: rgba(8, 55, 64, .92); }
+.lightbox figure { margin: 0; display: grid; gap: .6rem; justify-items: center; max-width: 100%; }
+.lightbox img { display: block; max-width: min(100%, 1400px); max-height: calc(100vh - 8rem); object-fit: contain; border-radius: 6px; background: var(--panel-deep); }
+.lightbox figcaption { color: #fff; font-size: 1rem; line-height: 1.45; max-width: 68ch; text-align: center; overflow-wrap: anywhere; }
+.lightbox-close { position: absolute; top: .75rem; right: .75rem; display: inline-flex; align-items: center; justify-content: center; width: 44px; height: 44px; padding: 0; color: #fff; background: transparent; border: 1px solid rgba(255, 255, 255, .38); }
+.lightbox-close:hover { background: rgba(255, 255, 255, .12); }
+.lightbox :focus-visible { outline-color: #ffdd87; }
+
+/* Asking the writer for a portrait. Quiet: it is an occasional request, not a primary action. */
+.portrait-ask { margin-top: .7rem; display: grid; gap: .35rem; justify-items: start; }
+.ask { min-height: 44px; padding: .5rem 1rem; color: var(--link, #0c5b68); background: transparent; border-color: #9cb9bf; font-size: .98rem; transition: background-color .16s ease, border-color .16s ease; }
+.ask:not(:disabled):hover { background: var(--panel); border-color: #789aa1; }
+.ask:disabled { color: #48626a; background: #cfdee1; border-color: transparent; }
+.portrait-ask small { color: var(--muted); font-size: .88rem; line-height: 1.4; min-height: 1.2em; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }

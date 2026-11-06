@@ -1,6 +1,6 @@
 <script>
-  /** @type {{cast:{characters:import('../lib/session.js').Character[]},assets:Record<string,string>,open?:boolean,onclose?:()=>void}} */
-  let { cast, assets, open = false, onclose = () => {} } = $props();
+  /** @type {{cast:{characters:import('../lib/session.js').Character[],portrait_button?:boolean},assets:Record<string,string>,open?:boolean,onclose?:()=>void,canRequest?:boolean,notes?:Record<string,string>,onrequest?:(character:import('../lib/session.js').Character)=>void}} */
+  let { cast, assets, open = false, onclose = () => {}, canRequest = false, notes = {}, onrequest = () => {} } = $props();
   /** @type {HTMLButtonElement|undefined} */
   let closeButton;
   $effect(() => { if (open) closeButton?.focus(); });
@@ -37,6 +37,12 @@
         {/if}
         <h3>{character.name}</h3>
         {#if character.description}<p>{character.description}</p>{/if}
+        {#if cast.portrait_button}
+          <div class="portrait-ask">
+            <button type="button" class="ask" disabled={!canRequest || notes[character.id] === 'Saving…'} aria-describedby={'ask-note-' + character.id} onclick={() => onrequest(character)}>{character.portrait ? 'New portrait' : 'Make portrait'}<span class="visually-hidden"> for {character.name}</span></button>
+            <small id={'ask-note-' + character.id} role="status">{notes[character.id] || (canRequest ? '' : 'Unavailable while saving is paused.')}</small>
+          </div>
+        {/if}
       </section>
     {/each}
   </div>

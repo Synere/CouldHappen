@@ -9,7 +9,7 @@ Each package is a folder here: `PACKAGE.md` (what it is, what it touches, what i
 | Package | Offers | A player might say |
 | --- | --- | --- |
 | [rpg-mechanics](rpg-mechanics/PACKAGE.md) | Fair visible dice, a private rules note designed for this setting, and an optional character sheet panel in the reader. | "I want stats", "add an RPG system", "make the rolls real", "track my health and gear" |
-| [scene-images](scene-images/PACKAGE.md) | A "Picture scene" button that makes an image of the current moment, a click-to-enlarge view, and an optional scene backdrop and colour theme. Needs an image provider key. | "I want pictures", "generate scene images", "can the story have art" |
+| [scene-images](scene-images/PACKAGE.md) | Pictures inside the story turn they belong to, checked against the scene before they are kept, a "Picture scene" button, a "Make portrait" button per cast member, portraits reused as references so characters stay consistent, and an optional colour theme. Needs an image provider key. | "I want pictures", "generate scene images", "can the story have art" |
 | [game-master](game-master/PACKAGE.md) | Runs the story like an expert tabletop game master: a private contract, checkable canon facts and current situation, and every change validated and tied to the entry that caused it. Five layers the Director can switch on or off at any time: continuity, memory, living world, discovery, pacing. | "keep the story consistent", "make the world feel alive", "remember my choices", "run it like a real GM" |
 
 ## Packages made for this workspace

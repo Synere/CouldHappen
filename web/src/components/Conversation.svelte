@@ -1,8 +1,8 @@
 <script>
   import { onMount, tick } from 'svelte';
   import ProseEntry from './ProseEntry.svelte';
-  /** @type {{entries:import('../lib/session.js').Entry[],changes:Record<string,string>,channel:import('../lib/session.js').Channel,session:import('../lib/session.js').Session}} */
-  let { entries, changes, channel, session } = $props();
+  /** @type {{entries:import('../lib/session.js').Entry[],changes:Record<string,string>,channel:import('../lib/session.js').Channel,session:import('../lib/session.js').Session,assets?:Record<string,string>}} */
+  let { entries, changes, channel, session, assets = {} } = $props();
   /** @type {HTMLElement} */
   let scroller;
   let follow = true;
@@ -61,6 +61,6 @@
       <p>{channel === 'story' ? 'Share a world, a character, or a first action with your writer. Your conversation will unfold here.' : 'Discuss ideas, preferences, imports, revisions, or Undo with the writer. Discussion does not automatically advance the fiction.'}</p>
     </div>
   {:else}
-    {#each entries as entry (entry.id)}<ProseEntry {entry} {channel} change={changes?.[entry.id] || 'same'} />{/each}
+    {#each entries as entry (entry.id)}<ProseEntry {entry} {channel} {assets} change={changes?.[entry.id] || 'same'} />{/each}
   {/if}
 </section>

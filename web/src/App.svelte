@@ -1,6 +1,6 @@
 <script>
   import { onMount, tick } from 'svelte';
-  import { poll } from './lib/api.js';
+  import { poll, submit, SaveError } from './lib/api.js';
   import { Session } from './lib/session.js';
   import Conversation from './components/Conversation.svelte';
   import Composer from './components/Composer.svelte';
@@ -21,6 +21,22 @@
   /** @type {ReturnType<typeof poll>|undefined} */
   let transport;
   function refresh() { transport?.refresh(); }
+  /** @type {Record<string,string>} */
+  let portraitNotes = $state({});
+  /** One click saves one Director request; it never retries by itself, so a doubtful receipt is left for the player to check.
+   * @param {import('./lib/session.js').Character} character */
+  async function requestPortrait(character) {
+    if (!snapshot || portraitNotes[character.id] === 'Saving…') return;
+    portraitNotes = { ...portraitNotes, [character.id]: 'Saving…' };
+    try {
+      await submit({ schema_version: 1, workspace_id: snapshot.workspace_id, generation: snapshot.generation, channel: 'director',
+        id: crypto.randomUUID(), body: `Make a portrait for ${character.name} (cast id ${character.id}).` }, new AbortController().signal);
+      portraitNotes = { ...portraitNotes, [character.id]: 'Requested. Your writer will answer in Director.' };
+    } catch (failure) {
+      const uncertain = !(failure instanceof SaveError) || failure.status >= 500;
+      portraitNotes = { ...portraitNotes, [character.id]: uncertain ? 'Not sure it saved. Check the Director channel before asking again.' : (failure instanceof Error ? failure.message : 'Could not save the request.') };
+    } finally { refresh(); }
+  }
   function closeCast() { castOpen = false; tick().then(() => castToggle?.focus()); }
   onMount(() => {
     transport = poll(next => { changes = session.receive(next); snapshot = next; }, message => { error = message; });
@@ -47,13 +63,13 @@
       {#if snapshot.work.mode === 'awaiting_director'}<p class="recovery-status" role="status">{channel === 'director' ? 'Awaiting your direction. Add a note below; the story stays paused until the writer interprets it.' : 'Awaiting Director direction. Open Director to discuss the next approach before the story continues.'}</p>{/if}
       {#key channel}
         <div class="reader-scroll">
-          <Conversation entries={snapshot[channel]} changes={changes[channel]} {channel} {session} />
+          <Conversation entries={snapshot[channel]} changes={changes[channel]} {channel} {session} assets={snapshot.assets} />
           <div class="scroll-fade" aria-hidden="true"></div>
         </div>
         <Composer {channel} {snapshot} {session} {epoch} {refresh} connected={!error} />
       {/key}
     </main>
-    <CastPanel cast={snapshot.cast} assets={snapshot.assets} open={castOpen} onclose={closeCast} />
+    <CastPanel cast={snapshot.cast} assets={snapshot.assets} open={castOpen} onclose={closeCast} canRequest={!!snapshot.cast.portrait_button && snapshot.permissions.director.allowed && !error} notes={portraitNotes} onrequest={requestPortrait} />
     {#if castOpen}<button type="button" class="cast-scrim" tabindex="-1" aria-label="Dismiss cast panel" onclick={closeCast}></button>{/if}
   </div>
 {:else}
