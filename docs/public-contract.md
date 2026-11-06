@@ -20,7 +20,7 @@ Reserve lines beginning `<!-- couldhappen:`. Prefix one backslash to any body li
 
 `cast.json` contains schema_version 1 and characters: stable nonempty string id, disclosed name, optional description, optional portrait relative to public/assets. Only referenced existing structurally valid PNGs within that resolved root are exposed. No card is required for a character. Import/preparing a portrait does not add cast. An optional top-level `portrait_button` boolean makes the Cast panel offer a "Make portrait" button for each character; pressing it saves one Director entry (`Make a portrait for <name> (cast id <id>).`) and nothing else.
 
-A story or Director entry may attach a picture with a line of its own, `![caption](/api/assets/<name>.png)`, outside code fences. The reader shows it as a figure with the caption under that entry, with a click-to-enlarge view. Each named PNG is checked like a portrait and added to the snapshot `assets`; a missing or invalid one makes the snapshot invalid.
+A story or Director entry may attach a picture with a Markdown image on a line of its own (an exclamation mark, the caption in square brackets, then `/api/assets/<name>.png` in parentheses), outside code fences. The reader shows it as a figure with the caption under that entry, with a click-to-enlarge view. Each named PNG is checked like a portrait and added to the snapshot `assets`; a missing or invalid one makes the snapshot invalid.
 
 `work.json` contains schema_version 1, mode play or awaiting_director, and director_question_id. Play requires null; awaiting_director requires the UUID of an existing writer entry in Director. The writer establishes that it is a new question and reconciles old pending work. No second disposition map exists.
 

@@ -18,7 +18,7 @@ The reader needs the optional `public/sheet.json` for the quick action and the t
 
 ## 3. The picture, in the turn it belongs to
 
-The reader shows a picture inside the story turn it was made for. A line by itself in a writer entry, `![caption](/api/assets/<file>.png)`, appears under that turn as a figure with the caption, and a click enlarges it. The caption is the alt text, so write it as a plain sentence about the scene. The file must be in `public/assets/` first: an entry that names a missing or invalid PNG makes the snapshot fail. Picture lines inside code fences are ignored.
+The reader shows a picture inside the story turn it was made for. A line by itself in a writer entry that is a Markdown image (an exclamation mark, the caption in square brackets, then `/api/assets/<file>.png` in parentheses, with no spaces) appears under that turn as a figure with the caption, and a click enlarges it. The caption is the alt text, so write it as a plain sentence about the scene. The file must be in `public/assets/` first: an entry that names a missing or invalid PNG makes the snapshot fail. Picture lines inside code fences are ignored.
 
 Workflow for one picture, every time:
 
