@@ -1,3 +1,13 @@
+/** Passages already revealed in this page. Switching channels remounts an entry, which must not replay its typing. */
+const revealed = new Set();
+/** True the first time a passage version is asked about, false after.
+ * @param {string} key */
+export function firstReveal(key) {
+  if (revealed.has(key)) return false;
+  revealed.add(key);
+  return true;
+}
+
 /** Reveal sanitized DOM text only. Never build partial HTML strings.
  * @param {HTMLElement} element @param {boolean} enabled */
 export function reveal(element, enabled) {

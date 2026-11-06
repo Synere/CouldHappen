@@ -1,6 +1,6 @@
 <script>
   import { markdown, splitBody } from '../lib/markdown.js';
-  import { reveal } from '../lib/reveal.js';
+  import { reveal, firstReveal } from '../lib/reveal.js';
   import Lightbox from './Lightbox.svelte';
   /** @type {{entry:import('../lib/session.js').Entry,change?:string,channel:import('../lib/session.js').Channel,assets?:Record<string,string>}} */
   let { entry, change = 'initial', channel, assets = {} } = $props();
@@ -20,7 +20,7 @@
   }
   function shrink() { enlarged = null; opener?.focus(); }
   /** @param {HTMLElement} node */
-  function animate(node) { return reveal(node, change === 'new' && entry.role === 'writer'); }
+  function animate(node) { return reveal(node, change === 'new' && entry.role === 'writer' && firstReveal(entry.id + ':' + entry.body_hash)); }
 </script>
 
 <article class:human={entry.role === 'human'} data-entry-id={entry.id}>

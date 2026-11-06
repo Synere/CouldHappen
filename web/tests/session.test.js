@@ -73,3 +73,11 @@ test('splitBody lifts standalone picture lines and ignores code fences', () => {
   assert.ok(!text.includes('scene-1.png'));
   assert.ok(text.includes('/api/assets/no.png'));
 });
+
+import { firstReveal } from '../src/lib/reveal.js';
+
+test('a passage version is revealed once, so switching channels does not replay typing', () => {
+  assert.equal(firstReveal('a:1'), true);
+  assert.equal(firstReveal('a:1'), false);
+  assert.equal(firstReveal('a:2'), true);
+});
