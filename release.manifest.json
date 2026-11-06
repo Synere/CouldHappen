@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "name": "couldhappen",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "contract_version": 1,
   "include": [
     ".agents/skills/couldhappen/**",
