@@ -8,6 +8,8 @@ informed:
 
 # 0004 — Publish the development repository with a fresh history
 
+> **Update 2026-11-07:** the private history was archived outside the repository and deleted. The fresh public history is now the only history, and `publish` was renamed `main`. References below to a private `main` and a `publish` branch describe the state at decision time.
+
 ## Context and Problem Statement
 
 The author plans to publish the development repository on GitHub. [ADR 0002](0002-publish-clean-release.md) allows that only after a deliberate history and secrets audit. The existing history has three problems for a public repository:

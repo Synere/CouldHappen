@@ -10,7 +10,6 @@
 *.html text eol=lf
 .gitignore text eol=lf
 LICENSE text eol=lf
-scripts/git-hooks/* text eol=lf
 .gitattributes text eol=lf
 
 *.png binary
