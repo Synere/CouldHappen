@@ -40,6 +40,18 @@ It can even improve its own approach along the way. If a story needs something n
 
 **The writer figures out how to make it work.**
 
+<!-- dev-only -->
+### Example: reshaping the UI in a single session
+
+One test session started from a character card and a stock install. Over a long Director conversation, the player asked the writer to redesign the reader: a custom skin, a Do/Say input, tabbed cast panels, mood meters, a floor plan, a watch face, and memory slips.
+
+<p align="center">
+  <img src="docs/images/director-export.png" alt="The Director tab showing the request to export the customized setup into a new workspace folder, with the writer starting its reply." width="520">
+</p>
+
+<p align="center"><sub>The Story tab: A showcase of the UI changes done to immerse in the story.</sub></p>
+<!-- /dev-only -->
+
 ## Give your writer more to work with
 
 CouldHappen includes optional **Director packages**: ready-made starting points for capabilities you want in your story. Ask your writer to apply one, customize it, or build something entirely different.
