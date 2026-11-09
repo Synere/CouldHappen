@@ -40,7 +40,7 @@ class SkillDocs(unittest.TestCase):
 
     def test_front_matter_values_are_valid_unquoted_yaml(self):
         """A ': ' or ' #' inside an unquoted value breaks YAML parsers that read these headers."""
-        pages = [SKILL / 'SKILL.md', REPO / '.claude/skills/couldhappen/SKILL.md', *sorted((SKILL / 'packages').glob('*/PACKAGE.md'))]
+        pages = [SKILL / 'SKILL.md', *sorted((SKILL / 'packages').glob('*/PACKAGE.md'))]
         for page in pages:
             lines = page.read_text(encoding='utf-8').splitlines()
             self.assertEqual(lines[0], '---', page)

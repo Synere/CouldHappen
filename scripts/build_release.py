@@ -12,6 +12,12 @@ the manifest's marker lines for that file type (by default
 ``<!-- dev-only -->`` / ``<!-- /dev-only -->`` in Markdown), each alone on its
 line. Configuration whose rules genuinely differ (such as .gitignore) uses a
 manifest template instead.
+
+Mirrors ship one tracked folder under a second name. Claude Code discovers
+skills only in ``.claude/skills/``, and other hosts read ``.agents/skills/``, so
+the manifest's ``mirrors`` map copies every selected file under a source prefix
+to the destination prefix. Nothing is tracked under a destination prefix: the
+copy exists only in the release, so it cannot drift from its source.
 """
 import argparse
 import fnmatch
@@ -67,7 +73,21 @@ def selected(ref, manifest, all_paths):
     for destination in templates:
         if destination not in files:
             files.append(destination)
+    for destination, source in manifest.get('mirrors', {}).items():
+        stray = [path for path in all_paths if path.startswith(destination)]
+        if stray:
+            raise ReleaseError(f'Mirror destination {destination} must not be tracked: {stray[0]}')
+        files.extend(destination + path[len(source):] for path in list(files) if path.startswith(source))
     return sorted(set(files))
+
+
+def source_path(path, manifest):
+    """Return the tracked path a release path is read from."""
+    for destination, source in manifest.get('mirrors', {}).items():
+        if path.startswith(destination):
+            path = source + path[len(destination):]
+            break
+    return manifest.get('templates', {}).get(path, path)
 
 
 def markers_for(path, manifest):
@@ -108,8 +128,7 @@ def strip_dev_only(path, data, manifest):
 
 
 def release_contents(ref, manifest, files):
-    templates = manifest.get('templates', {})
-    return {path: strip_dev_only(path, blob(ref, templates.get(path, path)), manifest) for path in files}
+    return {path: strip_dev_only(path, blob(ref, source_path(path, manifest)), manifest) for path in files}
 
 
 def link_targets(path, text):

@@ -12,10 +12,10 @@ All hosts are **experimental**. None is certified, and there is no required test
 | --- | --- | --- | --- |
 | opencode | Experimental — one story workspace, two sessions, went well | Finds the skill in `.agents/skills/` | Setup, background standing wait, card import, play, Undo, reset, and fresh-context reentry. |
 | Codex interactive CLI | Experimental — not yet tested | `.agents/skills/couldhappen/` | Nothing yet. |
-| Claude Code interactive CLI | Experimental — four story workspaces, went well | `.claude/skills/couldhappen/SKILL.md`, an entry point that hands off to the canonical skill | Skill discovery and a standing background wait across four workspaces (0.1.4, 0.1.8 twice, 0.1.10; Sonnet 5.5, desktop app). Long play with imported cards, Director packages (RPG mechanics, scene images, game master), generated pictures, a writer-built sheet and theme, and recovery from a context reset mid-fight using only the workspace files. A host restart ends the wait silently. |
+| Claude Code interactive CLI | Experimental — four story workspaces, went well | `.claude/skills/couldhappen/`, a full copy of the skill | Skill discovery and a standing background wait across four workspaces (0.1.4, 0.1.8 twice, 0.1.10; Sonnet 5.5, desktop app). Long play with imported cards, Director packages (RPG mechanics, scene images, game master), generated pictures, a writer-built sheet and theme, and recovery from a context reset mid-fight using only the workspace files. A host restart ends the wait silently. |
 | Pi with OpenRouter | Experimental — not yet tested | Not verified; if the skill is not listed, ask Pi to read `.agents/skills/couldhappen/SKILL.md` | Nothing yet. |
 
-On any host, asking the agent to read `.agents/skills/couldhappen/SKILL.md` explicitly always works; automatic discovery is a convenience. Edit only the canonical skill under `.agents/`.
+On any host, asking the agent to read `.agents/skills/couldhappen/SKILL.md` explicitly always works; automatic discovery is a convenience. `.agents/skills/couldhappen/` is the original; when you change the skill in a workspace, make the same change in the `.claude/skills/couldhappen/` copy.
 
 <!-- dev-only -->
 Evidence for each row lives in [validation results](validation-results.md); update both together.
@@ -37,7 +37,7 @@ The examples were written against Codex 0.165.0; verify the installed version an
 
 ## Claude Code interactive CLI
 
-Claude Code discovers the skill through `.claude/skills/couldhappen/SKILL.md`, which hands off to `.agents/skills/couldhappen/SKILL.md`. Merge `integrations/claude/settings.example.json` into `.claude/settings.json` only during an authorized play setup, and use normal native trust. The wrapper translates the same clean/dirty/error results at Stop. Demonstrate the actual shell wait and native event behavior, recording interruption and renewal limits.
+Claude Code discovers skills only under `.claude/skills/`, so the release ships `.claude/skills/couldhappen/` as an identical copy of `.agents/skills/couldhappen/`. Merge `integrations/claude/settings.example.json` into `.claude/settings.json` only during an authorized play setup, and use normal native trust. The wrapper translates the same clean/dirty/error results at Stop. Demonstrate the actual shell wait and native event behavior, recording interruption and renewal limits.
 
 <!-- dev-only -->
 The example was written against Claude Code 2.1.300; verify the installed version. No newer native Monitor or background-payload semantics are assumed.

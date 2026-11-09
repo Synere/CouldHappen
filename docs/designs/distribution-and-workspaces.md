@@ -103,7 +103,7 @@ The manifest is authoritative. The following summarizes it.
 ### Include
 
 * `.agents/skills/couldhappen/` — portable writer skill, references, and optional Director packages (`packages/`, never applied by themselves; see the skill's package index). A package script may send text such as a scene description to a third-party provider the Director chooses, with a key from the writer's own environment; the package says so before use, and the workspace stores no key.
-* `.claude/skills/couldhappen/SKILL.md` — Claude Code discovery entry point that hands off to the canonical skill.
+* `.claude/skills/couldhappen/` — a full, identical copy of the skill for Claude Code, which discovers skills only under `.claude/skills/`. The builder writes it from the manifest's `mirrors` map; nothing is tracked there, so the copy cannot drift from `.agents/` in the release. A pointer stub was used through 0.1.19; it relied on the writer choosing to open the real skill.
 * `helpers/` — local file, card, wait, and checkpoint operations.
 * `web/` — reader source, fonts and OFL licenses, configuration, tests, and the editable-reader README; excludes generated dependencies/build/test output.
 * `tests/` — local mechanical checks, excluding release-builder tests and caches.
@@ -130,7 +130,7 @@ The manifest is authoritative. The following summarizes it.
 * `PRODUCT.md` — current file contains development evidence; no user-facing replacement yet.
 * `docs/validation.md`, `docs/validation-results.md` — internal validation material that remains upstream.
 * `release/`, `scripts/`, `release.manifest.json` — release tooling and data templates.
-* `.codex/`, `.claude/` other than the skill entry point, and other development hook configuration; keep opt-in `integrations/` examples only.
+* `.codex/`, `.claude/` other than the skill copy, and other development hook configuration; keep opt-in `integrations/` examples only.
 * Generated dependencies, builds, test output, runtime state, public assets, imported source, credentials, and `.env*`.
 
 ### Release text and templates

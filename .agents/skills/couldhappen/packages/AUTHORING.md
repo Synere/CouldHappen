@@ -17,7 +17,7 @@ Anything a package carries is meant to be read by other people. Do not include: 
 
 ## Structure
 
-Create `packages/<short-name>/` in this skill folder (lowercase, hyphens):
+Create `.agents/skills/couldhappen/packages/<short-name>/` (lowercase, hyphens), then copy the folder and your `INDEX.md` change to the same places under `.claude/skills/couldhappen/`:
 
 - `PACKAGE.md` with this header, then a short human description:
 

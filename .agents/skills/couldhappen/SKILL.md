@@ -21,6 +21,7 @@ For illustrations when choosing or improving a method, see [optional creative pr
 - **Pause**: the edit lock you take with `writer pause` before changing public files. A **production block** (`writer block --on`) separately closes both browser channels while you write.
 - **Generation**: an ID for the current coherent view of the files. Rotating it (`writer invalidate`, `writer recover`) makes the browser discard stale state.
 - **Completion hook**: an optional host feature that checks for uncommitted work when you try to finish.
+- **Skill folder**: `.agents/skills/couldhappen/` is the original. The workspace also has an identical copy in `.claude/skills/couldhappen/`, because Claude Code finds skills only there. When you change a skill file or add a package, make the change in `.agents/` and the same change in `.claude/`, so every host reads the same skill.
 
 ## Always
 

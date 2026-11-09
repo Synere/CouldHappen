@@ -5,7 +5,6 @@
   "contract_version": 1,
   "include": [
     ".agents/skills/couldhappen/**",
-    ".claude/skills/couldhappen/SKILL.md",
     "helpers/**",
     "web/**",
     "tests/**",
@@ -52,7 +51,7 @@
     "scripts/**",
     "release.manifest.json",
     ".codex/**",
-    ".claude/*.json",
+    ".claude/settings*.json",
     ".claude/agents/**",
     ".claude/commands/**",
     ".claude/hooks/**",
@@ -69,6 +68,9 @@
     "public/cast.json": "release/public/cast.json",
     "public/work.json": "release/public/work.json",
     ".gitignore": "release/.gitignore"
+  },
+  "mirrors": {
+    ".claude/skills/couldhappen/": ".agents/skills/couldhappen/"
   },
   "required": [
     ".agents/skills/couldhappen/SKILL.md",
@@ -122,7 +124,7 @@
     "scripts/**",
     "release.manifest.json",
     ".codex/**",
-    ".claude/*.json",
+    ".claude/settings*.json",
     ".claude/agents/**",
     ".claude/commands/**",
     ".claude/hooks/**",

@@ -49,8 +49,13 @@ class ReleaseBuild(unittest.TestCase):
                 self.assertNotIn('implementation-progress', archive.read('README.md').decode())
                 self.assertIn('standing wait', archive.read('docs/setup.md').decode())
                 self.assertNotIn('Building a release', archive.read('docs/setup.md').decode())
-                claude_skill = archive.read('.claude/skills/couldhappen/SKILL.md').decode()
-                self.assertIn('.agents/skills/couldhappen/SKILL.md', claude_skill)
+                skill, mirror = '.agents/skills/couldhappen/', '.claude/skills/couldhappen/'
+                shipped = {name[len(skill):] for name in names if name.startswith(skill)}
+                mirrored = {name[len(mirror):] for name in names if name.startswith(mirror)}
+                self.assertIn('SKILL.md', shipped)
+                self.assertEqual(shipped, mirrored, 'Claude Code copy of the skill differs from .agents/')
+                for name in shipped:
+                    self.assertEqual(archive.read(skill + name), archive.read(mirror + name), name)
                 self.assertFalse(any(name.startswith(('.claude/agents/', '.claude/skills/impeccable/'))
                                      or name.startswith('.claude/settings') for name in names))
                 for forbidden in ('.git', '.impeccable', 'docs/history', 'docs/research', 'docs/reviews',
@@ -119,6 +124,38 @@ class VerifyArchive(unittest.TestCase):
         bad = {**self.good, 'public/story.md': b'# Story\n\nsecret\n'}
         with self.assertRaises(self.module.ReleaseError):  # not the empty template
             self.check(bad, bad)
+
+
+class Mirrors(unittest.TestCase):
+    def setUp(self):
+        sys.path.insert(0, str(REPO / 'scripts'))
+        import build_release
+        self.module = build_release
+        self.manifest = {'include': ['s/**', 'x.md'], 'exclude': ['**/*.pyc'], 'mirrors': {'m/': 's/'}}
+
+    def test_mirror_copies_selected_source_files_and_reads_from_the_source(self):
+        files = self.module.selected('HEAD', self.manifest, ['s/SKILL.md', 's/a/b.py', 's/a/b.pyc', 'x.md'])
+        self.assertEqual(files, ['m/SKILL.md', 'm/a/b.py', 's/SKILL.md', 's/a/b.py', 'x.md'])
+        self.assertEqual(self.module.source_path('m/a/b.py', self.manifest), 's/a/b.py')
+        self.assertEqual(self.module.source_path('x.md', self.manifest), 'x.md')
+
+    def test_a_mirrored_file_ships_its_source_template(self):
+        manifest = {**self.manifest, 'templates': {'s/c.json': 'release/c.json'}}
+        self.assertEqual(self.module.source_path('m/c.json', manifest), 'release/c.json')
+        self.assertEqual(self.module.source_path('s/c.json', manifest), 'release/c.json')
+
+    def test_the_real_manifest_ships_nested_package_files_in_both_copies(self):
+        manifest = json.loads((REPO / 'release.manifest.json').read_text(encoding='utf-8'))
+        source = '.agents/skills/couldhappen/packages/p/files/defaults.json'
+        files = self.module.selected('HEAD', manifest, [source])
+        mirrored = '.claude/skills/couldhappen/packages/p/files/defaults.json'
+        self.assertTrue({mirrored, source} <= set(files), files)
+        self.assertFalse(self.module.matches(mirrored, manifest['forbidden']))
+        self.assertTrue(self.module.matches('.claude/settings.local.json', manifest['forbidden']))
+
+    def test_a_tracked_file_under_the_mirror_destination_is_refused(self):
+        with self.assertRaises(self.module.ReleaseError):
+            self.module.selected('HEAD', self.manifest, ['s/SKILL.md', 'm/SKILL.md'])
 
 
 class DevOnlyBlocks(unittest.TestCase):

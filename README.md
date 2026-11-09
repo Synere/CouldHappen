@@ -130,7 +130,7 @@ Prerequisites: Python 3.11.4+, Node 24+, npm, Git.
 
 7. Open <http://127.0.0.1:5173>.
 
-8. Ask your agent to read `.agents/skills/couldhappen/SKILL.md` and **set up**. It should inspect the workspace, leave a standing wait running so your browser messages reach it, and begin when you supply a world prompt or cards. Codex and opencode also find the skill in `.agents/skills/`; Claude Code finds it through `.claude/skills/couldhappen/`. Support for every host is experimental; see [host integrations](docs/reference-hosts.md).
+8. Ask your agent to read `.agents/skills/couldhappen/SKILL.md` and **set up**. It should inspect the workspace, leave a standing wait running so your browser messages reach it, and begin when you supply a world prompt or cards. Codex and opencode also find the skill in `.agents/skills/`; Claude Code finds an identical copy in `.claude/skills/couldhappen/`. Support for every host is experimental; see [host integrations](docs/reference-hosts.md).
 
 9. After setup/claim, initialize Git in this directory and make the first baseline commit. The initialized workspace UUID belongs in that commit. Then check:
 
