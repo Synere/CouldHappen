@@ -39,7 +39,7 @@ Run these around the usual exchange in `references/writing.md` (pause, write, va
  ]}
 ```
 
-Fact status: `established` (true in the fiction), `rumour` (said or believed, not confirmed), `provisional` (your own idea, not yet shown), `outdated` (no longer true; kept for provenance). Set `known` to false for a truth the protagonist has not learned (a provisional idea is never known yet; `check` warns if you leave it at the default). `known` means the page has shown it to the protagonist, not that they understood it: the player may still draw the wrong conclusion.
+Fact status: `established` (true in the fiction), `rumour` (said or believed, not confirmed), `provisional` (your own idea, not yet shown), `outdated` (no longer true; kept for provenance). Set `known` to false for a truth the protagonist has not learned (a provisional idea is never known yet, and `check` warns if one is marked known; if the protagonist has heard it said, it is a rumour). `known` means the page has shown it to the protagonist, not that they understood it: the player may still draw the wrong conclusion.
 
 Changing an established fact is a story event: use `replace` with a reason (it records the old one as outdated). Promoting a rumour needs a reason. Time may not move backwards unless the scene is a flashback (`"flashback": true`).
 
@@ -59,7 +59,7 @@ A thread is an obligation the story has taken on. Types: `promise` (someone said
 - **Use `touch: true`** whenever a thread genuinely advanced in a scene, even if nothing else about it changed.
 - **Warnings are advice.** An overdue promise or a thread untouched for five scenes shows as `WARN` at the top of `hot`. You decide what the fiction needs: pay it off, complicate it, let it lapse with a consequence, or park it. A warning never forces an event.
 - **Retire on purpose.** At a scene or chapter boundary run `python tools/gm_state.py review` (Review, Retire, Refresh, Reopen). Park, resolve or discard what has run its course, and discard provisional facts you never used (`"status": "discarded"`, with a reason).
-- **Questions stay open.** A `question` has no prepared answer. Do not decide it in advance or steer toward one; set up situations that put it to the test, and resolve it with what play showed.
+- **Questions stay open.** A `question` has no prepared answer. Do not decide it in advance or steer toward one; set up situations that put it to the test, and resolve it with what play showed. Tag it with the people it concerns, or it will not come back into the hot context.
 - **Consequences first.** Promises and consequences stay in the hot context even when their tags do not match the scene, because those are the ones a good game master never lets slip.
 
 ## Layer 3, pressures and cast: what is happening without the player
@@ -145,7 +145,7 @@ Before you deliver, ask yourself:
 
 ## After an Undo
 
-Run `python tools/gm_state.py reconcile`, then `--apply`. It sets aside every change that cited a withdrawn entry, and any later change that depended on one, and keeps a private copy in `notes/gm/withdrawn.jsonl`. Facts whose prose still stands but whose delta was set aside must be restated in a new delta. The script only catches broken references, not meaning: then look over the cast cards, pressures and threads changed after the withdrawn entry, and fix any whose wording relied on what was withdrawn (an attitude that softened because of a reveal that no longer happened).
+Run `python tools/gm_state.py reconcile`, then `--apply`. It sets aside every change that cited a withdrawn entry, and any later change that depended on one (later changes are rechecked with the current rules, so a reveal whose truth was established by a withdrawn entry is set aside too), and keeps a private copy in `notes/gm/withdrawn.jsonl`. Facts whose prose still stands but whose delta was set aside must be restated in a new delta. The script only catches broken references, not meaning: then look over the cast cards, pressures and threads changed after the withdrawn entry, and fix any whose wording relied on what was withdrawn (an attitude that softened because of a reveal that no longer happened).
 
 ## Do not track
 

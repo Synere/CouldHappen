@@ -42,7 +42,7 @@ Then write the contract as the first delta, citing the Director entry in which t
 
 Write it to `notes/gm/pending.json`, then `check` and `commit`. Revisit the contract only when the Director's preferences change.
 
-If the story is already underway, seed the state: the current situation and at most about twenty facts that would hurt if contradicted, citing the entry where each became true (a writer entry for events, a Director entry for what they told you). Mark `established` only what the fiction has actually shown; mark what characters merely say or believe `rumour` and your own unshown ideas `provisional`. Tag every fact with the names and places it concerns. Set `known` to false for anything the protagonist has not learned. Do it in two or three deltas, not one.
+If the story is already underway, seed the state: the current situation and at most about twenty facts that would hurt if contradicted, citing the entry where each became true (a writer entry for events, a Director entry for what they told you). Mark `established` only what the fiction has actually shown; mark what characters merely say or believe `rumour` and your own unshown ideas `provisional`. Tag every fact with the names and places it concerns. Set `known` to false for anything the protagonist has not learned, including every provisional idea. Do it in two or three deltas, not one.
 
 ## 3. Switching on a further layer
 
@@ -50,7 +50,7 @@ Do this whenever the Director asks, at any point in the story, or when you have 
 
 - **Layer 2, memory.** Open threads for the promises, mysteries and consequences the story has already taken on (at most about ten; the ones that would hurt if forgotten). Cite the entry where each began; give promises with a clear deadline a `due_day`. From then on `touch` threads that advance and run `review` at chapter or session boundaries.
 - **Layer 3, living world.** Design the opposition with the story's tone in mind: two to four pressures (goal, next action, trigger, and where a deadline helps a clock and consequence), preferring one that already threatens something the player cares about. Add cast cards for the three to six recurring characters, one short phrase per field; leave a field out until the fiction supplies it. At every scene boundary ask "who wants something and is not getting it?", and run `review` before narrating a time skip.
-- **Layer 4, discovery.** List the truths the player must learn. Add each as a hidden fact (`known: false`) and a `required` revelation with three routes of different kinds. Add optional truths only if they are worth the bookkeeping. When the player surprises you, check the routes first; when one is lost, `block` it and add another.
+- **Layer 4, discovery.** List the truths the player must learn. Add each as a hidden fact (`known: false`) and a `required` revelation with three routes of different kinds. The fact may start `provisional` while you are still deciding, but it must be `established` before (or in the same delta as) the reveal. Add optional truths only if they are worth the bookkeeping. When the player surprises you, check the routes first; when one is lost, `block` it and add another.
 - **Layer 5, pacing.** Open a scene for the current moment (mode, agenda, exit condition, `serves`); you do not need to backfill past scenes. From then on close and open scenes as the story moves and run `boundary` at each boundary. Treat its warnings as advice, never as orders.
 
 Say in one line what you switched on and what you will now do differently.

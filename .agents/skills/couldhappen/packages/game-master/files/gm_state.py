@@ -131,7 +131,8 @@ def schema_text():
         ('thread', 'add'): 'id, ' + ', '.join(THREAD_FIELDS) + f' (type: {"|".join(THREAD_TYPES)})',
         ('thread', 'update'): 'id, reason, touch, ' + ', '.join(set(THREAD_FIELDS) - {'type'}),
         ('thread', 'resolve'): 'id, resolution, outcome (promises: ' + '|'.join(OUTCOMES) + ')',
-        ('pressure', 'add'): 'id, ' + ', '.join(PRESSURE_FIELDS) + ' (actor, goal, next_action, trigger required)',
+        ('pressure', 'add'): 'id, ' + ', '.join(PRESSURE_FIELDS) + ' (actor, goal, next_action, trigger required; '
+                             'stages need clock_max, at most one per step)',
         ('pressure', 'advance'): f'id, basis ({"|".join(BASIS)}), reason, steps (negative for a setback), evidence, next_action',
         ('pressure', 'update'): 'id, reason, touch, ' + ', '.join(set(PRESSURE_FIELDS) - {'actor', 'clock_max'}),
         ('pressure', 'resolve'): f'id, resolution, outcome ({"|".join(PRESSURE_OUTCOMES)})',
@@ -139,7 +140,7 @@ def schema_text():
         ('revelation', 'add'): f'id, fact, importance ({"|".join(IMPORTANCE)}), tags',
         ('revelation', 'route'): 'id, route, how, where',
         ('revelation', 'clue'): 'id, route, reason', ('revelation', 'block'): 'id, route, reason',
-        ('revelation', 'reveal'): 'id, how, route', ('revelation', 'update'): 'id, reason, fact, importance, tags',
+        ('revelation', 'reveal'): 'id, how, route (its fact must be established)', ('revelation', 'update'): 'id, reason, fact, importance, tags',
         ('revelation', 'discard'): 'id, reason',
         ('scene', 'open'): f'id, mode ({"|".join(MODES)}), agenda, exit_condition, tension 0-5, participants, serves',
         ('scene', 'update'): 'id, resolved, ' + ', '.join(set(SCENE_FIELDS) - {'resolved'}),
@@ -233,7 +234,7 @@ def apply_op(state, op, errs, warns, ctx):
     elif kind == 'fact' and verb == 'add':
         apply_add(state, op, bad, warns)
     elif kind == 'fact' and verb == 'update':
-        apply_update(state, op, bad)
+        apply_update(state, op, bad, warns, ctx)
     elif kind == 'fact' and verb == 'replace':
         apply_replace(state, op, bad, warns)
     elif kind == 'thread' and verb == 'add':
@@ -271,6 +272,10 @@ def fact_id(op, name, bad):
     return value
 
 
+PROVISIONAL_KNOWN = ('{fid} is provisional but marked known to the player{default}: an idea not yet shown cannot be '
+                     'known. Set known: false; if the protagonist has heard it said, it is a rumour.')
+
+
 def apply_add(state, op, bad, warns):
     if not keys_ok(op, {'op', 'kind', 'id'} | set(FACT_FIELDS), bad):
         return
@@ -292,14 +297,13 @@ def apply_add(state, op, bad, warns):
     if not fact['tags'] and not fact['pin']:
         warns.append(f'{fid} has no tags and is not pinned: it will not appear in the hot context. Add tags (names, places).')
     if fact['status'] == 'provisional' and fact['known']:
-        warns.append(f'{fid} is provisional but marked known to the player' + ('' if 'known' in fields else ' (the default)')
-                     + ': an idea not yet shown cannot be known. Set known: false unless the protagonist has heard it.')
+        warns.append(PROVISIONAL_KNOWN.format(fid=fid, default='' if 'known' in fields else ' (the default)'))
     if len(fact['text']) > LONG_FACT:
         warns.append(f'{fid} is {len(fact["text"])} characters. A fact is one lasting truth, not a summary of the turn: '
                      'the story already holds what happened. Keep only what must stay true, and split the rest.')
 
 
-def apply_update(state, op, bad):
+def apply_update(state, op, bad, warns, ctx):
     allowed = {'op', 'kind', 'id', 'reason'} | (set(FACT_FIELDS) - {'source'})
     if not keys_ok(op, allowed, bad):
         return
@@ -325,7 +329,16 @@ def apply_update(state, op, bad):
             return
     if fields.get('known') is False and fact['known']:
         return bad(f'{fid} is already known to the player and cannot become hidden')
+    rev = next((r for r in state['revelations'].values() if r['fact'] == fid and r['status'] in REV_LIVE), None)
+    if ctx.get('strict') and rev:
+        if fields.get('known') is True and not fact['known']:
+            return bad(f'{fid} is the hidden truth of {rev["id"]}: use reveal on {rev["id"]} (with how) to make it known')
+        if new_status == 'rumour':
+            return bad(f'{fid} is the hidden truth of {rev["id"]}; a truth cannot become a rumour. Discard or relink '
+                       f'{rev["id"]} first, or add the rumour as its own fact')
     fact.update(fields)
+    if fact['status'] == 'provisional' and fact['known'] and fields.get('known') is True:
+        warns.append(PROVISIONAL_KNOWN.format(fid=fid, default=''))
 
 
 def apply_replace(state, op, bad, warns):
@@ -531,7 +544,7 @@ def pressure_advance(state, op, bad, warns):
         if not typed(op['next_action'], str):
             return bad('next_action must be a short text')
         pressure['next_action'] = op['next_action']
-    if 'next_action' not in op:
+    if 'next_action' not in op and steps >= 0:
         warns.append(f'{pressure["id"]} advanced without a new next_action: is "{pressure["next_action"]}" still what '
                      'this actor will do, given what just happened?')
     pressure['clock'] += steps
@@ -756,8 +769,12 @@ def rev_warnings(state, only=None):
         fact = state['facts'].get(r['fact'])
         if not fact or fact['status'] in TERMINAL_FACT:
             out.append(f'{r["id"]} points at {r["fact"]}, which is outdated or discarded: relink or discard it.')
+        elif fact['status'] == 'rumour':
+            out.append(f'{r["id"]} points at {r["fact"]}, a rumour: a revelation needs a truth. Relink it to a fact, '
+                       'or discard it.')
         elif fact['known']:
-            out.append(f'{r["id"]}: the player already knows {r["fact"]}; mark it revealed (reveal) or discard it.')
+            first = '' if fact['status'] == 'established' else 'establish it (fact update, with a reason), then '
+            out.append(f'{r["id"]}: the player already knows {r["fact"]}; {first}mark it revealed (reveal) or discard it.')
         viable = sum(1 for x in r['routes'].values() if x['status'] == 'open')
         if r['importance'] == 'required':
             if viable == 0:
@@ -923,7 +940,7 @@ def validate_delta(state, delta, errs, warns, entries=None, strict=False):
     """Return the new state after applying delta to a copy of state; append problems to errs.
 
     strict adds rules introduced after deltas were first committed. A new delta is checked with them;
-    replaying the log is not, so an older campaign keeps replaying exactly as it was written."""
+    replaying the log is not, so an older campaign keeps replaying (reconcile rechecks deltas after a withdrawal)."""
     if not isinstance(delta, dict):
         errs.append('delta must be an object')
         return state
@@ -1031,11 +1048,13 @@ def read_entries(root):
     return entries
 
 
-def replay(deltas):
+def replay(deltas, strict_after=None):
+    """Rebuild state from committed deltas. Deltas whose seq is above strict_after are held to the current rules."""
     state, good, bad = new_state(), [], []
     for delta in deltas:
         errs, warns = [], []
-        new = validate_delta(state, delta, errs, warns)
+        strict = strict_after is not None and (delta.get('seq') or 0) > strict_after
+        new = validate_delta(state, delta, errs, warns, strict=strict)
         if errs:
             bad.append((delta, errs))
         else:
@@ -1364,7 +1383,8 @@ def cmd_reconcile(args):
     deltas, entries = read_lines(deltas_path), read_entries(args.root)
     missing = [d for d in deltas if d.get('entry') not in entries]
     kept = [d for d in deltas if d.get('entry') in entries]
-    state, good, bad = replay(kept)
+    # after a withdrawal, later deltas are rechecked with today's rules: what they relied on may be gone
+    state, good, bad = replay(kept, min((d.get('seq') or 0) for d in missing) if missing else None)
     for d in missing:
         print(f'WITHDRAWN seq {d.get("seq")}: entry {d.get("entry")} is no longer in the logs ({d.get("why")})')
     for d, errs in bad:

@@ -551,34 +551,93 @@ class GmStateTest(unittest.TestCase):
 
     # ---- truth, belief and open questions ------------------------------------------------------
 
-    def test_a_reveal_needs_an_established_truth_and_a_rumour_is_not_one(self):
-        guess = self.secret(status='provisional')
-        reveal = {'op': 'reveal', 'kind': 'revelation', 'id': 'V1', 'route': 'a', 'how': 'the harbourmaster admitted it'}
-        self.commit(self.delta(self.add_entry(), [guess, self.rev(), self.route('a', 'Mara confesses')]))
-        self.commit(self.delta(self.add_entry('a'), [reveal]), expect=1)
-        establish = {'op': 'update', 'kind': 'fact', 'id': 'F9', 'status': 'established', 'reason': 'he admitted it'}
-        self.commit(self.delta(self.add_entry('b'), [establish, reveal]))
-        self.assertTrue(self.state()['facts']['F9']['known'])
-        self.commit(self.delta(self.add_entry('c'), [self.fact('F2', status='rumour', known=False),
-                                                     self.rev('V2', fact='F2')]), expect=1)
+    def refuse(self, delta, message):
+        """The pending delta is rejected, and for the stated reason."""
+        (self.root / 'notes/gm/pending.json').write_text(json.dumps(delta), encoding='utf-8')
+        result = run(self.root, 'check')
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn(message, result.stdout)
 
-    def test_an_older_log_that_revealed_a_provisional_fact_still_replays(self):
+    def checked(self, delta):
+        (self.root / 'notes/gm/pending.json').write_text(json.dumps(delta), encoding='utf-8')
+        result = run(self.root, 'check')
+        self.assertEqual(result.returncode, 0, result.stdout)
+        return result.stdout
+
+    def reveal_op(self, rid='V1', route='a'):
+        return {'op': 'reveal', 'kind': 'revelation', 'id': rid, 'route': route, 'how': 'the harbourmaster admitted it'}
+
+    def establish(self, fid='F9'):
+        return {'op': 'update', 'kind': 'fact', 'id': fid, 'status': 'established', 'reason': 'he admitted it'}
+
+    def hidden_guess(self):
+        """A provisional hidden truth with one route, committed."""
+        self.commit(self.delta(self.add_entry(), [self.secret(status='provisional'), self.rev(),
+                                                  self.route('a', 'Mara confesses')]))
+
+    def test_a_reveal_needs_an_established_truth(self):
+        self.hidden_guess()
+        self.refuse(self.delta(self.add_entry('a'), [self.reveal_op()]), 'F9 is provisional, not established')
+        self.commit(self.delta(self.add_entry('b'), [self.establish(), self.reveal_op()]))
+        self.assertTrue(self.state()['facts']['F9']['known'])
+
+    def test_a_revelation_never_points_at_a_rumour(self):
+        self.refuse(self.delta(self.add_entry(), [self.fact('F2', status='rumour', known=False),
+                                                  self.rev('V2', fact='F2')]), 'F2 is a rumour, which is what someone believes')
+        self.hidden_guess()
+        self.commit(self.delta(self.add_entry('b'), [self.fact('F2', status='rumour', known=False)]))
+        self.refuse(self.delta(self.add_entry('c'), [{'op': 'update', 'kind': 'revelation', 'id': 'V1', 'fact': 'F2',
+                                                      'reason': 'the truth changed'}]),
+                    'F2 is a rumour; a revelation points at the truth')
+
+    def test_fact_update_cannot_get_round_the_revelation_rules(self):
+        self.hidden_guess()
+        self.refuse(self.delta(self.add_entry('a'), [{'op': 'update', 'kind': 'fact', 'id': 'F9', 'known': True}]),
+                    'F9 is the hidden truth of V1: use reveal')
+        self.refuse(self.delta(self.add_entry('b'), [{'op': 'update', 'kind': 'fact', 'id': 'F9', 'status': 'rumour',
+                                                      'reason': 'someone said it'}]),
+                    'a truth cannot become a rumour')
+
+    def test_older_logs_that_broke_the_new_rules_still_replay_with_a_warning(self):
         e = self.add_entry()
-        ops = [self.secret(status='provisional'), self.rev(), self.route('a', 'Mara confesses'),
-               {'op': 'reveal', 'kind': 'revelation', 'id': 'V1', 'route': 'a', 'how': 'he admitted it'}]
+        old = [self.delta(e, [self.secret(status='provisional'), self.rev(), self.route('a', 'Mara confesses'),
+                              self.reveal_op()]),
+               self.delta(e, [self.fact('F2', status='rumour', known=False, tags=['harbourmaster']),
+                              self.rev('V2', fact='F2')])]
         (self.root / 'notes/gm/deltas.jsonl').write_text(
-            json.dumps({'seq': 1, **self.delta(e, ops)}) + '\n', encoding='utf-8', newline='\n')
+            ''.join(json.dumps({'seq': i + 1, **d}) + '\n' for i, d in enumerate(old)), encoding='utf-8', newline='\n')
         result = run(self.root, 'state')
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(json.loads(result.stdout)['revelations']['V1']['status'], 'revealed')
+        self.assertIn('V2 points at F2, a rumour', run(self.root, 'hot').stdout)
+        self.assertEqual(run(self.root, 'reconcile').returncode, 0)  # nothing withdrawn, nothing rechecked
 
-    def test_a_provisional_fact_left_known_draws_a_warning(self):
-        (self.root / 'notes/gm/pending.json').write_text(json.dumps(self.delta(self.add_entry(), [
-            self.fact(status='provisional')])), encoding='utf-8')
-        self.assertIn('F1 is provisional but marked known to the player (the default)', run(self.root, 'check').stdout)
-        (self.root / 'notes/gm/pending.json').write_text(json.dumps(self.delta(self.add_entry('b'), [
-            self.fact(status='provisional', known=False)])), encoding='utf-8')
-        self.assertNotIn('marked known', run(self.root, 'check').stdout)
+    def test_reconcile_sets_aside_a_reveal_whose_truth_was_established_by_a_withdrawn_entry(self):
+        self.hidden_guess()
+        e2, e3 = self.add_entry('Two.'), self.add_entry('Three.')
+        self.commit(self.delta(e2, [self.establish()]))
+        self.commit(self.delta(e3, [self.reveal_op()]))
+        story = self.root / 'public/story.md'
+        story.write_text(story.read_text(encoding='utf-8').replace(files.entry('Two.', id=e2), ''),
+                         encoding='utf-8', newline='\n')
+        out = run(self.root, 'reconcile').stdout
+        self.assertIn('WITHDRAWN seq 2', out)
+        self.assertIn('DEPENDENT seq 3', out)
+        self.assertEqual(run(self.root, 'reconcile', '--apply').returncode, 0)
+        state = self.state()
+        self.assertEqual(state['facts']['F9']['status'], 'provisional')
+        self.assertFalse(state['facts']['F9']['known'])
+        self.assertEqual(state['revelations']['V1']['status'], 'hidden')
+
+    def test_a_provisional_fact_marked_known_draws_a_warning(self):
+        warning = 'F1 is provisional but marked known to the player'
+        self.assertIn(warning + ' (the default)', self.checked(self.delta(self.add_entry(), [self.fact(status='provisional')])))
+        self.assertIn(warning + ':', self.checked(self.delta(self.add_entry('b'), [self.fact(status='provisional', known=True)])))
+        self.assertNotIn('marked known', self.checked(self.delta(self.add_entry('c'), [
+            self.fact(status='provisional', known=False)])))
+        self.commit(self.delta(self.add_entry('d'), [self.fact(status='provisional', known=False)]))
+        self.assertIn(warning, self.checked(self.delta(self.add_entry('e'), [
+            {'op': 'update', 'kind': 'fact', 'id': 'F1', 'known': True}])))
 
     def test_an_open_question_shows_as_undecided(self):
         self.commit(self.delta(self.add_entry(), [
@@ -593,20 +652,20 @@ class GmStateTest(unittest.TestCase):
 
     def test_a_clock_can_lose_ground_and_its_stages_say_what_each_step_means(self):
         stages = ['recruited the harbourmaster', 'pressing the merchants', 'replacing the council']
-        self.commit(self.delta(self.add_entry(), [self.pressure(stages=stages + ['too many', 'way too many'])]), expect=1)
+        self.refuse(self.delta(self.add_entry(), [self.pressure(stages=stages + ['too many', 'way too many'])]),
+                    '5 stages for a clock of 4')
+        no_clock = {k: v for k, v in self.pressure(stages=['one']).items() if k != 'clock_max'}
+        self.refuse(self.delta(self.add_entry(), [no_clock]), 'stages need a clock')
         self.commit(self.delta(self.add_entry('a'), [self.pressure(stages=stages)]))
         self.commit(self.delta(self.add_entry('b'), [self.advance(steps=2, next_action='lean on the merchants')]))
         hot = run(self.root, 'hot', '--about', 'guild').stdout
         self.assertIn('reached: pressing the merchants | next stage: replacing the council', hot)
-        self.commit(self.delta(self.add_entry('c'), [self.advance(steps=-3, basis='action')]), expect=1)
-        self.commit(self.delta(self.add_entry('d'), [self.advance(steps=-1, basis='action',
-                                                                   reason='the player exposed the harbourmaster')]))
+        self.refuse(self.delta(self.add_entry('c'), [self.advance(steps=-3, basis='action')]), 'cannot lose 3 step(s)')
+        setback = self.advance(steps=-1, basis='action', reason='the player exposed the harbourmaster')
+        self.assertNotIn('without a new next_action', self.checked(self.delta(self.add_entry('d'), [setback])))
+        self.commit(self.delta(self.add_entry('d'), [setback]))
         self.assertEqual(self.state()['pressures']['P1']['clock'], 1)
         self.assertIn('P1 Harbour guild clock 1/4 | reached: recruited the harbourmaster', run(self.root, 'review').stdout)
-        no_clock = {k: v for k, v in self.pressure('P2', stages=['one']).items() if k != 'clock_max'}
-        (self.root / 'notes/gm/pending.json').write_text(json.dumps(self.delta(self.add_entry('e'), [no_clock])),
-                                                          encoding='utf-8')
-        self.assertIn('stages need a clock', run(self.root, 'check').stdout)
 
 
 if __name__ == '__main__':
