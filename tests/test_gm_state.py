@@ -681,6 +681,23 @@ class GmStateTest(unittest.TestCase):
                          encoding='utf-8', newline='\n')
         self.assertIn('DEPENDENT', run(self.root, 'reconcile').stdout)
 
+    def test_with_layer_4_off_a_replace_and_update_in_one_delta_cannot_reveal(self):
+        self.hidden_guess()
+        self.assertEqual(run(self.root, 'layers', '--off', '4').returncode, 0)
+        self.refuse(self.delta(self.add_entry('a'), [
+            {'op': 'replace', 'kind': 'fact', 'id': 'F9', 'new': 'F10', 'text': 'The clerk forged it.',
+             'reason': 'the truth changed'},
+            {'op': 'update', 'kind': 'fact', 'id': 'F10', 'known': True}]), 'F10 is the hidden truth of V1: use reveal')
+        self.assertNotIn('hidden_revelations', run(self.root, 'state').stdout)
+
+    def test_a_replaced_truth_cannot_get_a_second_revelation(self):
+        self.hidden_guess()
+        self.commit(self.delta(self.add_entry('a'), [{'op': 'replace', 'kind': 'fact', 'id': 'F9', 'new': 'F10',
+                                                      'text': 'The clerk forged it.', 'reason': 'the truth changed'}]))
+        self.refuse(self.delta(self.add_entry('b'), [self.rev('V2', fact='F10')]), 'F10 already has a live revelation (V1')
+        relink = {'op': 'update', 'kind': 'revelation', 'id': 'V1', 'fact': 'F10', 'reason': 'the truth changed'}
+        self.commit(self.delta(self.add_entry('c'), [relink]))
+
     def test_a_relink_cannot_give_one_truth_two_live_revelations(self):
         self.hidden_guess()
         self.commit(self.delta(self.add_entry('a'), [self.fact('F2', known=False, tags=['clerk']),
@@ -741,6 +758,8 @@ class GmStateTest(unittest.TestCase):
         self.commit(self.delta(self.add_entry('d'), [setback]))
         self.assertEqual(self.state()['pressures']['P1']['clock'], 1)
         self.assertIn('P1 Harbour guild clock 1/4 | reached: recruited the harbourmaster', run(self.root, 'review').stdout)
+        self.commit(self.delta(self.add_entry('f'), [self.advance(steps=3, next_action='rule the town')]))
+        self.assertIn('clock 4/4 | reached: replacing the council', run(self.root, 'review').stdout)
 
 
 if __name__ == '__main__':

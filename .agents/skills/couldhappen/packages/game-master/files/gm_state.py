@@ -286,21 +286,17 @@ def truth_chain(state, fid):
     return out
 
 
-def hidden_truths(state):
-    """Map every fact id that is (or replaced) the truth of a live revelation to that revelation's id."""
-    out = {}
-    for r in state['revelations'].values():
-        if r['status'] in REV_LIVE:
-            for fid in truth_chain(state, r['fact']):
-                out.setdefault(fid, r['id'])
-    return out
+def truths_of(state, fid):
+    """Ids of the live revelations whose hidden truth is fid, or a fact that fid replaced. It also sees the
+    revelations of a switched-off layer 4 (load keeps them in 'hidden_revelations'), so neither replace nor
+    switching the layer off is a way round the rules that protect a hidden truth."""
+    revs = list(state['revelations'].values()) + list(state.get('hidden_revelations', {}).values())
+    return [r['id'] for r in revs if r['status'] in REV_LIVE and fid in truth_chain(state, r['fact'])]
 
 
 def truth_of(state, fid):
-    """The id of the live revelation whose hidden truth is fid (or a fact fid replaced), or None. It also sees
-    revelations of a switched-off layer 4 (load keeps them in 'hidden_truths'), so neither replace nor switching
-    the layer off is a way round the rules that protect a hidden truth."""
-    return hidden_truths(state).get(fid) or state.get('hidden_truths', {}).get(fid)
+    """The first live revelation protecting fid (see truths_of), or None."""
+    return next(iter(truths_of(state, fid)), None)
 
 
 def apply_add(state, op, bad, warns):
@@ -529,8 +525,8 @@ def stage_note(p):
     """' | reached: ... | next stage: ...' for a pressure with stages, else ''."""
     stages, clock = p.get('stages') or [], p['clock']
     parts = []
-    if 0 < clock <= len(stages):
-        parts.append(f'reached: {stages[clock - 1]}')
+    if clock > 0 and stages:
+        parts.append(f'reached: {stages[min(clock, len(stages)) - 1]}')
     if clock < len(stages):
         parts.append(f'next stage: {stages[clock]}')
     return ''.join(' | ' + x for x in parts)
@@ -695,6 +691,8 @@ def rev_add(state, op, bad, ctx):
         return bad('the player already knows that fact; only a hidden truth (known: false) can be a revelation')
     if any(r['fact'] == fields['fact'] and r['status'] in REV_LIVE for r in state['revelations'].values()):
         return bad(f'{fields["fact"]} already has a live revelation')
+    if ctx.get('strict') and truth_of(state, fields['fact']):
+        return bad(f'{fields["fact"]} already has a live revelation ({truth_of(state, fields["fact"])}, through a replace)')
     state['revelations'][rid] = {'id': rid, 'tags': [], **fields, 'status': 'hidden', 'routes': {},
                                  'origin': ctx['entry'], 'revealed_entry': None, 'reveal_how': None}
 
@@ -777,8 +775,9 @@ def rev_update(state, op, bad, ctx):
             return bad('the new fact must exist, be live, and still be hidden from the player')
         if ctx.get('strict') and fact['status'] == 'rumour':
             return bad(f'{fact["id"]} is a rumour; a revelation points at the truth, not at a belief')
-        if ctx.get('strict') and truth_of(state, fact['id']) not in (None, rev['id']):
-            return bad(f'{fact["id"]} already has a live revelation ({truth_of(state, fact["id"])})')
+        others = [x for x in truths_of(state, fact['id']) if x != rev['id']]
+        if ctx.get('strict') and others:
+            return bad(f'{fact["id"]} already has a live revelation ({others[0]})')
         if not reason_ok(op, bad, f'relinking {rev["id"]}'):
             return
     rev.update(fields)
@@ -1137,7 +1136,7 @@ def load(root):
     active = read_layers(root)
     state['layers'] = sorted(active)
     if 4 not in active:  # a switched-off layer 4 still protects its hidden truths (see truth_of)
-        state['hidden_truths'] = hidden_truths(state)
+        state['hidden_revelations'] = state['revelations']
     for layer, keys in LAYER_KEYS.items():  # a layer that is off is invisible; its records stay in the log
         if layer not in active:
             for key in keys:
@@ -1496,6 +1495,7 @@ def main():
         print('discarded')
     elif args.cmd == 'state':
         state = load(args.root)
+        state.pop('hidden_revelations', None)  # a switched-off layer stays invisible
         if args.live:
             state['facts'] = {k: v for k, v in state['facts'].items() if v['status'] not in TERMINAL_FACT}
             state['threads'] = {k: v for k, v in state['threads'].items() if v['status'] in THREAD_LIVE}
