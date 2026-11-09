@@ -629,6 +629,49 @@ class GmStateTest(unittest.TestCase):
         self.assertFalse(state['facts']['F9']['known'])
         self.assertEqual(state['revelations']['V1']['status'], 'hidden')
 
+    def test_switching_layer_4_off_does_not_unlock_a_hidden_truth(self):
+        self.hidden_guess()
+        self.assertEqual(run(self.root, 'layers', '--off', '4').returncode, 0)
+        self.refuse(self.delta(self.add_entry('a'), [{'op': 'update', 'kind': 'fact', 'id': 'F9', 'known': True}]),
+                    'F9 is the hidden truth of V1: use reveal')
+        self.refuse(self.delta(self.add_entry('b'), [{'op': 'update', 'kind': 'fact', 'id': 'F9', 'status': 'rumour',
+                                                      'reason': 'someone said it'}]), 'a truth cannot become a rumour')
+
+    def test_replace_cannot_reveal_a_hidden_truth_or_hide_a_known_fact(self):
+        self.hidden_guess()
+        replace = {'op': 'replace', 'kind': 'fact', 'id': 'F9', 'new': 'F10', 'text': 'The clerk forged it.',
+                   'reason': 'the truth changed'}
+        self.refuse(self.delta(self.add_entry('a'), [{**replace, 'known': True}]), 'F9 is the hidden truth of V1: replace it hidden')
+        out = self.checked(self.delta(self.add_entry('b'), [replace]))
+        self.assertIn('V1 points at F9, which is outdated or discarded: relink', out)
+        self.commit(self.delta(self.add_entry('c'), [self.fact('F1')]))
+        self.refuse(self.delta(self.add_entry('d'), [{'op': 'replace', 'kind': 'fact', 'id': 'F1', 'new': 'F2',
+                                                      'text': 'Mara owes nothing.', 'reason': 'she paid it back', 'known': False}]),
+                    'F1 is known to the player; its replacement cannot be hidden')
+
+    def test_a_relink_cannot_give_one_truth_two_live_revelations(self):
+        self.hidden_guess()
+        self.commit(self.delta(self.add_entry('a'), [self.fact('F2', known=False, tags=['clerk']),
+                                                     self.rev('V2', fact='F2')]))
+        self.refuse(self.delta(self.add_entry('b'), [{'op': 'update', 'kind': 'revelation', 'id': 'V2', 'fact': 'F9',
+                                                      'reason': 'same secret'}]), 'F9 already has a live revelation (V1)')
+
+    def test_reconcile_keeps_an_older_reveal_that_did_not_depend_on_the_withdrawn_entry(self):
+        e1, e2, e3 = self.add_entry('One.'), self.add_entry('Two.'), self.add_entry('Three.')
+        old = [self.delta(e1, [self.secret(status='provisional'), self.rev(), self.route('a', 'Mara confesses')]),
+               self.delta(e2, [self.fact('F2', text='The tide is high.', tags=['harbour'])]),
+               self.delta(e3, [self.reveal_op()])]
+        (self.root / 'notes/gm/deltas.jsonl').write_text(
+            ''.join(json.dumps({'seq': i + 1, **d}) + '\n' for i, d in enumerate(old)), encoding='utf-8', newline='\n')
+        story = self.root / 'public/story.md'
+        story.write_text(story.read_text(encoding='utf-8').replace(files.entry('Two.', id=e2), ''),
+                         encoding='utf-8', newline='\n')
+        out = run(self.root, 'reconcile').stdout
+        self.assertIn('WITHDRAWN seq 2', out)
+        self.assertNotIn('DEPENDENT', out)
+        self.assertEqual(run(self.root, 'reconcile', '--apply').returncode, 0)
+        self.assertEqual(self.state()['revelations']['V1']['status'], 'revealed')
+
     def test_a_provisional_fact_marked_known_draws_a_warning(self):
         warning = 'F1 is provisional but marked known to the player'
         self.assertIn(warning + ' (the default)', self.checked(self.delta(self.add_entry(), [self.fact(status='provisional')])))

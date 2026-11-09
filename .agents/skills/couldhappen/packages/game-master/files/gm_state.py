@@ -236,7 +236,7 @@ def apply_op(state, op, errs, warns, ctx):
     elif kind == 'fact' and verb == 'update':
         apply_update(state, op, bad, warns, ctx)
     elif kind == 'fact' and verb == 'replace':
-        apply_replace(state, op, bad, warns)
+        apply_replace(state, op, bad, warns, ctx)
     elif kind == 'thread' and verb == 'add':
         thread_add(state, op, bad, warns, ctx)
     elif kind == 'thread' and verb == 'update':
@@ -274,6 +274,16 @@ def fact_id(op, name, bad):
 
 PROVISIONAL_KNOWN = ('{fid} is provisional but marked known to the player{default}: an idea not yet shown cannot be '
                      'known. Set known: false; if the protagonist has heard it said, it is a rumour.')
+
+
+def truth_of(state, fid):
+    """The id of the live revelation whose hidden truth is fid, or None. It also sees revelations of a
+    switched-off layer 4 (load keeps their links in 'hidden_truths'), so switching the layer off is never a
+    way round the rules that protect a hidden truth."""
+    for r in state['revelations'].values():
+        if r['fact'] == fid and r['status'] in REV_LIVE:
+            return r['id']
+    return state.get('hidden_truths', {}).get(fid)
 
 
 def apply_add(state, op, bad, warns):
@@ -329,19 +339,19 @@ def apply_update(state, op, bad, warns, ctx):
             return
     if fields.get('known') is False and fact['known']:
         return bad(f'{fid} is already known to the player and cannot become hidden')
-    rev = next((r for r in state['revelations'].values() if r['fact'] == fid and r['status'] in REV_LIVE), None)
-    if ctx.get('strict') and rev:
+    rid = truth_of(state, fid)
+    if ctx.get('strict') and rid:
         if fields.get('known') is True and not fact['known']:
-            return bad(f'{fid} is the hidden truth of {rev["id"]}: use reveal on {rev["id"]} (with how) to make it known')
+            return bad(f'{fid} is the hidden truth of {rid}: use reveal on {rid} (with how) to make it known')
         if new_status == 'rumour':
-            return bad(f'{fid} is the hidden truth of {rev["id"]}; a truth cannot become a rumour. Discard or relink '
-                       f'{rev["id"]} first, or add the rumour as its own fact')
+            return bad(f'{fid} is the hidden truth of {rid}; a truth cannot become a rumour. Discard or relink '
+                       f'{rid} first, or add the rumour as its own fact')
     fact.update(fields)
     if fact['status'] == 'provisional' and fact['known'] and fields.get('known') is True:
         warns.append(PROVISIONAL_KNOWN.format(fid=fid, default=''))
 
 
-def apply_replace(state, op, bad, warns):
+def apply_replace(state, op, bad, warns, ctx):
     allowed = {'op', 'kind', 'id', 'new', 'reason'} | (set(FACT_FIELDS) - {'status'})
     if not keys_ok(op, allowed, bad):
         return
@@ -358,6 +368,13 @@ def apply_replace(state, op, bad, warns):
         return bad('text is required')
     if not reason_ok(op, bad, f'replacing {old_id}'):
         return
+    if ctx.get('strict') and 'known' in fields and fields['known'] != old['known']:
+        if old['known']:
+            return bad(f'{old_id} is known to the player; its replacement cannot be hidden')
+        rid = truth_of(state, old_id)
+        if rid:
+            return bad(f'{old_id} is the hidden truth of {rid}: replace it hidden and relink {rid}, '
+                       'then reveal it when the page shows it')
     old['status'], old['replaced_by'] = 'outdated', new_id
     fact = {'id': new_id, 'known': old['known'], 'tags': old['tags'], 'pin': old['pin'],
             'source': 'story', **fields, 'status': 'established', 'replaces': old_id}
@@ -743,6 +760,8 @@ def rev_update(state, op, bad, ctx):
             return bad('the new fact must exist, be live, and still be hidden from the player')
         if ctx.get('strict') and fact['status'] == 'rumour':
             return bad(f'{fact["id"]} is a rumour; a revelation points at the truth, not at a belief')
+        if ctx.get('strict') and truth_of(state, fact['id']) not in (None, rev['id']):
+            return bad(f'{fact["id"]} already has a live revelation ({truth_of(state, fact["id"])})')
         if not reason_ok(op, bad, f'relinking {rev["id"]}'):
             return
     rev.update(fields)
@@ -969,6 +988,8 @@ def validate_delta(state, delta, errs, warns, entries=None, strict=False):
         apply_op(new, op, errs, warns, ctx)
     moves = sum(1 for op in ops if isinstance(op, dict) and op.get('kind') == 'pressure' and op.get('op') == 'advance')
     touched = {op.get('id') for op in ops if isinstance(op, dict) and op.get('kind') == 'revelation'}
+    facts = {op.get('id') for op in ops if isinstance(op, dict) and op.get('kind') == 'fact'}
+    touched |= {r['id'] for r in new['revelations'].values() if r['fact'] in facts}
     if touched:
         warns.extend(rev_warnings(new, touched))
     if any(isinstance(op, dict) and op.get('kind') == 'scene' for op in ops):
@@ -1048,12 +1069,14 @@ def read_entries(root):
     return entries
 
 
-def replay(deltas, strict_after=None):
-    """Rebuild state from committed deltas. Deltas whose seq is above strict_after are held to the current rules."""
+def replay(deltas, strict_after=None, lenient=()):
+    """Rebuild state from committed deltas. Deltas whose seq is above strict_after are held to the current
+    rules, except those whose seq is in lenient."""
     state, good, bad = new_state(), [], []
     for delta in deltas:
         errs, warns = [], []
-        strict = strict_after is not None and (delta.get('seq') or 0) > strict_after
+        seq = delta.get('seq') or 0
+        strict = strict_after is not None and seq > strict_after and seq not in lenient
         new = validate_delta(state, delta, errs, warns, strict=strict)
         if errs:
             bad.append((delta, errs))
@@ -1093,6 +1116,8 @@ def load(root):
     state, _, bad = replay(deltas)
     active = read_layers(root)
     state['layers'] = sorted(active)
+    if 4 not in active:  # a switched-off layer 4 still protects its hidden truths (see truth_of)
+        state['hidden_truths'] = {r['fact']: r['id'] for r in state['revelations'].values() if r['status'] in REV_LIVE}
     for layer, keys in LAYER_KEYS.items():  # a layer that is off is invisible; its records stay in the log
         if layer not in active:
             for key in keys:
@@ -1383,8 +1408,12 @@ def cmd_reconcile(args):
     deltas, entries = read_lines(deltas_path), read_entries(args.root)
     missing = [d for d in deltas if d.get('entry') not in entries]
     kept = [d for d in deltas if d.get('entry') in entries]
-    # after a withdrawal, later deltas are rechecked with today's rules: what they relied on may be gone
-    state, good, bad = replay(kept, min((d.get('seq') or 0) for d in missing) if missing else None)
+    # After a withdrawal, later deltas are rechecked with today's rules, since what they relied on may be gone.
+    # A delta that broke those rules even with nothing withdrawn (an older log) keeps the rules it was written under:
+    # failing them now says nothing about the withdrawal.
+    cut = min((d.get('seq') or 0) for d in missing) if missing else None
+    lenient = {d.get('seq') or 0 for d, _ in replay(deltas, cut)[2]} if missing else set()
+    state, good, bad = replay(kept, cut, lenient)
     for d in missing:
         print(f'WITHDRAWN seq {d.get("seq")}: entry {d.get("entry")} is no longer in the logs ({d.get("why")})')
     for d, errs in bad:
