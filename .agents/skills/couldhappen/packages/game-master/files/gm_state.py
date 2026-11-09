@@ -34,7 +34,7 @@ TRANSITIONS = {'provisional': {'established', 'rumour', 'outdated', 'discarded'}
                'rumour': {'established', 'outdated'},
                'established': {'outdated'},
                'outdated': set(), 'discarded': set()}
-THREAD_TYPES = ('promise', 'mystery', 'consequence', 'relationship', 'callback')
+THREAD_TYPES = ('promise', 'mystery', 'consequence', 'relationship', 'callback', 'question')
 THREAD_STATUS = ('open', 'active', 'dormant', 'resolved', 'discarded')
 THREAD_LIVE = ('open', 'active', 'dormant')
 THREAD_MOVES = {'open': {'active', 'dormant', 'discarded'}, 'active': {'dormant'},
@@ -68,7 +68,7 @@ FACT_FIELDS = {'text': str, 'status': str, 'source': str, 'known': bool, 'tags':
 THREAD_FIELDS = {'type': str, 'text': str, 'status': str, 'due_condition': str, 'due_day': int,
                  'tags': list}
 PRESSURE_FIELDS = {'actor': str, 'goal': str, 'next_action': str, 'trigger': str, 'consequence': str,
-                   'clock_max': int, 'status': str, 'tags': list}
+                   'clock_max': int, 'status': str, 'tags': list, 'stages': list}
 NPC_FIELDS = {'name': str, 'want': str, 'fear': str, 'secret': str, 'voice': str, 'attitude': str,
               'status': str, 'tags': list}
 
@@ -132,7 +132,7 @@ def schema_text():
         ('thread', 'update'): 'id, reason, touch, ' + ', '.join(set(THREAD_FIELDS) - {'type'}),
         ('thread', 'resolve'): 'id, resolution, outcome (promises: ' + '|'.join(OUTCOMES) + ')',
         ('pressure', 'add'): 'id, ' + ', '.join(PRESSURE_FIELDS) + ' (actor, goal, next_action, trigger required)',
-        ('pressure', 'advance'): f'id, basis ({"|".join(BASIS)}), reason, steps, evidence, next_action',
+        ('pressure', 'advance'): f'id, basis ({"|".join(BASIS)}), reason, steps (negative for a setback), evidence, next_action',
         ('pressure', 'update'): 'id, reason, touch, ' + ', '.join(set(PRESSURE_FIELDS) - {'actor', 'clock_max'}),
         ('pressure', 'resolve'): f'id, resolution, outcome ({"|".join(PRESSURE_OUTCOMES)})',
         ('npc', 'set'): 'id, fields: ' + ', '.join(NPC_FIELDS) + ' (name required for a new one; this is also how to update)',
@@ -291,6 +291,9 @@ def apply_add(state, op, bad, warns):
     state['facts'][fid] = fact
     if not fact['tags'] and not fact['pin']:
         warns.append(f'{fid} has no tags and is not pinned: it will not appear in the hot context. Add tags (names, places).')
+    if fact['status'] == 'provisional' and fact['known']:
+        warns.append(f'{fid} is provisional but marked known to the player' + ('' if 'known' in fields else ' (the default)')
+                     + ': an idea not yet shown cannot be known. Set known: false unless the protagonist has heard it.')
     if len(fact['text']) > LONG_FACT:
         warns.append(f'{fid} is {len(fact["text"])} characters. A fact is one lasting truth, not a summary of the turn: '
                      'the story already holds what happened. Keep only what must stay true, and split the rest.')
@@ -455,11 +458,35 @@ def pressure_add(state, op, bad, warns, ctx):
         return bad('a new pressure starts active or dormant')
     if 'clock_max' in fields and not 2 <= fields['clock_max'] <= 12:
         return bad('clock_max must be between 2 and 12')
-    state['pressures'][pid] = {'id': pid, 'consequence': '', 'clock_max': None, 'tags': [], **fields,
+    if not stages_ok(fields.get('stages'), fields.get('clock_max'), bad):
+        return
+    state['pressures'][pid] = {'id': pid, 'consequence': '', 'clock_max': None, 'tags': [], 'stages': [], **fields,
                                'clock': 0, 'origin': ctx['entry'], 'last_moved': state['scene_count'],
                                'evidence': None, 'resolution': None, 'outcome': None}
     if not state['pressures'][pid]['tags']:
         warns.append(f'{pid} has no tags: it will show in full only when its clock is full.')
+
+
+def stages_ok(stages, clock_max, bad):
+    """Stage n says what the clock reaching n means; there is at most one per step."""
+    if stages and not clock_max:
+        bad('stages need a clock: set clock_max, one stage per step at most')
+        return False
+    if stages and len(stages) > clock_max:
+        bad(f'{len(stages)} stages for a clock of {clock_max}: at most one stage per step')
+        return False
+    return True
+
+
+def stage_note(p):
+    """' | reached: ... | next stage: ...' for a pressure with stages, else ''."""
+    stages, clock = p.get('stages') or [], p['clock']
+    parts = []
+    if 0 < clock <= len(stages):
+        parts.append(f'reached: {stages[clock - 1]}')
+    if clock < len(stages):
+        parts.append(f'next stage: {stages[clock]}')
+    return ''.join(' | ' + x for x in parts)
 
 
 def live_pressure(state, op, bad, name='id'):
@@ -492,12 +519,14 @@ def pressure_advance(state, op, bad, warns):
     if evidence is not None and not typed(evidence, str):
         return bad('evidence must be a short text')
     steps = op.get('steps', 1 if pressure['clock_max'] else 0)
-    if not typed(steps, int):
-        return bad('steps must be a whole number')
+    if not (isinstance(steps, int) and not isinstance(steps, bool)):
+        return bad('steps must be a whole number (negative for a setback)')
     if steps and not pressure['clock_max']:
         return bad(f'{pressure["id"]} has no clock; omit steps')
     if pressure['clock_max'] and pressure['clock'] + steps > pressure['clock_max']:
         return bad(f'{pressure["id"]} clock is {pressure["clock"]}/{pressure["clock_max"]}; {steps} more step(s) would overflow it')
+    if pressure['clock'] + steps < 0:
+        return bad(f'{pressure["id"]} clock is {pressure["clock"]}/{pressure["clock_max"]}; it cannot lose {-steps} step(s)')
     if 'next_action' in op:
         if not typed(op['next_action'], str):
             return bad('next_action must be a short text')
@@ -527,6 +556,8 @@ def pressure_update(state, op, bad):
         return bad('nothing to change')
     pressure = live_pressure(state, op, bad)
     if not pressure:
+        return
+    if 'stages' in fields and not stages_ok(fields['stages'], pressure['clock_max'], bad):
         return
     new_status = fields.pop('status', None)
     if new_status and new_status != pressure['status']:
@@ -610,6 +641,9 @@ def rev_add(state, op, bad, ctx):
     fact = state['facts'].get(fields['fact'])
     if not fact or fact['status'] in TERMINAL_FACT:
         return bad(f'fact {fields["fact"]} must exist and not be outdated or discarded')
+    if ctx.get('strict') and fact['status'] == 'rumour':
+        return bad(f'{fact["id"]} is a rumour, which is what someone believes. Make the truth behind it its own '
+                   'fact (established or provisional) and point the revelation at that')
     if fact['known']:
         return bad('the player already knows that fact; only a hidden truth (known: false) can be a revelation')
     if any(r['fact'] == fields['fact'] and r['status'] in REV_LIVE for r in state['revelations'].values()):
@@ -665,6 +699,9 @@ def rev_reveal(state, op, bad, ctx):
     fact = state['facts'].get(rev['fact'])
     if not fact or fact['status'] in TERMINAL_FACT:
         return bad(f'its fact {rev["fact"]} is outdated or discarded; relink the revelation first')
+    if ctx.get('strict') and fact['status'] != 'established':
+        return bad(f'its fact {fact["id"]} is {fact["status"]}, not established. A reveal shows a truth: establish it '
+                   'first in this delta (fact update, status established, with a reason), or relink the revelation')
     if 'route' in op:
         route = rev_route_of(rev, op, bad, ('open', 'used'))
         if not route:
@@ -691,6 +728,8 @@ def rev_update(state, op, bad, ctx):
         fact = state['facts'].get(fields['fact'])
         if not fact or fact['status'] in TERMINAL_FACT or fact['known']:
             return bad('the new fact must exist, be live, and still be hidden from the player')
+        if ctx.get('strict') and fact['status'] == 'rumour':
+            return bad(f'{fact["id"]} is a rumour; a revelation points at the truth, not at a belief')
         if not reason_ok(op, bad, f'relinking {rev["id"]}'):
             return
     rev.update(fields)
@@ -880,8 +919,11 @@ def delta_hash(delta):
     return hashlib.sha1(json.dumps(core, sort_keys=True).encode('utf-8')).hexdigest()[:12]
 
 
-def validate_delta(state, delta, errs, warns, entries=None):
-    """Return the new state after applying delta to a copy of state; append problems to errs."""
+def validate_delta(state, delta, errs, warns, entries=None, strict=False):
+    """Return the new state after applying delta to a copy of state; append problems to errs.
+
+    strict adds rules introduced after deltas were first committed. A new delta is checked with them;
+    replaying the log is not, so an older campaign keeps replaying exactly as it was written."""
     if not isinstance(delta, dict):
         errs.append('delta must be an object')
         return state
@@ -902,7 +944,7 @@ def validate_delta(state, delta, errs, warns, entries=None):
     if delta.get('delta', delta_hash(delta)) in state['seen']:
         errs.append('this delta was already committed')
     new = copy.deepcopy(state)
-    ctx = {'entry': delta.get('entry'), 'entries': entries}
+    ctx = {'entry': delta.get('entry'), 'entries': entries, 'strict': strict}
     for op in ops:
         if not isinstance(op, dict):
             errs.append('each operation must be an object')
@@ -1115,6 +1157,8 @@ def hot(state, about, budget):
         if t['due_condition']:
             due += f', due when: {t["due_condition"]}'
         line = f'{t["id"]} [{t["type"]}, {t["status"]}{due}] {t["text"]}'
+        if t['type'] == 'question':
+            line += ' (undecided: let play answer it)'
         if fit(line, 'threads'):
             thread_lines.append(line)
     present = {p.lower() for p in state['situation'].get('present', [])}
@@ -1133,7 +1177,7 @@ def hot(state, about, budget):
         full = p['clock_max'] and p['clock'] >= p['clock_max']
         if full or any(t.lower() in context for t in p['tags']):
             clock = f', clock {p["clock"]}/{p["clock_max"]}' if p['clock_max'] else ''
-            line = (f'{p["id"]} [{p["actor"]}{clock}] goal: {p["goal"]} | next: {p["next_action"]} | '
+            line = (f'{p["id"]} [{p["actor"]}{clock}] goal: {p["goal"]}{stage_note(p)} | next: {p["next_action"]} | '
                     f'moves when: {p["trigger"]}' + (f' | if unopposed: {p["consequence"]}' if p['consequence'] else ''))
             if fit(line, 'threads'):
                 pressure_lines.append(line)
@@ -1252,7 +1296,7 @@ def review(state):
     for p in state['pressures'].values():
         if p['status'] == 'active':
             clock = f' clock {p["clock"]}/{p["clock_max"]}' if p['clock_max'] else ''
-            out.append(f'  {p["id"]} {p["actor"]}{clock}: next "{p["next_action"]}" when "{p["trigger"]}"')
+            out.append(f'  {p["id"]} {p["actor"]}{clock}{stage_note(p)}: next "{p["next_action"]}" when "{p["trigger"]}"')
     if not any(p['status'] == 'active' for p in state['pressures'].values()):
         out.append('  no active pressures: who wants something the player is not giving them?')
     out += ['REOPEN plan a strong next opening: a situation already in motion, not a recap of what happened']
@@ -1291,7 +1335,7 @@ def cmd_check(args, commit=False):
             errs.append(f'{op["kind"]} belongs to layer {layer} ({LAYER_NAMES[layer]}), which is off. '
                         f'Switch it on first: python tools/gm_state.py layers --on {layer}')
     entries = read_entries(args.root) if commit else None
-    new = validate_delta(state, delta, errs, warns, entries)
+    new = validate_delta(state, delta, errs, warns, entries, strict=True)
     prose = getattr(args, 'prose', None)
     if prose:
         for term in banned_in(new, Path(prose).read_text(encoding='utf-8')):

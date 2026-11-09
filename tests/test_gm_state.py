@@ -549,6 +549,65 @@ class GmStateTest(unittest.TestCase):
         self.commit(self.delta(self.add_entry(), [self.pressure()]))
         self.assertIn('STILL TRUE? P1 Harbour guild next: "send a bailiff to Mara"', run(self.root, 'boundary').stdout)
 
+    # ---- truth, belief and open questions ------------------------------------------------------
+
+    def test_a_reveal_needs_an_established_truth_and_a_rumour_is_not_one(self):
+        guess = self.secret(status='provisional')
+        reveal = {'op': 'reveal', 'kind': 'revelation', 'id': 'V1', 'route': 'a', 'how': 'the harbourmaster admitted it'}
+        self.commit(self.delta(self.add_entry(), [guess, self.rev(), self.route('a', 'Mara confesses')]))
+        self.commit(self.delta(self.add_entry('a'), [reveal]), expect=1)
+        establish = {'op': 'update', 'kind': 'fact', 'id': 'F9', 'status': 'established', 'reason': 'he admitted it'}
+        self.commit(self.delta(self.add_entry('b'), [establish, reveal]))
+        self.assertTrue(self.state()['facts']['F9']['known'])
+        self.commit(self.delta(self.add_entry('c'), [self.fact('F2', status='rumour', known=False),
+                                                     self.rev('V2', fact='F2')]), expect=1)
+
+    def test_an_older_log_that_revealed_a_provisional_fact_still_replays(self):
+        e = self.add_entry()
+        ops = [self.secret(status='provisional'), self.rev(), self.route('a', 'Mara confesses'),
+               {'op': 'reveal', 'kind': 'revelation', 'id': 'V1', 'route': 'a', 'how': 'he admitted it'}]
+        (self.root / 'notes/gm/deltas.jsonl').write_text(
+            json.dumps({'seq': 1, **self.delta(e, ops)}) + '\n', encoding='utf-8', newline='\n')
+        result = run(self.root, 'state')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(json.loads(result.stdout)['revelations']['V1']['status'], 'revealed')
+
+    def test_a_provisional_fact_left_known_draws_a_warning(self):
+        (self.root / 'notes/gm/pending.json').write_text(json.dumps(self.delta(self.add_entry(), [
+            self.fact(status='provisional')])), encoding='utf-8')
+        self.assertIn('F1 is provisional but marked known to the player (the default)', run(self.root, 'check').stdout)
+        (self.root / 'notes/gm/pending.json').write_text(json.dumps(self.delta(self.add_entry('b'), [
+            self.fact(status='provisional', known=False)])), encoding='utf-8')
+        self.assertNotIn('marked known', run(self.root, 'check').stdout)
+
+    def test_an_open_question_shows_as_undecided(self):
+        self.commit(self.delta(self.add_entry(), [
+            {'op': 'set', 'kind': 'situation', 'fields': {'day': 1, 'present': ['Mara'], 'scene': 's1'}},
+            {'op': 'add', 'kind': 'thread', 'id': 'T1', 'type': 'question', 'tags': ['Mara'],
+             'text': 'Will Mara trust the protagonist with what she knows?'}]))
+        self.assertIn('T1 [question, open] Will Mara trust the protagonist with what she knows? '
+                      '(undecided: let play answer it)', run(self.root, 'hot').stdout)
+        self.commit(self.delta(self.add_entry('b'), [{'op': 'resolve', 'kind': 'thread', 'id': 'T1',
+                                                      'resolution': 'She told them everything.'}]))
+        self.assertEqual(self.state()['threads']['T1']['status'], 'resolved')
+
+    def test_a_clock_can_lose_ground_and_its_stages_say_what_each_step_means(self):
+        stages = ['recruited the harbourmaster', 'pressing the merchants', 'replacing the council']
+        self.commit(self.delta(self.add_entry(), [self.pressure(stages=stages + ['too many', 'way too many'])]), expect=1)
+        self.commit(self.delta(self.add_entry('a'), [self.pressure(stages=stages)]))
+        self.commit(self.delta(self.add_entry('b'), [self.advance(steps=2, next_action='lean on the merchants')]))
+        hot = run(self.root, 'hot', '--about', 'guild').stdout
+        self.assertIn('reached: pressing the merchants | next stage: replacing the council', hot)
+        self.commit(self.delta(self.add_entry('c'), [self.advance(steps=-3, basis='action')]), expect=1)
+        self.commit(self.delta(self.add_entry('d'), [self.advance(steps=-1, basis='action',
+                                                                   reason='the player exposed the harbourmaster')]))
+        self.assertEqual(self.state()['pressures']['P1']['clock'], 1)
+        self.assertIn('P1 Harbour guild clock 1/4 | reached: recruited the harbourmaster', run(self.root, 'review').stdout)
+        no_clock = {k: v for k, v in self.pressure('P2', stages=['one']).items() if k != 'clock_max'}
+        (self.root / 'notes/gm/pending.json').write_text(json.dumps(self.delta(self.add_entry('e'), [no_clock])),
+                                                          encoding='utf-8')
+        self.assertIn('stages need a clock', run(self.root, 'check').stdout)
+
 
 if __name__ == '__main__':
     unittest.main()

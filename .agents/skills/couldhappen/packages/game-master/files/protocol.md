@@ -39,13 +39,13 @@ Run these around the usual exchange in `references/writing.md` (pause, write, va
  ]}
 ```
 
-Fact status: `established` (true in the fiction), `rumour` (said or believed, not confirmed), `provisional` (your own idea, not yet shown), `outdated` (no longer true; kept for provenance). Set `known` to false for a truth the protagonist has not learned.
+Fact status: `established` (true in the fiction), `rumour` (said or believed, not confirmed), `provisional` (your own idea, not yet shown), `outdated` (no longer true; kept for provenance). Set `known` to false for a truth the protagonist has not learned (a provisional idea is never known yet; `check` warns if you leave it at the default). `known` means the page has shown it to the protagonist, not that they understood it: the player may still draw the wrong conclusion.
 
 Changing an established fact is a story event: use `replace` with a reason (it records the old one as outdated). Promoting a rumour needs a reason. Time may not move backwards unless the scene is a flashback (`"flashback": true`).
 
 ## Layer 2, threads: what must not be forgotten
 
-A thread is an obligation the story has taken on. Types: `promise` (someone said they would), `mystery` (a question the player wants answered), `consequence` (something the player did that the world will answer), `relationship` (a bond that is changing), `callback` (a detail worth echoing later). Open one only when it will change what you write; skip incidental detail.
+A thread is an obligation the story has taken on. Types: `promise` (someone said they would), `mystery` (a question the player wants answered), `consequence` (something the player did that the world will answer), `relationship` (a bond that is changing), `callback` (a detail worth echoing later), `question` (an open dramatic question nobody has answered yet, you included: "Will Mara trust them enough to talk?"). Open one only when it will change what you write; skip incidental detail.
 
 ```json
 {"op": "add", "kind": "thread", "id": "T3", "type": "promise", "due_day": 6, "tags": ["Mara"],
@@ -59,6 +59,7 @@ A thread is an obligation the story has taken on. Types: `promise` (someone said
 - **Use `touch: true`** whenever a thread genuinely advanced in a scene, even if nothing else about it changed.
 - **Warnings are advice.** An overdue promise or a thread untouched for five scenes shows as `WARN` at the top of `hot`. You decide what the fiction needs: pay it off, complicate it, let it lapse with a consequence, or park it. A warning never forces an event.
 - **Retire on purpose.** At a scene or chapter boundary run `python tools/gm_state.py review` (Review, Retire, Refresh, Reopen). Park, resolve or discard what has run its course, and discard provisional facts you never used (`"status": "discarded"`, with a reason).
+- **Questions stay open.** A `question` has no prepared answer. Do not decide it in advance or steer toward one; set up situations that put it to the test, and resolve it with what play showed.
 - **Consequences first.** Promises and consequences stay in the hot context even when their tags do not match the scene, because those are the ones a good game master never lets slip.
 
 ## Layer 3, pressures and cast: what is happening without the player
@@ -77,6 +78,8 @@ A **pressure** is someone who wants something and will act whether or not the pl
 ```
 
 - **Advance only what is justified.** `basis` is `time`, `event`, `action` or `offscreen`, always with a reason. Never advance everything on a whim; advancing more than two in one delta draws a warning.
+- **Clocks can lose ground.** A negative `steps` (with a reason, usually basis `action` or `event`) is a setback: the player foiled part of the plan, or a rival pushed back. The clock never goes below 0.
+- **Stages say what the clock means.** Optional `stages` on `add` or `update`: one short phrase per step (`["recruited the harbourmaster", "pressing the merchants", "replacing the council"]`), at most `clock_max`. `hot` shows the stage reached and the next one.
 - **Off-screen means observable.** An off-screen move needs `evidence`: the sign the protagonist can later find. If the world moved and nothing shows it, the player cannot feel it.
 - **Full clocks come due.** When a clock fills, `hot` warns. Let the consequence land, or resolve the pressure as thwarted with an explanation. Do not leave it hanging.
 - **Lifecycle.** `active` ↔ `dormant` (with a reason), then `resolved` (outcome `achieved`, `thwarted` or `abandoned`) or `discarded`. Dormant pressures cannot advance until woken.
@@ -99,10 +102,11 @@ A **revelation** is a hidden truth the player can find out, tracked apart from w
 {"op": "reveal", "kind": "revelation", "id": "V1", "route": "b", "how": "the player put the pages beside the harbourmaster's own hand"}
 ```
 
-- **Required vs optional.** `required` means the story cannot go on without the player learning it; give it three open routes of different kinds (a person, a place or object, a consequence of events). `optional` truths need no minimum.
+- **Required vs optional.** `required` means the story is much poorer if the player never learns it; give it three open routes of different kinds (a person, a place or object, a consequence of events). Three routes is a resilience rule, not a script: the story can still go on if the player misreads a clue, and a wrong conclusion is itself something the world can answer. `optional` truths need no minimum.
+- **Leads, not just answers.** A route can point somewhere ("the clerk knows who bought the ink") rather than give the truth away. Use `clue` when a route yields a lead or a piece; keep `reveal` for when the truth itself is on the page.
 - **Routes are adaptable.** A route is a way the truth could surface, not a scripted scene. When the player does something unexpected, use the nearest route or add one (`route`), as long as it does not contradict established facts. If a route is lost (the informant dies, the place burns), `block` it with a reason and add another.
 - **Clues are partial.** `clue` marks a route as used and makes the revelation `partial`: the player has a piece, not the answer. Use it when a route yields something short of the truth.
-- **Reveal only on the page.** `reveal` flips the fact to known and needs a `how` that matches what the prose actually shows. Never reveal in a delta for a scene where the player did not learn it.
+- **Reveal only on the page.** `reveal` flips the fact to known and needs a `how` that matches what the prose actually shows. The fact must be `established`: if it was still provisional, establish it (`update`, status established, with a reason) earlier in the same delta. A revelation never points at a rumour; a rumour is what someone believes, so make the truth behind it its own fact. Never reveal in a delta for a scene where the player did not learn it.
 - **If the truth changes** (twist, rewrite), `replace` the fact, then `update` the revelation's `fact` to the new hidden one, with a reason. A revelation pointing at an outdated fact is flagged.
 - **Retire.** `discard` a revelation, with a reason, when the story no longer needs it. The fact stays hidden.
 - **Hidden means hidden.** Everything under "WHAT THE PLAYER COULD DISCOVER" is writer-private. Never state it as narrator knowledge before it is revealed; characters may hint, lie, or be wrong.
@@ -141,7 +145,7 @@ Before you deliver, ask yourself:
 
 ## After an Undo
 
-Run `python tools/gm_state.py reconcile`, then `--apply`. It sets aside every change that cited a withdrawn entry, and any later change that depended on one, and keeps a private copy in `notes/gm/withdrawn.jsonl`. Facts whose prose still stands but whose delta was set aside must be restated in a new delta.
+Run `python tools/gm_state.py reconcile`, then `--apply`. It sets aside every change that cited a withdrawn entry, and any later change that depended on one, and keeps a private copy in `notes/gm/withdrawn.jsonl`. Facts whose prose still stands but whose delta was set aside must be restated in a new delta. The script only catches broken references, not meaning: then look over the cast cards, pressures and threads changed after the withdrawn entry, and fix any whose wording relied on what was withdrawn (an attitude that softened because of a reveal that no longer happened).
 
 ## Do not track
 
