@@ -11,4 +11,4 @@ These instructions are for agents working on CouldHappen itself, the development
 - Keep LF line endings. Run the checks in [docs/setup.md](docs/setup.md#development-checks) before proposing a change.
 - The license is AGPL-3.0-or-later. Contributions are made under it.
 
-**Contributors and the maintainer** follow [CONTRIBUTING.md](CONTRIBUTING.md): work on a branch and open a pull request against `main` on [github.com/Synere/CouldHappen](https://github.com/Synere/CouldHappen). There is one history, and it is public. Commit with a `@users.noreply.github.com` address. Push only when the user asks, and never force-push.
+**Contributors** follow [CONTRIBUTING.md](CONTRIBUTING.md) and open a pull request against `main` on [github.com/Synere/CouldHappen](https://github.com/Synere/CouldHappen). **The maintainer** commits on the current branch, usually `main`; no new branch is needed for each change. There is one history, and it is public. Commit with a `@users.noreply.github.com` address. Push only when the user asks, and never force-push.
