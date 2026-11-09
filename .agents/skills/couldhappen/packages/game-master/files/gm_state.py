@@ -276,14 +276,31 @@ PROVISIONAL_KNOWN = ('{fid} is provisional but marked known to the player{defaul
                      'known. Set known: false; if the protagonist has heard it said, it is a rumour.')
 
 
-def truth_of(state, fid):
-    """The id of the live revelation whose hidden truth is fid, or None. It also sees revelations of a
-    switched-off layer 4 (load keeps their links in 'hidden_truths'), so switching the layer off is never a
-    way round the rules that protect a hidden truth."""
+def truth_chain(state, fid):
+    """fid and every fact that replaced it, in order: a replaced truth is still the same secret."""
+    out, seen = [], set()
+    while fid and fid not in seen:
+        out.append(fid)
+        seen.add(fid)
+        fid = state['facts'].get(fid, {}).get('replaced_by')
+    return out
+
+
+def hidden_truths(state):
+    """Map every fact id that is (or replaced) the truth of a live revelation to that revelation's id."""
+    out = {}
     for r in state['revelations'].values():
-        if r['fact'] == fid and r['status'] in REV_LIVE:
-            return r['id']
-    return state.get('hidden_truths', {}).get(fid)
+        if r['status'] in REV_LIVE:
+            for fid in truth_chain(state, r['fact']):
+                out.setdefault(fid, r['id'])
+    return out
+
+
+def truth_of(state, fid):
+    """The id of the live revelation whose hidden truth is fid (or a fact fid replaced), or None. It also sees
+    revelations of a switched-off layer 4 (load keeps them in 'hidden_truths'), so neither replace nor switching
+    the layer off is a way round the rules that protect a hidden truth."""
+    return hidden_truths(state).get(fid) or state.get('hidden_truths', {}).get(fid)
 
 
 def apply_add(state, op, bad, warns):
@@ -373,8 +390,8 @@ def apply_replace(state, op, bad, warns, ctx):
             return bad(f'{old_id} is known to the player; its replacement cannot be hidden')
         rid = truth_of(state, old_id)
         if rid:
-            return bad(f'{old_id} is the hidden truth of {rid}: replace it hidden and relink {rid}, '
-                       'then reveal it when the page shows it')
+            return bad(f'{old_id} is the hidden truth of {rid}: replace it hidden (it stays {rid}\'s truth), '
+                       f'relink {rid} to the new fact, then reveal it when the page shows it')
     old['status'], old['replaced_by'] = 'outdated', new_id
     fact = {'id': new_id, 'known': old['known'], 'tags': old['tags'], 'pin': old['pin'],
             'source': 'story', **fields, 'status': 'established', 'replaces': old_id}
@@ -950,6 +967,11 @@ def banned_in(state, text):
     return [t for t in state['contract'].get('banned_terms', []) if t.lower() in text]
 
 
+def key_of(delta):
+    """The identity of a committed delta: its stored hash, or the hash of its content."""
+    return delta.get('delta') or delta_hash(delta)
+
+
 def delta_hash(delta):
     core = {k: delta[k] for k in ('entry', 'why', 'ops') if k in delta}
     return hashlib.sha1(json.dumps(core, sort_keys=True).encode('utf-8')).hexdigest()[:12]
@@ -1069,15 +1091,13 @@ def read_entries(root):
     return entries
 
 
-def replay(deltas, strict_after=None, lenient=()):
-    """Rebuild state from committed deltas. Deltas whose seq is above strict_after are held to the current
-    rules, except those whose seq is in lenient."""
+def replay(deltas, strict=()):
+    """Rebuild state from committed deltas. Deltas whose hash is in strict are held to the current rules."""
     state, good, bad = new_state(), [], []
     for delta in deltas:
         errs, warns = [], []
-        seq = delta.get('seq') or 0
-        strict = strict_after is not None and seq > strict_after and seq not in lenient
-        new = validate_delta(state, delta, errs, warns, strict=strict)
+        strict_here = key_of(delta) in strict
+        new = validate_delta(state, delta, errs, warns, strict=strict_here)
         if errs:
             bad.append((delta, errs))
         else:
@@ -1117,7 +1137,7 @@ def load(root):
     active = read_layers(root)
     state['layers'] = sorted(active)
     if 4 not in active:  # a switched-off layer 4 still protects its hidden truths (see truth_of)
-        state['hidden_truths'] = {r['fact']: r['id'] for r in state['revelations'].values() if r['status'] in REV_LIVE}
+        state['hidden_truths'] = hidden_truths(state)
     for layer, keys in LAYER_KEYS.items():  # a layer that is off is invisible; its records stay in the log
         if layer not in active:
             for key in keys:
@@ -1395,7 +1415,8 @@ def cmd_check(args, commit=False):
         return
     _, deltas_path, pending_path, _ = paths(args.root)
     deltas = read_lines(deltas_path)
-    delta = {'seq': len(deltas) + 1, 'delta': delta.get('delta') or delta_hash(delta),
+    delta = {'seq': max((d.get('seq') or 0 for d in deltas), default=0) + 1,
+             'delta': delta.get('delta') or delta_hash(delta),
              **{k: delta[k] for k in ('entry', 'why', 'ops')}}
     write_text(deltas_path, dump_lines(deltas + [delta]))
     if pending_path.exists() and not getattr(args, 'file', None):
@@ -1411,9 +1432,11 @@ def cmd_reconcile(args):
     # After a withdrawal, later deltas are rechecked with today's rules, since what they relied on may be gone.
     # A delta that broke those rules even with nothing withdrawn (an older log) keeps the rules it was written under:
     # failing them now says nothing about the withdrawal.
-    cut = min((d.get('seq') or 0) for d in missing) if missing else None
-    lenient = {d.get('seq') or 0 for d, _ in replay(deltas, cut)[2]} if missing else set()
-    state, good, bad = replay(kept, cut, lenient)
+    # Position in the log decides "after", not seq, which older versions could repeat.
+    first = next((i for i, d in enumerate(deltas) if d.get('entry') not in entries), len(deltas))
+    later = {key_of(d) for d in deltas[first + 1:]}
+    lenient = {key_of(d) for d, _ in replay(deltas, later)[2]} if missing else set()
+    state, good, bad = replay(kept, later - lenient)
     for d in missing:
         print(f'WITHDRAWN seq {d.get("seq")}: entry {d.get("entry")} is no longer in the logs ({d.get("why")})')
     for d, errs in bad:

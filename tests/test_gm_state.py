@@ -649,6 +649,38 @@ class GmStateTest(unittest.TestCase):
                                                       'text': 'Mara owes nothing.', 'reason': 'she paid it back', 'known': False}]),
                     'F1 is known to the player; its replacement cannot be hidden')
 
+    def test_a_replaced_hidden_truth_stays_protected(self):
+        self.hidden_guess()
+        self.commit(self.delta(self.add_entry('a'), [{'op': 'replace', 'kind': 'fact', 'id': 'F9', 'new': 'F10',
+                                                      'text': 'The clerk forged it.', 'reason': 'the truth changed'}]))
+        make_known = {'op': 'update', 'kind': 'fact', 'id': 'F10', 'known': True}
+        self.refuse(self.delta(self.add_entry('b'), [make_known]), 'F10 is the hidden truth of V1: use reveal')
+        self.assertEqual(run(self.root, 'layers', '--off', '4').returncode, 0)
+        self.refuse(self.delta(self.add_entry('c'), [make_known]), 'F10 is the hidden truth of V1: use reveal')
+
+    def test_seq_stays_unique_after_reconcile_and_duplicates_do_not_confuse_it(self):
+        e1, e2, e3 = self.add_entry('One.'), self.add_entry('Two.'), self.add_entry('Three.')
+        for e, fid in ((e1, 'F1'), (e2, 'F2'), (e3, 'F3')):
+            self.commit(self.delta(e, [self.fact(fid)]))
+        story = self.root / 'public/story.md'
+        story.write_text(story.read_text(encoding='utf-8').replace(files.entry('Two.', id=e2), ''),
+                         encoding='utf-8', newline='\n')
+        self.assertEqual(run(self.root, 'reconcile', '--apply').returncode, 0)
+        self.commit(self.delta(self.add_entry('Four.'), [self.fact('F4')]))
+        seqs = [json.loads(line)['seq'] for line in
+                (self.root / 'notes/gm/deltas.jsonl').read_text(encoding='utf-8').split('\n') if line]
+        self.assertEqual(seqs, [1, 3, 4])
+        # an older log with a repeated seq: an old lenient delta must not lend its number to a later strict one
+        e5, e6, e7 = self.add_entry('Five.'), self.add_entry('Six.'), self.add_entry('Seven.')
+        old = [self.delta(e5, [self.secret(status='provisional'), self.rev(), self.route('a', 'Mara confesses')]),
+               self.delta(e6, [self.establish()]),
+               self.delta(e7, [self.reveal_op()])]
+        (self.root / 'notes/gm/deltas.jsonl').write_text(
+            ''.join(json.dumps({'seq': n, **d}) + '\n' for n, d in zip((1, 2, 2), old)), encoding='utf-8', newline='\n')
+        story.write_text(story.read_text(encoding='utf-8').replace(files.entry('Six.', id=e6), ''),
+                         encoding='utf-8', newline='\n')
+        self.assertIn('DEPENDENT', run(self.root, 'reconcile').stdout)
+
     def test_a_relink_cannot_give_one_truth_two_live_revelations(self):
         self.hidden_guess()
         self.commit(self.delta(self.add_entry('a'), [self.fact('F2', known=False, tags=['clerk']),
