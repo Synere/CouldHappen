@@ -35,6 +35,7 @@ Create `.agents/skills/couldhappen/packages/<short-name>/` (lowercase, hyphens),
 
 - `APPLY.md`: the instructions a writer follows, addressed to the writer ("you"). State the order, the checks, the standard workspace rules (pause, validate, release, restart helper or Vite when needed, record in `START_HERE.md`, commit), and what to report. Say plainly what you could not verify.
 - `files/`: scripts and data as real files, not pasted into the prompt. Mark every setting-specific part, and every part meant to be adapted.
+- **Reader changes as intent, never whole files.** The receiving player has probably had their reader changed already, and a copied `App.svelte` or stylesheet would silently undo those changes. Describe each reader change as what it adds and where (for example, "a sheet panel below the cast, styled like the cast entries"), name the stock classes or variables it can reuse on an unchanged reader, and let the receiving writer fit it to the reader as it is. A short code excerpt is fine as an illustration.
 
 Then add one line to the "Packages made for this workspace" list in [INDEX.md](INDEX.md) and record the package in `notes/packages.md`.
 
