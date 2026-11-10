@@ -14,13 +14,17 @@ Only an actual host/story observation establishes that something works on a host
 
 On any host, from a fresh release workspace, confirm that the standing wait starts at the end of setup with no chat prompt, and that `portrait` accepts the original card path.
 
+**Closed 2026-11-11.** The author reports both working across several later story sessions.
+
 ## ISS-2 — More hosts
 
 Any order: Codex CLI, Claude Code (including skill discovery), and Pi with OpenRouter, each with a human-selected model.
 
 ## ISS-3 — Fresh-context continuation
 
-After reentry from files alone, continue the fiction through browser input and compare it against the maintained records. Reentry itself has been observed; continuing the fiction afterwards has not.
+After reentry from files alone, continue the fiction through browser input and compare it against the maintained records. Reentry itself had been observed; continuing the fiction afterwards had not.
+
+**Closed 2026-11-11.** The author restarted with a fresh context on Claude Code and on opencode and continued the fiction from the workspace files through the reader; both worked.
 
 ## ISS-7 — Try character-brains
 

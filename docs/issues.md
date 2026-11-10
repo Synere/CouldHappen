@@ -24,11 +24,8 @@ whose blockers are all closed.
 
 | ID | Item | Area | Blocked by / phase | Source |
 | --- | --- | --- | --- | --- |
-| ISS-1 | Re-test the fixes on a host: standing wait starts after setup with no chat prompt; `portrait` accepts the original card path | hosts | — | [host validation](plans/host-validation.md#iss-1--re-test-the-fixes) |
 | ISS-2 | Test more hosts, any order: Codex CLI, Claude Code (with skill discovery), Pi with OpenRouter | hosts | — | [host validation](plans/host-validation.md#iss-2--more-hosts) |
-| ISS-3 | Fresh-context continuation: after reentry from files alone, continue the fiction through browser input | hosts | — | [host validation](plans/host-validation.md#iss-3--fresh-context-continuation) |
 | ISS-4 | Run `egm-drift-report` over the design, distribution design and public contract before a wider release | docs | — | [public release](plans/public-release.md#iss-4--drift-report) |
-| ISS-6 | Retake the README and GitHub screenshots for the restyled reader | docs | — | [public release](plans/public-release.md#iss-6--retake-the-screenshots) |
 | ISS-7 | Try character-brains on a host with subagents, with game-master layers 1 to 4 | packages | — | [host validation](plans/host-validation.md#iss-7--try-character-brains) |
 | ISS-17 | Run a fresh EGM design review of the approved design | docs | — | [public release](plans/public-release.md#iss-17--egm-design-review) |
 
@@ -65,4 +62,7 @@ whose blockers are all closed.
 
 | ID | Item | Closed | Resolution |
 | --- | --- | --- | --- |
+| ISS-1 | Re-test the fixes on a host | 2026-11-11 | The author observed the standing wait starting after setup and `portrait` working in several later sessions |
+| ISS-3 | Fresh-context continuation | 2026-11-11 | The author continued the fiction after a fresh-context restart on Claude Code and opencode |
+| ISS-6 | Retake the README screenshots | 2026-11-11 | Story, Director and empty Story shots retaken in the restyled stock reader; the director-export shot shows a player-built reader and was kept |
 | ISS-5 | Publish by the ADR-4 checklist | 2026-11-11 | Done on 2026-11-05: v0.1.7 was published from the fresh history; releases since are built from tags by `release.yml` |

@@ -132,8 +132,17 @@ The author ran further Claude Code (desktop app, Sonnet 5.5) sessions in unpacke
 | Claude Code interactive CLI equivalent | Experimental; four story workspaces (0.1.4 to 0.1.10, Sonnet 5.5, desktop app) reported as working well. Skill discovery observed. |
 | Pi 1.5.0 + human-selected native OpenRouter model | Experimental; not run; published extension docs/types inspected, extension not compiled/loaded in Pi. |
 | Actual prompt/card short scene and Director discussion | Not run; assets/prompt not supplied. |
-| Actual fresh-context continuation using maintained files alone | Run once on opencode (2026-11-05): accurate read-only report from files alone. Fiction was not continued in that session. |
+| Actual fresh-context continuation using maintained files alone | Run once on opencode (2026-11-05): accurate read-only report from files alone. Since then the author has restarted with a fresh context on Claude Code and on opencode and continued the fiction through the reader; both worked (reported 2026-11-11). |
 | Director Undo against actual scene history, preserved improvements, and new-direction continuation | Run once on opencode (2026-11-05): restore, verbatim archive, retained methods, and `awaiting_director` observed. |
 | Independent Impeccable finish review | Run with fresh context on synthetic rendered evidence. First pass `fix`; four UI findings fixed and recaptured; final capture check `ship` for the rendered UI surface. Build-state record finding remains open. This is not native-host or actual-story evidence. |
 | Impeccable design documentation | `DESIGN.md` and `.impeccable/design.json` authored by the independent documenter from the built system. |
 | Literal comp spec/plates/hero gates | Open at `spec`; no pass claimed. The comp's illustrative scene/portraits are not reproduced. Adaptation boundaries are recorded in `.impeccable/composition-selection.md` and the surface brief. |
+
+## Author-reported observations — 2026-11-11
+
+The author reports these from their own story sessions; there is no transcript review behind them.
+
+| Observation | Outcome |
+| --- | --- |
+| Standing wait after setup and `portrait` with the original card path (the fixes behind ISS-1) | Working across several sessions. |
+| Fresh-context continuation (ISS-3) | Worked on Claude Code and on opencode: the writer resumed from the workspace files and the fiction continued through the reader. |
