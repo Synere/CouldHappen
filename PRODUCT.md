@@ -39,7 +39,7 @@ The player can ask the loaded writer agent to “set up.” The agent establishe
 
 ## Brand Commitments
 
-CouldHappen is the working project name. The user accepted cast-panel placement and requested a fresh visual direction because the earlier project's interface felt boring. No prior palette, typography, or visual theme is binding. The user selected Woven anthology in the actual Impeccable direction round: petrol/teal shell, saffron accents, pale cool reading surface, serif prose, sans controls, and restrained interlaced rules. Reference: .impeccable/mocks/decision/woven.png. This is visual-direction approval; scene content and portraits remain illustrative. Avoid making one permanent genre the template's identity.
+CouldHappen is the working project name. The user accepted cast-panel placement and requested a fresh visual direction because the earlier project's interface felt boring. No prior palette, typography, or visual theme is binding. The user selected Woven anthology in the actual Impeccable direction round: petrol/teal shell, saffron accents, pale cool reading surface, serif prose, sans controls, and restrained interlaced rules. Reference: .impeccable/mocks/decision/woven.png. This is visual-direction approval; scene content and portraits remain illustrative. Avoid making one permanent genre the template's identity. On 2026-11-11 the reader was restyled as a dim petrol room (centred column, hairline rules, a backdrop layer) that keeps the petrol and saffron accents but drops the pale reading surface ([ADR-6](docs/decisions/ADR-6-dark-petrol-reader.md)); [DESIGN.md](DESIGN.md) describes the current design.
 
 ## Evidence on Hand
 

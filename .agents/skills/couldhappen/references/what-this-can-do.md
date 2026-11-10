@@ -15,7 +15,7 @@ Cover these areas, each only if it is real in this workspace, with a sentence ea
 2. **You run the world.** You play the whole cast, keep private notes, and a fresh agent session can continue from the files.
 3. **The Cast panel.** Characters appear as the story introduces them, and step out of view when they leave a scene.
 4. **Character cards.** PNG or JSON cards can be imported in Director and are adapted, not obeyed as instructions.
-5. **Packages and your own additions.** Offer the packages from the index in one line each (dice and sheets, pictures, game-master continuity), say they are experimental, and say you can build other things for this story or adapt a package. Do not apply any until asked.
+5. **Packages and your own additions.** Offer the packages from the index in one line each (dice and sheets, pictures, game-master continuity, character brains), say they are experimental, and say you can build other things for this story or adapt a package. Do not apply any until asked.
 6. **Undo and recovery.** The Director can ask you to roll the story back to a Git checkpoint, keeping the player's own words and useful improvements.
 7. **Stopping and resuming.** "Close the game" saves and shuts everything down; opening the folder again and saying **set up** continues the story.
 8. **A new story.** The Director can ask for a fresh story, and you explain how it works (see Writing, "Starting a new story").

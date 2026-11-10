@@ -8,6 +8,7 @@ Current state and next steps only. The dated history of how the project got here
 - **Release:** the latest is `release/dist/couldhappen-0.1.7.zip` (SHA-256 `d21a43f2...`, built from the public commit and published as GitHub release `v0.1.7`), the first AGPL-3.0-or-later release, with the drift-report fixes; it passed `scripts/smoke_release.py` (18 of 18). Builds are deterministic from a tracked commit; see [Building a release](setup.md#building-a-release).
 - **Hosts:** all four are experimental. opencode has one largely successful story-workspace test, which found two problems (no standing wait after setup; the `portrait` path), both fixed since. Claude Code has one largely successful session (0.1.4, Sonnet 5.5) whose four problems are fixed since. Codex CLI and Pi with OpenRouter are untested. See [host integrations](reference-hosts.md).
 - **Skill:** rewritten for clarity on 2026-11-05 and checked by a fresh-context reviewer; not yet run on a host.
+- **2026-11-11, from a player package (erotic-sandbox):** the stock reader is restyled as a dim petrol room ([ADR-6](decisions/ADR-6-dark-petrol-reader.md)); the voice method is a writer reference and `character-brains` is a new package that requires game-master layers 1 to 4 ([ADR-7](decisions/ADR-7-character-brains-and-voice.md)). Mechanical checks and the browser tests pass; neither the voice reference nor character-brains has run on a host yet, and the README and GitHub screenshots still show the old reader.
 - **Not yet observed on any host:** native checkpoint hooks reached and trusted; fresh-context *continuation of fiction* (reentry itself was observed); the standing-wait and portrait fixes on a real session; closing the game on request; the wait check after a host restart.
 
 ## Resume here
@@ -23,7 +24,9 @@ Do not run a durable story in this repository. Test from a workspace unpacked fr
 3. **Fresh-context continuation.** After reentry from files alone, continue the fiction through browser input and compare it against the maintained records.
 4. **Drift report.** Run `egm-drift-report` over the [design](designs/couldhappen.md), [distribution design](designs/distribution-and-workspaces.md), and [public contract](public-contract.md) before a wider release.
 5. **Publish.** Follow the checklist in [ADR-4](decisions/ADR-4-publish-with-fresh-history.md): drift report, tree audit, 0.1.7, fresh history.
-6. **Writing-style package (idea, not started).** A general `writing-style` director package that steers the writer's prose, like SillyTavern presets but without per-prompt injection. Design sketch:
+6. **Retake the screenshots** in the README and on GitHub for the restyled reader.
+7. **Try character-brains** on a host with subagents, from a fresh release workspace with game-master layers 1 to 4.
+8. **Writing-style package (idea, not started).** A general `writing-style` director package that steers the writer's prose, like SillyTavern presets but without per-prompt injection. Design sketch:
    - A distilled active guide (about 500 tokens: voice, POV and tense, rhythm, banned phrases, two or three voice anchors) in `notes/style/guide.md`, linked from `START_HERE.md`.
    - A per-turn step to re-read it before each writer entry, plus a rule to re-read the full guide when unsure the style still holds (context swamped, fresh session, after compaction).
    - A `tools/style_check.py` lint run on the entry body file before append: banned phrases, repeated openers, long paragraphs, POV or tense slips. It cannot judge taste, and the package says so.

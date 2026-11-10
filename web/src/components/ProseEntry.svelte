@@ -26,13 +26,8 @@
 <article class:human={entry.role === 'human'} data-entry-id={entry.id}>
   <div class="entry-rule">
     <i class="lead" aria-hidden="true"></i>
-    <span>{entry.role === 'human' ? (channel === 'story' ? 'Your contribution' : 'You · Director') : (channel === 'story' ? 'Writer continuation' : 'Writer · Director')}</span>
-    <i class="thread" aria-hidden="true">
-      <svg class="knot" viewBox="0 0 34 22" focusable="false" aria-hidden="true">
-        <path d="M9 2 17 11 9 20 1 11Z" fill="var(--reading)" stroke="var(--saffron)" stroke-width="2.6" stroke-linejoin="round" />
-        <path d="M17 2 25 11 17 20 9 11Z" fill="var(--reading)" stroke="var(--petrol)" stroke-width="2.6" stroke-linejoin="round" />
-      </svg>
-    </i>
+    <span>{entry.role === 'human' ? 'You' : 'Writer'}</span>
+    <i class="thread" aria-hidden="true"></i>
   </div>
   {#if change === 'revised'}<small class="revision">Passage updated</small>{/if}
   {#key entry.body_hash}
