@@ -28,7 +28,7 @@ The following values identify original root document bytes inside the ZIP, befor
 | `PRODUCT.md` | `1EF4AF44B69114A35287AFAE0A399311A0227E9B3617F80550C8B0F47CE9BDF7` |
 | `technical_plan_decisions.md` | `B7213EA538978516351BB7BCBCFA866B1983DB12E997F24CFC10E7C435740C25` |
 
-Use the [former-path map](../../README.md#former-root-paths) for current locations. Historical pending choices and old installation-specific examples are not current implementation instructions.
+Use the [former-path map](../README.md#former-paths) for current locations. Historical pending choices and old installation-specific examples are not current implementation instructions.
 
 ## Organization verification
 

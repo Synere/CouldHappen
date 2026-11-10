@@ -3,7 +3,7 @@
 - **Status:** Completed; findings resolved in the proposal — see [resolution record](2026-11-05_packaging-resolution.md). Focused re-review skipped by author.
 - **Review type:** Manual fresh-context Goldfish-style review in OpenCode, **not** a certified EGM Goldfish review
 - **Packet:** [2026-11-05_packaging-goldfish-review-packet.md](2026-11-05_packaging-goldfish-review-packet.md)
-- **Documents under review:** [ADR 0001](../decisions/0001-separate-story-workspaces.md), [ADR 0002](../decisions/0002-publish-clean-release.md), [Distribution and workspaces](../designs/distribution-and-workspaces.md)
+- **Documents under review:** [ADR-1](../decisions/ADR-1-separate-story-workspaces.md), [ADR-2](../decisions/ADR-2-publish-clean-release.md), [Distribution and workspaces](../designs/distribution-and-workspaces.md)
 - **Verdict:** **Accept with changes — not ready to move from Proposed to Accepted.**
 
 ## Scope and limits
@@ -46,7 +46,7 @@ The primary instructions in `README.md` and `docs/setup.md` still lead with “o
 
 ### P1-5 — The update/propagation model is claimed but deferred
 
-ADR 0002 lists a repeatable release and update path as a decision driver, but v1 provides only manual ZIP replacement. There is no version, source commit, manifest, conflict-detection procedure, or defined upstream-patch process. The future updater is unimplemented and described only as something that “may” exist.
+ADR-2 lists a repeatable release and update path as a decision driver, but v1 provides only manual ZIP replacement. There is no version, source commit, manifest, conflict-detection procedure, or defined upstream-patch process. The future updater is unimplemented and described only as something that “may” exist.
 
 ## P2 findings
 
@@ -54,8 +54,8 @@ ADR 0002 lists a repeatable release and update path as a decision driver, but v1
 * “Empty” public files are ambiguous. The contract requires title-only logs and schema-valid empty `cast.json`/`work.json`; the ADR checklists omit `work.json` and the required `couldhappen.json` fields.
 * `.gitignore` lacks common OS/editor artifacts such as `.DS_Store`, `Thumbs.db`, `desktop.ini`, and swap files; `writer close` checks Git but not public validation.
 * MIT covers the package, not user stories or imported third-party material. “No commercial sale planned” is an intention, not a license restriction. Third-party notices are not defined.
-* The confirmation checklists differ across ADR 0001, ADR 0002, and the distribution design. Several checks are manual and lack expected output or evidence format.
-* The decision index linkage required by ADR 0000 was not verified because the packet excluded `docs/decisions/README.md`.
+* The confirmation checklists differ across ADR-1, ADR-2, and the distribution design. Several checks are manual and lack expected output or evidence format.
+* The decision index linkage required by ADR-0 was not verified because the packet excluded `docs/decisions/README.md`.
 
 ## Recommended resolution before Accepted
 
@@ -71,7 +71,7 @@ ADR 0002 lists a repeatable release and update path as a decision driver, but v1
 ## Files read by the reviewer
 
 * The review packet.
-* ADR 0000, ADR 0001, ADR 0002.
+* ADR-0, ADR-1, ADR-2.
 * `docs/designs/distribution-and-workspaces.md`.
 * `docs/designs/couldhappen.md`, contiguous ranges covering the required sections plus adjacent sections.
 * `docs/public-contract.md`.

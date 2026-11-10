@@ -10,7 +10,7 @@
 ## Read in this order
 
 1. [Product context](../../PRODUCT.md) and the design's [Overview](../designs/couldhappen.md#overview), [Goals](../designs/couldhappen.md#goals), and [Non-Goals](../designs/couldhappen.md#non-goals).
-2. Read the design's [creative-initiative principle](../designs/couldhappen.md#creative-initiative), then its [Technical Plan](../designs/couldhappen.md#technical-plan-architecture), then its [Detailed Implementation](../designs/couldhappen.md#detailed-implementation). The latter contains the ordered 12-step file inventory, public formats, commands, package pins, host examples, and validation obligations.
+2. Read the design's [creative-initiative principle](../designs/couldhappen.md#creative-initiative), then its [Technical Plan](../designs/couldhappen.md#technical-plan-architecture), then its [Detailed Implementation](../designs/couldhappen.md#alternatives-and-implementation-plan). The latter contains the ordered 12-step file inventory, public formats, commands, package pins, host examples, and validation obligations.
 3. [Predecessor reconciliation](planning/design_reconciliation.md) for retained requirements, explicit changes, and additions. Use the [technical decision record](planning/technical_plan_decisions.md) only when the rationale for a settled choice matters.
 4. [Visual direction/provenance](../designs/impeccable_direction_notes.md), the actual [selected Woven PNG](../designs/woven/woven.png), and [selection record](../designs/woven/direction-selection.json) before frontend work.
 5. [Documentation index](../README.md) for targeted research and historical evidence. The [completed EGM draft handoff](planning/egm_draft_handoff.md) is history; it is not an instruction to restart drafting.

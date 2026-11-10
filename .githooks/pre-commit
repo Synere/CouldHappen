@@ -1,0 +1,3 @@
+#!/bin/sh
+# groundwork: the docs checks. Git runs this for every agent and every person.
+node scripts/groundwork-check.mjs || { echo "pre-commit: groundwork-check failed" >&2; exit 1; }

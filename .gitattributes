@@ -4,6 +4,7 @@
 *.txt text eol=lf
 *.py text eol=lf
 *.js text eol=lf
+*.mjs text eol=lf
 *.ts text eol=lf
 *.svelte text eol=lf
 *.css text eol=lf
@@ -23,3 +24,6 @@ goldfish_reviews/** -text whitespace=cr-at-eol
 
 # Raw terminal output contains literal carriage returns.
 .impeccable/direction-roll.txt -diff
+
+# groundwork: hook files stay LF, so a clone with core.autocrlf=true can still run them
+.githooks/* text eol=lf

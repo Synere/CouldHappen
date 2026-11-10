@@ -36,9 +36,9 @@ The independent documenter then authored `DESIGN.md` and `.impeccable/design.jso
 
 The packaging boundary is now accepted:
 
-- [ADR 0000](../decisions/0000-use-markdown-architectural-decision-records.md) records the MADR convention.
-- [ADR 0001](../decisions/0001-separate-story-workspaces.md) establishes a clean, separately versioned story workspace for every real story.
-- [ADR 0002](../decisions/0002-publish-clean-release.md) establishes a deterministic release ZIP rather than the development history, under MIT.
+- [ADR-0](../decisions/ADR-0-use-markdown-architectural-decision-records.md) records the MADR convention.
+- [ADR-1](../decisions/ADR-1-separate-story-workspaces.md) establishes a clean, separately versioned story workspace for every real story.
+- [ADR-2](../decisions/ADR-2-publish-clean-release.md) establishes a deterministic release ZIP rather than the development history, under MIT.
 - [Distribution and workspaces](../designs/distribution-and-workspaces.md) is the accepted normative packaging contract.
 - The approved design contains an accepted amendment superseding its original distributable-workspace statement for packaging.
 

@@ -48,6 +48,9 @@ jobs:
             echo "The tagged commit is not on the public main branch"; exit 1
           fi
 
+      - name: Docs checks
+        run: node scripts/groundwork-check.mjs
+
       - name: Unit tests
         run: python -m unittest discover -s tests -p "test_*.py"
 

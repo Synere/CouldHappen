@@ -50,4 +50,4 @@ Checked against the code: the UUID claim (`runtime.identity`, called from `Bridg
 
 10. Nested Git repositories: the helpers support them, the design forbids them. Recommended: keep the code, and have setup check that `git rev-parse --show-toplevel` is the workspace before the baseline commit. **Done:** code kept; setup check of `git rev-parse --show-toplevel` added to `docs/setup.md` and the skill's setup reference (smoke test checks before the commit).
 
-**Done:** `.codex/hooks.json` untracked (ADR 0004).
+**Done:** `.codex/hooks.json` untracked (ADR-4).

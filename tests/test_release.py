@@ -88,7 +88,7 @@ class ReleaseBuild(unittest.TestCase):
         self.assertGreater(listed['count'], 20)
         self.assertIn('README.md', listed['files'])
         self.assertNotIn('PRODUCT.md', listed['files'])
-        self.assertNotIn('docs/decisions/0001-separate-story-workspaces.md', listed['files'])
+        self.assertNotIn('docs/decisions/ADR-1-separate-story-workspaces.md', listed['files'])
 
     def test_version_lives_only_in_the_manifest(self):
         for name in ('web/package.json', 'web/package-lock.json'):

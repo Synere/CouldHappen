@@ -6,9 +6,9 @@ consulted:
 informed:
 ---
 
-# 0001 — Separate story workspaces from the development repository
+# ADR-1 — Separate story workspaces from the development repository
 
-- **Related:** [Distribution and workspaces](../designs/distribution-and-workspaces.md), [ADR 0002](0002-publish-clean-release.md), [approved design](../designs/couldhappen.md), [implementation progress](../implementation-progress.md)
+- **Related:** [Distribution and workspaces](../designs/distribution-and-workspaces.md), [ADR-2](ADR-2-publish-clean-release.md), [approved design](../designs/couldhappen.md), [implementation progress](../implementation-progress.md)
 
 ## Context and problem statement
 
@@ -58,7 +58,7 @@ The development history is useful upstream, but it is not the artifact a player 
 * Imports, portraits, private writer records, and story history are tracked by default because the workspace is the archive unit. A public remote or shared archive exposes them.
 * A redacted/shareable export is not implemented in v1. Users who want one should copy only the public conversations, cast, and assets they intend to publish.
 * The development repository may be public only after a deliberate history and secrets audit. The current public logs/cast are empty, but that is not a permanent guarantee.
-* The software license (AGPL-3.0-or-later, [ADR 0003](0003-license-agpl.md)) covers the package source, not the user’s story or imported third-party card material.
+* The software license (AGPL-3.0-or-later, [ADR-3](ADR-3-license-agpl.md)) covers the package source, not the user’s story or imported third-party card material.
 
 ### Consequences
 
@@ -110,6 +110,6 @@ The canonical confirmation checklist is in [Distribution and workspaces](../desi
 ## More information
 
 * Normative packaging behavior: [Distribution and workspaces](../designs/distribution-and-workspaces.md)
-* Publication model: [ADR 0002](0002-publish-clean-release.md)
+* Publication model: [ADR-2](ADR-2-publish-clean-release.md)
 * Approved product design: [CouldHappen](../designs/couldhappen.md)
 * Validation procedure: [Validation](../validation.md)

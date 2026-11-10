@@ -38,10 +38,10 @@ desktop.ini
 !.claude/skills/couldhappen/
 .agents/skills/impeccable/
 
-# Development evidence kept locally, never published (ADR 0004)
+# Development evidence kept locally, never published (ADR-4)
 .research/
 goldfish_reviews/
 .impeccable/
 
-# Local Impeccable hook config with absolute paths (ADR 0004)
+# Local Impeccable hook config with absolute paths (ADR-4)
 .codex/hooks.json

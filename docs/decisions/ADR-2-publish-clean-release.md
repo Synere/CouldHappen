@@ -6,7 +6,7 @@ consulted:
 informed:
 ---
 
-# 0002 — Publish a clean release, not the development history
+# ADR-2 — Publish a clean release, not the development history
 
 ## Context and Problem Statement
 
@@ -54,14 +54,14 @@ The development repository remains upstream. The public distribution is a determ
 * Development-only artifacts do not ship: `.git`, `.impeccable`, planning/research/review/archive folders, `.research`, `goldfish_reviews`, internal handoff/progress records, decisions/designs, release tooling/templates, `PRODUCT.md`, development hooks, runtime state, imports, public assets, and credentials.
 * The public contract is self-contained for runtime behavior and does not link to an excluded design document. The approved design remains upstream product/design authority.
 * `couldhappen.json`, `.gitignore`, and the public files are release templates. Shipped Markdown is the development file with its `dev-only` blocks removed by the builder (changed 2026-11-05 from separate Markdown templates, which drifted from their development copies).
-* The software license was **MIT** (`LICENSE` at the repository root); [ADR 0003](0003-license-agpl.md) replaced it with AGPL-3.0-or-later on 2026-11-05. The license covers the package source, not a user’s story or imported third-party card material. “No commercial sale is planned” is an intention, not a license restriction. Bundled font OFL notices ship under `web/fonts/`; npm dependencies retain their own licenses.
+* The software license was **MIT** (`LICENSE` at the repository root); [ADR-3](ADR-3-license-agpl.md) replaced it with AGPL-3.0-or-later on 2026-11-05. The license covers the package source, not a user’s story or imported third-party card material. “No commercial sale is planned” is an intention, not a license restriction. Bundled font OFL notices ship under `web/fonts/`; npm dependencies retain their own licenses.
 
 ### Privacy
 
 * Story workspaces are private/local by default.
 * Imports, portraits, private records, and story history are tracked by default because the workspace is the archive unit. A public remote exposes them.
 * A redacted/shareable export is not implemented in v1.
-* The development repository may be public only after a deliberate history and secrets audit; [ADR 0004](0004-publish-with-fresh-history.md) does this by publishing a fresh history. The clean release does not repair an already-exposed development history.
+* The development repository may be public only after a deliberate history and secrets audit; [ADR-4](ADR-4-publish-with-fresh-history.md) does this by publishing a fresh history. The clean release does not repair an already-exposed development history.
 
 ### Updates
 
@@ -115,7 +115,7 @@ The canonical checklist is in [Distribution and workspaces](../designs/distribut
 
 ## More Information
 
-* [ADR 0001](0001-separate-story-workspaces.md) — clean story workspaces.
+* [ADR-1](ADR-1-separate-story-workspaces.md) — clean story workspaces.
 * [Distribution and workspaces](../designs/distribution-and-workspaces.md) — the normative packaging contract.
 * [Decision index](README.md).
 * [Impeccable install model](https://impeccable.style/docs) — a comparable separation of installed artifact from development repository.

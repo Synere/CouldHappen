@@ -2,7 +2,7 @@
 
 - **Status:** Accepted — 2026-11-05
 - **Date:** 2026-11-05
-- **Related:** [ADR 0001](../decisions/0001-separate-story-workspaces.md), [ADR 0002](../decisions/0002-publish-clean-release.md), [ADR 0000](../decisions/0000-use-markdown-architectural-decision-records.md), [approved design](couldhappen.md), [public contract](../public-contract.md)
+- **Related:** [ADR-1](../decisions/ADR-1-separate-story-workspaces.md), [ADR-2](../decisions/ADR-2-publish-clean-release.md), [ADR-0](../decisions/ADR-0-use-markdown-architectural-decision-records.md), [approved design](couldhappen.md), [public contract](../public-contract.md)
 - **Scope:** Packaging, release construction, story-workspace lifecycle, privacy, and update boundaries. This does not change the fiction model, UI direction, or runtime helper contract.
 
 ## Relationship to the approved design
@@ -46,7 +46,7 @@ The current single-repository behavior remains the development baseline; durable
 5. **Development-only material is not shipped.** Design-review artifacts, planning/research/review history, internal handoffs, development hooks, release tooling, and implementation evidence stay upstream.
 6. **Story privacy is the user's responsibility, with safe defaults.** Story workspaces are private/local by default. Imports and private records are tracked because the workspace is the archive unit. A public remote or shared archive exposes them; a redacted/shareable export is not yet implemented.
 7. **The development repository's history is preserved.** This model does not rewrite or purge existing commits.
-8. **Version 1 uses a release ZIP under the AGPL-3.0-or-later license** ([ADR 0003](../decisions/0003-license-agpl.md); MIT until 2026-11-05). A GitHub template or installer can be added later. No automatic updater is provided in v1.
+8. **Version 1 uses a release ZIP under the AGPL-3.0-or-later license** ([ADR-3](../decisions/ADR-3-license-agpl.md); MIT until 2026-11-05). A GitHub template or installer can be added later. No automatic updater is provided in v1.
 
 ## Story-workspace creation and baseline
 
@@ -158,7 +158,7 @@ Deliberate closure validates the public records before disarming and refuses inv
 * Do not add the development repository as a remote or merge its history into a story.
 * Imports, portraits, private records, and story history are tracked because the story workspace is the archive unit. A public remote exposes them. A Director package that calls an outside service (for example `scene-images`) sends the text it needs to that provider; the provider and cost are the Director's choice and are stated before use.
 * A redacted/shareable export is **not implemented in v1**. Users who need one should copy only the public conversations/cast/assets they intend to publish.
-* The development repository is published with a fresh history: one new root commit of the audited current tree, never the private history ([ADR 0004](../decisions/0004-publish-with-fresh-history.md)). Development evidence (`.research/`, `goldfish_reviews/`, `.impeccable/`) is untracked and stays local; the approved Woven references live in `docs/designs/woven/`. The current repository contains no real story or imported cards; that is not a permanent guarantee.
+* The development repository is published with a fresh history: one new root commit of the audited current tree, never the private history ([ADR-4](../decisions/ADR-4-publish-with-fresh-history.md)). Development evidence (`.research/`, `goldfish_reviews/`, `.impeccable/`) is untracked and stays local; the approved Woven references live in `docs/designs/woven/`. The current repository contains no real story or imported cards; that is not a permanent guarantee.
 * The license covers the package source, not the user's story or third-party imported card material. Imported cards retain their own provenance and terms.
 * The release builder scans text for the configured secret markers in `release.manifest.json` (private-key headers, `OPENROUTER_API_KEY=`, `GITHUB_TOKEN=`, `sk-or-v1-`, and a boundary-fixture marker). Files under `tests/` and `web/tests/` are allowlisted for the boundary-fixture marker only, because the tests plant it on purpose. The builder excludes `.env*`, runtime state, imports, and assets by path.
 

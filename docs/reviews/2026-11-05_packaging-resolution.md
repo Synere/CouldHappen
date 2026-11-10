@@ -3,7 +3,7 @@
 - **First review:** [manual Goldfish-style review](2026-11-05_packaging-goldfish-review.md) — accept with changes
 - **Author decision:** approved the documented defaults and authorized skipping the focused re-review
 - **Focused re-review:** not run; no certified EGM claim
-- **Decision status:** ADR 0001/0002 and [Distribution and workspaces](../designs/distribution-and-workspaces.md) accepted
+- **Decision status:** ADR-1/ADR-2 and [Distribution and workspaces](../designs/distribution-and-workspaces.md) accepted
 
 ## Finding resolution
 

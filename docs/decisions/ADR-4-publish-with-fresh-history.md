@@ -6,15 +6,15 @@ consulted:
 informed:
 ---
 
-# 0004 — Publish the development repository with a fresh history
+# ADR-4 — Publish the development repository with a fresh history
 
 > **Update 2026-11-07:** the private history was archived outside the repository and deleted. The fresh public history is now the only history, and `publish` was renamed `main`. References below to a private `main` and a `publish` branch describe the state at decision time.
 
 ## Context and Problem Statement
 
-The author plans to publish the development repository on GitHub. [ADR 0002](0002-publish-clean-release.md) allows that only after a deliberate history and secrets audit. The existing history has three problems for a public repository:
+The author plans to publish the development repository on GitHub. [ADR-2](ADR-2-publish-clean-release.md) allows that only after a deliberate history and secrets audit. The existing history has three problems for a public repository:
 
-* Commits before `060f7a4` carry the MIT license ([ADR 0003](0003-license-agpl.md) moved to AGPL-3.0-or-later). Anyone who receives an MIT commit may use that copy under MIT.
+* Commits before `060f7a4` carry the MIT license ([ADR-3](ADR-3-license-agpl.md) moved to AGPL-3.0-or-later). Anyone who receives an MIT commit may use that copy under MIT.
 * Development evidence (`.research/`, `goldfish_reviews/`, `.impeccable/`) contains absolute local paths and raw captured material, and older commits carry it whatever the current tree holds.
 * Auditing every past commit for secrets and paths is costly and easy to get wrong.
 

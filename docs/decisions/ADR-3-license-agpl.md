@@ -6,11 +6,11 @@ consulted:
 informed:
 ---
 
-# 0003 — License the package under AGPL-3.0-or-later
+# ADR-3 — License the package under AGPL-3.0-or-later
 
 ## Context and Problem Statement
 
-[ADR 0002](0002-publish-clean-release.md) chose MIT. Before the first public GitHub release, the author reconsidered. CouldHappen invites agents to modify its own helper and reader during play, and the misuse most worth preventing is a closed, hosted version of a modified copy. Which license should the package carry when it is published?
+[ADR-2](ADR-2-publish-clean-release.md) chose MIT. Before the first public GitHub release, the author reconsidered. CouldHappen invites agents to modify its own helper and reader during play, and the misuse most worth preventing is a closed, hosted version of a modified copy. Which license should the package carry when it is published?
 
 ## Considered Options
 

@@ -1,0 +1,39 @@
+{
+  "groundwork": 1,
+  "project": "CouldHappen",
+  "preset": "small",
+  "layers": [
+    "core",
+    "decisions"
+  ],
+  "core": {
+    "brief": "docs/designs/couldhappen.md",
+    "markdown": [
+      "AGENTS.md",
+      "CLAUDE.md",
+      "docs/**"
+    ],
+    "links": "relative",
+    "agents": {
+      "knowledge": "Everyone",
+      "rules": "Everyone"
+    }
+  },
+  "decisions": {
+    "form": "files",
+    "dir": "docs/decisions",
+    "id": "ADR-n",
+    "adopted": [],
+    "citeIgnore": [
+      "docs/templates/adr/**",
+      "docs/decisions/.markdownlint.yml"
+    ]
+  },
+  "grandfather": {
+    "date": "2026-11-11",
+    "decisionsThrough": 4
+  },
+  "checks": {
+    "drop": {}
+  }
+}

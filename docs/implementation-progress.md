@@ -22,7 +22,7 @@ Do not run a durable story in this repository. Test from a workspace unpacked fr
 2. **More hosts, any order.** Codex CLI, Claude Code (including skill discovery), and Pi with OpenRouter, each with a human-selected model. Record results in [validation results](validation-results.md) and the status table in [host integrations](reference-hosts.md).
 3. **Fresh-context continuation.** After reentry from files alone, continue the fiction through browser input and compare it against the maintained records.
 4. **Drift report.** Run `egm-drift-report` over the [design](designs/couldhappen.md), [distribution design](designs/distribution-and-workspaces.md), and [public contract](public-contract.md) before a wider release.
-5. **Publish.** Follow the checklist in [ADR 0004](decisions/0004-publish-with-fresh-history.md): drift report, tree audit, 0.1.7, fresh history.
+5. **Publish.** Follow the checklist in [ADR-4](decisions/ADR-4-publish-with-fresh-history.md): drift report, tree audit, 0.1.7, fresh history.
 6. **Writing-style package (idea, not started).** A general `writing-style` director package that steers the writer's prose, like SillyTavern presets but without per-prompt injection. Design sketch:
    - A distilled active guide (about 500 tokens: voice, POV and tense, rhythm, banned phrases, two or three voice anchors) in `notes/style/guide.md`, linked from `START_HERE.md`.
    - A per-turn step to re-read it before each writer entry, plus a rule to re-read the full guide when unsure the style still holds (context swamped, fresh session, after compaction).

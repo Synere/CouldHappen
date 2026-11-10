@@ -6,20 +6,21 @@ The [approved design](../designs/couldhappen.md) remains the normative product a
 
 | ADR | Status | Decision |
 | --- | --- | --- |
-| [0000](0000-use-markdown-architectural-decision-records.md) | Accepted | Use MADR to record durable decisions. |
-| [0001](0001-separate-story-workspaces.md) | Accepted | Run every real story in a clean workspace with its own Git history; keep the development repository as upstream. |
-| [0002](0002-publish-clean-release.md) | Accepted | Publish a deterministic clean release ZIP rather than the development history; MIT license; private/local story repositories; no v1 updater. The MIT choice is replaced by 0003. |
-| [0003](0003-license-agpl.md) | Accepted | License the package under AGPL-3.0-or-later instead of MIT. |
-| [0004](0004-publish-with-fresh-history.md) | Accepted | Publish the development repository with a fresh one-commit history; keep evidence folders local. |
+| [ADR-0](ADR-0-use-markdown-architectural-decision-records.md) | Accepted | Use MADR to record durable decisions. |
+| [ADR-1](ADR-1-separate-story-workspaces.md) | Accepted | Run every real story in a clean workspace with its own Git history; keep the development repository as upstream. |
+| [ADR-2](ADR-2-publish-clean-release.md) | Accepted | Publish a deterministic clean release ZIP rather than the development history; MIT license; private/local story repositories; no v1 updater. The MIT choice is replaced by ADR-3. |
+| [ADR-3](ADR-3-license-agpl.md) | Accepted | License the package under AGPL-3.0-or-later instead of MIT. |
+| [ADR-4](ADR-4-publish-with-fresh-history.md) | Accepted | Publish the development repository with a fresh one-commit history; keep evidence folders local. |
+| [ADR-5](ADR-5-adopt-groundwork-checks.md) | Accepted | Check the docs with groundwork; name decisions `ADR-n-title.md` and cite them as `ADR-n`. |
 
 For new decisions, copy one of the templates:
 
-* [adr-template.md](adr-template.md) — all sections with explanations.
-* [adr-template-minimal.md](adr-template-minimal.md) — mandatory sections with explanations.
-* [adr-template-bare.md](adr-template-bare.md) — all sections, empty.
-* [adr-template-bare-minimal.md](adr-template-bare-minimal.md) — mandatory sections, empty.
+* [adr-template.md](../templates/adr/adr-template.md) — all sections with explanations.
+* [adr-template-minimal.md](../templates/adr/adr-template-minimal.md) — mandatory sections with explanations.
+* [adr-template-bare.md](../templates/adr/adr-template-bare.md) — all sections, empty.
+* [adr-template-bare-minimal.md](../templates/adr/adr-template-bare-minimal.md) — mandatory sections, empty.
 
-Name the file `NNNN-title-with-dashes.md`, where `NNNN` is the next consecutive number. Keep the title lowercase and use dashes. The `.markdownlint.yml` file holds the MADR lint adjustments.
+Name the file `ADR-n-title-with-dashes.md`, where `n` is the next consecutive number with no leading zeros, and start it with the heading `# ADR-n — Title`. Keep the title lowercase and use dashes. Cite a decision as `ADR-n`. Besides the MADR sections, a new decision needs a Y-statement line (`> In the context of …, facing …, we decided … to achieve …, accepting …`) and a Confirmation section; `node scripts/groundwork-check.mjs` enforces both ([ADR-5](ADR-5-adopt-groundwork-checks.md)). The `.markdownlint.yml` file holds the MADR lint adjustments.
 
 Intermediate EGM brainstorming, drafts, reviewer reports, and drift reports are process evidence. Keep them in `docs/history/`, `docs/reviews/`, or another explicitly chosen artifact directory; do not place them in `docs/designs/` or this directory as if they were normative requirements.
 

@@ -2,7 +2,7 @@
 
 - **Status:** Review completed — see the [review report](2026-11-05_packaging-goldfish-review.md). Verdict: accept with changes; the decisions remain Proposed.
 - **Date:** 2026-11-05
-- **Decisions under review:** [ADR 0001](../decisions/0001-separate-story-workspaces.md), [ADR 0002](../decisions/0002-publish-clean-release.md), and [Distribution and workspaces](../designs/distribution-and-workspaces.md)
+- **Decisions under review:** [ADR-1](../decisions/ADR-1-separate-story-workspaces.md), [ADR-2](../decisions/ADR-2-publish-clean-release.md), and [Distribution and workspaces](../designs/distribution-and-workspaces.md)
 - **Recorded author choices:** MIT license; release ZIP first; no commercial sale planned
 
 ## Reviewer instructions
@@ -12,9 +12,9 @@ Act as a fresh-context, skeptical design reviewer. You are reviewing a packaging
 Read only:
 
 1. This packet.
-2. `docs/decisions/0000-use-markdown-architectural-decision-records.md`
-3. `docs/decisions/0001-separate-story-workspaces.md`
-4. `docs/decisions/0002-publish-clean-release.md`
+2. `docs/decisions/ADR-0-use-markdown-architectural-decision-records.md`
+3. `docs/decisions/ADR-1-separate-story-workspaces.md`
+4. `docs/decisions/ADR-2-publish-clean-release.md`
 5. `docs/designs/distribution-and-workspaces.md`
 6. The [approved design](../designs/couldhappen.md) sections **Selected architecture and ownership**, **Workspace materials and public agreement**, **Public changes and agent-managed setup**, **Checkpoints and host completion**, and **Detailed Implementation** step 1 (workspace/scope) and step 8 (setup).
 7. `docs/public-contract.md`
