@@ -16,6 +16,8 @@ Run `egm-drift-report` over the [design](../designs/couldhappen.md), [distributi
 
 Retake the screenshots in the README and on GitHub for the restyled reader ([ADR-6](../decisions/ADR-6-dark-petrol-reader.md)).
 
+**Closed 2026-11-11.** `story-cast.png`, `director.png` and `story-empty.png` were retaken at 1702×892 in the current stock reader, from a temporary copy of the public files of the 0.1.10 D&D story workspace (the story the old shots showed). `director-export.png` shows a reader a player built, not the stock one, so it was kept.
+
 ## ISS-17 — EGM design review
 
 The design's Open Questions say a fresh EGM design review of the [approved design](../designs/couldhappen.md) has not run, and that the predecessor reconciliation does not replace it.
