@@ -51,8 +51,7 @@
   "sessionHook": {
     "maxLines": 12,
     "harnesses": [
-      "claude",
-      "codex"
+      "claude"
     ]
   }
 }
