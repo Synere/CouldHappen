@@ -4,7 +4,8 @@
 
 | Document | What it is |
 | --- | --- |
-| [Progress log](progress-log.md) | The full dated implementation handoff, with later entries appended. The short current version is [implementation progress](../implementation-progress.md). |
+| [Progress log](progress-log.md) | The full dated implementation handoff, with later entries appended until 2026-11-11. Frozen. |
+| [Implementation progress](implementation-progress.md) | The short current-state note, frozen on 2026-11-11 when the [issues register](../issues.md) replaced it ([ADR-8](../decisions/ADR-8-open-work-in-the-register.md)). |
 | [Design alternatives and implementation plan](design-alternatives-and-plan.md) | Sections split out of the approved design after implementation: alternatives considered and the ordered build plan. |
 | [Original implementation handoff](implementation_handoff.md) | The design-to-implementation handoff written before application work began. |
 | [Scene observation placeholder](demo-session.md) | The pre-test scene record; superseded by [validation results](../validation-results.md). |

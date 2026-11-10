@@ -79,7 +79,7 @@ The experience depends on the capabilities of your chosen agent, and support for
 
 This is the development and packaging repository, not a story workspace. **Do not run a durable story here.** Real stories run in a clean workspace unpacked from the release ZIP ([ADR-1](docs/decisions/ADR-1-separate-story-workspaces.md), [ADR-2](docs/decisions/ADR-2-publish-clean-release.md)). The release README is this file with the development-only blocks removed; see [Building a release](docs/setup.md#building-a-release).
 
-* **Current state and next steps:** [implementation progress](docs/implementation-progress.md).
+* **Open work and next steps:** the [issues register](docs/issues.md); plans are in [docs/plans/](docs/plans/).
 * **Building and smoke-testing a release:** [Building a release](docs/setup.md#building-a-release).
 * **Documentation index:** [docs/README.md](docs/README.md).
 * **Design:** [approved design](docs/designs/couldhappen.md), [design system](DESIGN.md), [product context](PRODUCT.md).

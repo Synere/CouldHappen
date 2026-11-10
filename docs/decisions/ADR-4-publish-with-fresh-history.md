@@ -8,6 +8,8 @@ informed:
 
 # ADR-4 — Publish the development repository with a fresh history
 
+> In the context of publishing the development repository on GitHub, facing a history with MIT-licensed commits, development evidence with local paths, and a costly audit of every past commit, we decided to publish a fresh history (one new root commit of the cleaned current tree), to achieve a public repository with only the current tree to audit, accepting that the full development history stays private.
+
 > **Update 2026-11-07:** the private history was archived outside the repository and deleted. The fresh public history is now the only history, and `publish` was renamed `main`. References below to a private `main` and a `publish` branch describe the state at decision time.
 
 ## Context and Problem Statement
@@ -37,6 +39,10 @@ Chosen option: **publish a fresh history**, selected by the project author on 20
 * The approved visual references that the design depends on (the Woven mock, its selection record, and the reader surface direction) are copied into `docs/designs/woven/` so they are published with the design.
 * The MIT release ZIPs (0.1.0 to 0.1.6) are not shared. 0.1.7, the first AGPL build, is the first release given to anyone and the first GitHub release.
 * The record stays honest: ADRs and the progress log still say the early releases were MIT.
+
+### Confirmation
+
+The public `main` starts at one root commit (`535dbae`, "CouldHappen 0.1.7"), and GitHub release `v0.1.7` carries the ZIP built from it ([validation results](../validation-results.md)). `.research/`, `goldfish_reviews/` and `.impeccable/` are ignored by `.gitignore` and forbidden by `release.manifest.json`. `release.yml` refuses a tag whose commit is not on the public `main`.
 
 ### Publish checklist
 

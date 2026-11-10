@@ -1,6 +1,6 @@
 # Validation results — 2026-11-04
 
-Implementation evidence, recorded in Asia/Manila. This is not a compatibility certificate or an actual scene report. The approved first-scope application surface and its Woven UI finish are implemented and mechanically checked; native-host execution, supplied story/cards, fresh-context continuation, checkpoint-limited Undo, and the literal comp pixel gates remain unperformed or intentionally open. See the [implementation handoff](implementation-progress.md).
+Implementation evidence, recorded in Asia/Manila. This is not a compatibility certificate or an actual scene report. The approved first-scope application surface and its Woven UI finish are implemented and mechanically checked; native-host execution, supplied story/cards, fresh-context continuation, checkpoint-limited Undo, and the literal comp pixel gates remain unperformed or intentionally open. Open work is in the [issues register](issues.md). Since 0.1.8, release builds and smoke tests run in `.github/workflows/release.yml` and their SHA-256 is on each GitHub release, so the release rows below stop at 0.1.7.
 
 Runtime observed: Windows; Python 3.14.2; Node 25.6.0; npm 11.8.0; Git 2.53.0.windows.1. Exact approved frontend pins installed successfully and generated `web/package-lock.json`. The targeted minimum runtimes were not separately exercised.
 

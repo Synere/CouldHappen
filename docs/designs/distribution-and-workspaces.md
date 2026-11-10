@@ -125,7 +125,7 @@ The manifest is authoritative. The following summarizes it.
 
 * `.git/` — development history.
 * `.impeccable/`, `docs/history/`, `docs/research/`, `docs/reviews/`, `.research/`, `goldfish_reviews/`.
-* `docs/implementation-progress.md`.
+* `docs/issues.md` and `docs/plans/`.
 * `docs/decisions/`, `docs/designs/` — rationale and internal specifications remain upstream.
 * `PRODUCT.md` — current file contains development evidence; no user-facing replacement yet.
 * `docs/validation.md`, `docs/validation-results.md` — internal validation material that remains upstream.

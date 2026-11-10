@@ -99,7 +99,7 @@ The available investigations establish source-inspected handoff precedents and u
 
 ## Technical Plan (Architecture)
 
-The author approved this Technical Plan on 2026-11-04. It combines the author's architecture choices into one workflow; the implementation status is in [implementation progress](../implementation-progress.md). The supporting [technical decision record](../history/planning/technical_plan_decisions.md) preserves the discussions, comparisons, research, and source links.
+The author approved this Technical Plan on 2026-11-04. It combines the author's architecture choices into one workflow; open work is in the [issues register](../issues.md). The supporting [technical decision record](../history/planning/technical_plan_decisions.md) preserves the discussions, comparisons, research, and source links.
 
 ### Selected architecture and ownership
 
@@ -337,7 +337,7 @@ The alternatives the author considered (and why each was selected or rejected) a
 
 ## Open Questions
 
-* **Observation:** What has and has not been observed on real hosts is recorded only in [validation results](../validation-results.md); open next steps are in [implementation progress](../implementation-progress.md).
+* **Observation:** What has and has not been observed on real hosts is recorded only in [validation results](../validation-results.md); open next steps are in the [issues register](../issues.md).
 * **Independent review:** A fresh EGM design review of this document has not run. The [predecessor reconciliation](../history/planning/design_reconciliation.md) checked alignment with the brief and does not replace that review.
 
 ### Additional Resources

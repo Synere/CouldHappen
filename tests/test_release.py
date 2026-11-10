@@ -46,7 +46,7 @@ class ReleaseBuild(unittest.TestCase):
                         text = archive.read(name).decode()
                         self.assertNotIn('dev-only', text, name)
                         self.assertNotIn('Development repository', text, name)
-                self.assertNotIn('implementation-progress', archive.read('README.md').decode())
+                self.assertNotIn('docs/issues.md', archive.read('README.md').decode())
                 self.assertIn('standing wait', archive.read('docs/setup.md').decode())
                 self.assertNotIn('Building a release', archive.read('docs/setup.md').decode())
                 skill, mirror = '.agents/skills/couldhappen/', '.claude/skills/couldhappen/'

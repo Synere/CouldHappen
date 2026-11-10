@@ -8,6 +8,8 @@ informed:
 
 # ADR-2 — Publish a clean release, not the development history
 
+> In the context of a portable fiction workspace that players copy and fill with their own story, facing a development repository whose history, review artifacts and validation records a player should not inherit, we decided to publish a deterministic release ZIP built from a tested commit by the release manifest, with a GitHub template or an installer as later options, to achieve a clean, self-contained and verifiable starting workspace, accepting a release build to maintain, a contents review, and manual updates.
+
 ## Context and Problem Statement
 
 CouldHappen is intended to be a portable fiction workspace that users copy, open in their own agent, and fill with their own story. Publishing the current development repository directly would give users the implementation history, design-review artifacts, and internal validation records. If they fork it publicly, their story content would also be public by default.

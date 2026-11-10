@@ -4,7 +4,10 @@
   "preset": "small",
   "layers": [
     "core",
-    "decisions"
+    "decisions",
+    "open-work",
+    "plans",
+    "session-hook"
   ],
   "core": {
     "brief": "docs/designs/couldhappen.md",
@@ -35,5 +38,21 @@
   },
   "checks": {
     "drop": {}
+  },
+  "openWork": {
+    "register": "docs/issues.md",
+    "id": "ISS-n",
+    "features": []
+  },
+  "plans": {
+    "dir": "docs/plans",
+    "decId": "DEC-n"
+  },
+  "sessionHook": {
+    "maxLines": 12,
+    "harnesses": [
+      "claude",
+      "codex"
+    ]
   }
 }

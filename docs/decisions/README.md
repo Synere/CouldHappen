@@ -14,6 +14,7 @@ The [approved design](../designs/couldhappen.md) remains the normative product a
 | [ADR-5](ADR-5-adopt-groundwork-checks.md) | Accepted | Check the docs with groundwork; name decisions `ADR-n-title.md` and cite them as `ADR-n`. |
 | [ADR-6](ADR-6-dark-petrol-reader.md) | Accepted | Restyle the stock reader as a dark petrol room with a centred column, hairline rules and a backdrop layer. |
 | [ADR-7](ADR-7-character-brains-and-voice.md) | Accepted | Ship the voice method as a writer reference and character brains as a package that requires game-master layers 1 to 4. |
+| [ADR-8](ADR-8-open-work-in-the-register.md) | Accepted | Keep open work in the groundwork register and plans, retire the progress note, and leave designs, reviews and drift reports to EGM. |
 
 For new decisions, copy one of the templates:
 
@@ -26,4 +27,4 @@ Name the file `ADR-n-title-with-dashes.md`, where `n` is the next consecutive nu
 
 Intermediate EGM brainstorming, drafts, reviewer reports, and drift reports are process evidence. Keep them in `docs/history/`, `docs/reviews/`, or another explicitly chosen artifact directory; do not place them in `docs/designs/` or this directory as if they were normative requirements.
 
-Status changes to **Accepted** only after the project author approves the decision. Implementation and validation evidence belongs in [implementation progress](../implementation-progress.md) and [validation results](../validation-results.md), not in the ADR.
+Status changes to **Accepted** only after the project author approves the decision. Validation evidence belongs in [validation results](../validation-results.md), and open work in the [issues register](../issues.md), not in the ADR ([ADR-8](ADR-8-open-work-in-the-register.md)).

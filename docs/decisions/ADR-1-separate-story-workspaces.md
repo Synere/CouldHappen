@@ -8,9 +8,11 @@ informed:
 
 # ADR-1 — Separate story workspaces from the development repository
 
-- **Related:** [Distribution and workspaces](../designs/distribution-and-workspaces.md), [ADR-2](ADR-2-publish-clean-release.md), [approved design](../designs/couldhappen.md), [implementation progress](../implementation-progress.md)
+> In the context of a portable workspace where the development repository and a real story would share one Git history, facing mixed history, a `writer close` that sees development changes, and avoidable privacy risk, we decided that every real story runs in its own clean workspace with a fresh Git history, created first from a release ZIP, to achieve story history and private material kept apart from development, accepting one more setup step and package updates that do not flow automatically.
 
-## Context and problem statement
+- **Related:** [Distribution and workspaces](../designs/distribution-and-workspaces.md), [ADR-2](ADR-2-publish-clean-release.md), [approved design](../designs/couldhappen.md), [implementation progress](../history/implementation-progress.md) (history since ADR-8)
+
+## Context and Problem Statement
 
 The approved design makes the directory itself the portable workspace: the writer skill, helper source, frontend, public conversations, imports, and documentation live together. That is convenient for copying, but it currently means the development repository and a real story share one Git history.
 
@@ -41,7 +43,7 @@ The development history is useful upstream, but it is not the artifact a player 
 3. **Create a separate clean story workspace per story.** A copy of the release package with its own `.git`, `.couldhappen/`, public logs/cast, imports, and commits. The development repository remains upstream. Recommended.
 4. **Generate a story workspace from a release ZIP.** A distribution mechanism for option 3. It removes manual copying and controls exactly which files ship. Recommended as the initial creation mechanism.
 
-## Decision outcome
+## Decision Outcome
 
 **Chosen option: 3, with 4 as the initial creation mechanism.**
 

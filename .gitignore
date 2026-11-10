@@ -33,6 +33,8 @@ desktop.ini
 
 # Locally installed Impeccable tooling (npx impeccable install); not part of the app or release
 .claude/*
+# The groundwork SessionStart hook (repo-relative, no personal paths) is shared
+!.claude/settings.json
 !.claude/skills/
 .claude/skills/*
 !.claude/skills/couldhappen/

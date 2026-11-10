@@ -1,4 +1,4 @@
-// groundwork-check v12 — installed by the groundwork skill; `groundwork doctor --fix` replaces it when a newer
+// groundwork-check v13 — installed by the groundwork skill; `groundwork doctor --fix` replaces it when a newer
 // version ships (ADR-22). Checks only your project keeps go in a separate script without this header line.
 //
 // The deterministic checks for the layers a project has switched on (ADR-12). Settings come from
@@ -15,6 +15,15 @@
 //   node scripts/groundwork-check.mjs --fmt --staged
 //                                                   the pre-commit step: tidy the staged notes and stage them
 //                                                   again (ADR-42). The only mode that runs `git add`.
+//   node scripts/groundwork-check.mjs new spec|delta|review|idea [--title T] [--spec SPEC-n] [--target PATH]
+//                                                   write a spec, a delta, a review record or an idea brief from
+//                                                   its template; it refuses when the layer is off (ADR-69)
+//   node scripts/groundwork-check.mjs note hub|plan|map|research [--title T]
+//                                                   a plan note in the repo's link form, listed in the hub (ADR-37)
+//   node scripts/groundwork-check.mjs apply-delta SLUG
+//                                                   merge a proposed delta into its specs and mark it applied (ADR-45)
+//   node scripts/groundwork-check.mjs move-closed   move the register's closed rows to the closed file
+//                                                   (each writing verb prints JSON with the check's result)
 //   node scripts/groundwork-check.mjs --install-hooks
 //                                                   point git at .githooks/ (run from `prepare`);
 //                                                   outside a git checkout it does nothing
@@ -82,12 +91,562 @@
 // parts into warnings. Structural breakage (dead links, duplicate IDs, citations that don't resolve)
 // is an error regardless of age.
 import { spawnSync } from "node:child_process";
-import { existsSync, lstatSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { homedir } from "node:os";
 import { dirname, join, posix, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const argv = process.argv.slice(2);
 const args = new Set(argv);
 const argVal = (name) => (argv.includes(name) ? argv[argv.indexOf(name) + 1] ?? null : null);
+// ---- writing verbs (ADR-69) ---------------------------------------------------------------------
+// new, note, apply-delta and move-closed live here, so anyone can work in the project without the skill (ADR-67).
+// Their templates are embedded below and render in the repo's link form (ADR-37). The whole section is one block:
+// a verb writes, prints JSON, and exits before any check runs.
+const VERBS = ["new", "note", "apply-delta", "move-closed"];
+if (VERBS.includes(argv[0])) {
+  const opts = { _: [] };
+  for (let i = 1; i < argv.length; i++) {
+    const a = argv[i];
+    if (a.startsWith("--")) opts[a.slice(2)] = argv[i + 1] && !argv[i + 1].startsWith("--") ? argv[++i] : true;
+    else opts._.push(a);
+  }
+  /** The repo: --repo, else the nearest folder above cwd holding .groundwork.json, else cwd. */
+  const REPO = (() => {
+    if (typeof opts.repo === "string") return resolve(opts.repo);
+    for (let dir = resolve(process.cwd()); ; dir = dirname(dir)) {
+      if (existsSync(join(dir, ".groundwork.json"))) return dir;
+      if (dirname(dir) === dir) return resolve(process.cwd());
+    }
+  })();
+  const SELF = fileURLToPath(import.meta.url);
+  const CHECK_CMD = "node scripts/groundwork-check.mjs";
+  // Where this machine's vault and ideas folder are remembered; never in the repo (ADR-43, ADR-52).
+  const USER_CONFIG = process.env.GROUNDWORK_USER_CONFIG || join(homedir(), ".groundwork.json");
+  const PLAN_NOTES_CONFIG = process.env.GROUNDWORK_PLAN_NOTES_CONFIG || (process.env.GROUNDWORK_USER_CONFIG ? null : join(homedir(), ".claude/plan-notes.json"));
+  // The review roles the skill ships (roles/); a record names them in its frontmatter (ADR-56).
+  const ROLES = ["codebase", "comprehension", "design", "readiness", "structure", "style", "zoom-out"];
+  // The mark on every placeholder a template writes; the check fails it in a spec past draft and in any review record (ADR-63).
+  const PLACEHOLDER = "TODO(groundwork):";
+
+  const out = (obj) => { console.log(JSON.stringify(obj, null, 2)); process.exit(obj.ok === false ? 1 : 0); };
+  const fail = (error, extra = {}) => out({ ok: false, error, ...extra });
+  const p = (rel) => join(REPO, rel);
+  const readJson = (file, fallback = null) => { try { return JSON.parse(readFileSync(file, "utf8")); } catch { return fallback; } };
+  const writeJson = (file, obj) => writeFileSync(file, JSON.stringify(obj, null, 2) + "\n");
+  const render = (text, vars) => text.replace(/\{\{(\w+)\}\}/g, (m, k) => (k in vars ? vars[k] : m));
+  const today = () => {
+    if (typeof opts.date === "string") return opts.date;
+    const d = new Date(); // the local date, not UTC
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  };
+  const git = (...a) => { const r = spawnSync("git", a, { cwd: REPO, encoding: "utf8" }); return r.status === 0 ? r.stdout.trim() : null; };
+  function idParts(pattern = "ADR-n") {
+    const k = pattern.lastIndexOf("n");
+    const e = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const pre = k === -1 ? pattern : pattern.slice(0, k);
+    const post = k === -1 ? "" : pattern.slice(k + 1);
+    return { src: `${e(pre)}(\\d+)${e(post)}`, label: (n) => `${pre}${n}${post}` };
+  }
+  /** The check, run on the repo after a write; its result rides along in the verb's JSON. */
+  function runCheck() {
+    const r = spawnSync(process.execPath, [SELF, "--json", "--root", REPO], { cwd: REPO, encoding: "utf8", maxBuffer: 256 * 1024 * 1024 });
+    try { return JSON.parse(r.stdout); } catch { return { ok: false, errors: [{ message: (r.stdout + r.stderr).trim() }], warnings: [] }; }
+  }
+  const newResult = (extra = {}) => ({ ok: true, written: [], changed: [], skipped: [], conflicts: [], notes: [], ...extra });
+  function loadConfig() {
+    const config = readJson(p(".groundwork.json"));
+    if (!config) fail(".groundwork.json not found: this folder is not set up yet");
+    return config;
+  }
+
+  // ---- templates (ADR-37) -----------------------------------------------------------------------
+  // `{{link Note#Heading|text}}` and `{{purpose}}` render in the form core.links names; {{#wiki}}, {{#relative}}
+  // and {{#obsidian}} blocks hold only whole sentences that differ.
+  const TEMPLATES = {
+    hub: `---
+{{tags moc}}
+type: hub
+status: current
+updated: {{DATE}}
+---
+
+# {{NAME}}
+
+{{purpose}} The **hub note** for {{PROJECT}}: what the project is, where everything lives, which note owns which topic, and the rules these notes follow. Substantive facts live in exactly one of the notes listed below, never here.
+
+## The project
+
+**{{PROJECT}}** — *one paragraph: what it is, who it is for, and its main parts.*
+
+## Where things live
+
+| What | Where |
+| --- | --- |
+{{WHERE_ROWS}}
+
+## The notes
+
+Start here, then go to the note that owns the topic. **State** is the note's \`type · status\` from its frontmatter; what each kind and status means is under {{link #Note kinds}}.
+
+| Note | Owns | State |
+| --- | --- | --- |
+{{NOTE_ROWS}}
+
+## How these notes work
+
+These notes are reference material for **both human and AI developers**. \`{{CHECK_CMD}}\` enforces the rules below; run it after editing notes.
+
+### Note kinds
+
+A note's frontmatter \`type\` is one of six kinds, and its \`status\` is one the kind allows. Milestones ("phase 2 delivered") go in the Owns column above or the note's body, never in \`status\`.
+
+| \`type\` | Holds | Allowed \`status\` |
+| --- | --- | --- |
+| \`hub\` | the note index and these rules | \`current\` |
+| \`register\` | the queue of open work | \`current\` |
+| \`reference\` | what exists now, kept true to the code | \`current\`, \`retired\` |
+| \`record\` | rulings and decisions, entry by entry (an entry is superseded on its own) | \`current\` |
+| \`research\` | cited evidence | \`active\`, \`completed\`, \`superseded\` |
+| \`plan\` | work not built yet that waits on someone, on research or on another phase, or runs over several phases | \`proposed\`, \`active\`, \`completed\`, \`abandoned\`, \`superseded\` |
+
+A \`superseded\` note names its replacement in \`superseded_by\`. The State column of the note table reads \`<type> · <status>\` and matches the frontmatter exactly; every note has a row.
+
+### Rules
+
+1. **One topic, one note.** Every note opens with its Purpose, which declares what it owns; a plan's Purpose also says what ends it ("Ends when …"). {{#relative}}The Purpose is a paragraph that starts \`**Purpose.**\`.{{/relative}}{{#wiki}}The Purpose is a \`> [!abstract] Purpose\` callout.{{/wiki}} Adding or changing a fact means editing only the owning note, never a sibling note.
+2. **Link, don't copy.** {{#relative}}Refer to other notes with relative links (\`[text](other-note.md#heading)\`); never restate their content.{{/relative}}{{#wiki}}Refer to other notes with wiki-links (\`[[Other note#Heading]]\`); never restate their content.{{/wiki}}
+3. **Code wins.** The notes describe intent and structure; the repository is the runtime truth. When they disagree, trust the code and fix the owning note.
+4. **Frontmatter** on every note: \`type\` and \`status\` (from {{link #Note kinds}}), \`updated\` (ISO date of the last edit), the project's tag in \`tags\` where one is set, \`dec-prefix\` on a note with a decision log, and \`ends-with\` on a plan that names its end row.
+5. **Decision IDs are note-local; cite them with the note's prefix.** Each note keeps its own series under a \`## Decision log\` heading, and the numbers collide across notes. A note with a log declares \`dec-prefix\` in its frontmatter, and outside that note a citation carries the prefix. A replaced decision is marked superseded and keeps its reasoning; nothing is renumbered.
+6. **A plan is for work that waits or runs over phases.** Work that runs start to finish needs no plan note: its reasoning goes into the reference it changes and the commit. A completed plan is never reopened: new work in its area starts a new plan. Where the project keeps a register of open work, a plan's end is a row there: its frontmatter names the row in \`ends-with\`, its "Ends when …" names it too, and closing the row and setting the plan \`completed\` (or \`abandoned\`) go in the same commit.
+7. **A reference lists its Known gaps.** A Known gap names a shipped thing and what it gets wrong or lacks. It goes in the reference's \`## Known gaps\` section under a heading of its own; where the project keeps a register, that heading starts with the row's ID and is the row's home section. When a gap is fixed, its lasting content becomes body text describing the fixed behaviour and the heading goes.
+8. **A chat is never the only source.** A session, commit, review or pasted chat may appear in a note as evidence, never as the only source of a fact. A handoff to a fresh session is written into the plan's section, not left only in pasted text.
+{{#obsidian}}9. **Tables are kept unpadded; a padded table in \`git status\` is Obsidian, not a mistake.** Clicking into a table in Obsidian re-pads every row to its widest cell, so a click turns a table into a whitespace-only diff. Don't investigate, revert or commit that padding by hand: \`{{CHECK_CMD}} --fmt\` strips it, the pre-commit hook strips it from staged notes, and the check fails while a table is padded.{{/obsidian}}
+`,
+    plan: `---
+{{tags}}
+type: plan
+status: proposed
+updated: {{DATE}}
+---
+
+# {{NAME}}
+
+{{purpose}} What this plan covers, in one or two sentences. Ends when the work it describes has shipped.
+
+## Approach
+
+How the work will be done, phase by phase.
+
+## Decision log
+
+Give the note a \`dec-prefix\` in its frontmatter when the first row goes in.
+
+| ID | Decision | Date | Why |
+| --- | --- | --- | --- |
+`,
+    map: `---
+{{tags}}
+type: map
+status: proposed
+updated: {{DATE}}
+---
+
+# {{NAME}}
+
+{{purpose}} The map of an effort too big for one session: its decision tickets, and the way they are resolved. Ends when nothing is left to decide and the destination goes to a spec or to tickets.
+
+## Destination
+
+What reaching the end looks like: the spec, decision or change this effort is finding its way to.
+
+## Notes
+
+The domain; commands every session should use; standing preferences.
+
+## Decisions so far
+
+One line per resolved ticket, \`DEC-n — the gist (ISS-n)\`, as each one is resolved.
+
+## Not yet specified
+
+Fog: questions you can tell are coming but cannot yet phrase sharply.
+
+## Out of scope
+
+Work ruled beyond the destination, one line each with why.
+
+## Decision log
+
+Give the note a \`dec-prefix\` in its frontmatter when the first row goes in.
+
+| ID | Decision | Date | Why |
+| --- | --- | --- | --- |
+`,
+    research: `---
+{{tags}}
+type: research
+status: active
+updated: {{DATE}}
+---
+
+# {{NAME}}
+
+{{purpose}} The question this research answers, and what will be decided from it.
+
+## Findings
+
+Each finding with its source.
+
+## Sources
+`,
+    brief: `# {{PROJECT}}
+
+- **Author:** {{AUTHOR}}
+- **Date:** {{DATE}}
+- **Status:** draft
+
+## Overview
+
+What this is and who it is for, in a paragraph.
+
+## Analysis
+
+What is known: the facts, constraints and research the decisions rest on.
+
+## Goals vs. Non-Goals
+
+**In-scope goals**
+- (to be written)
+
+**Out-of-scope non-goals**
+- (to be written)
+
+## Alternatives Weighed
+
+The options considered and why each was taken or rejected.
+
+## Key Decisions & Staging for Next Steps
+
+The decisions themselves are recorded with IDs where \`AGENTS.md\` points. This section says what comes next.
+`,
+  };
+  const titleSlug = (t) => t.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+  const headingSlug = (h) => h.toLowerCase().replace(/[^\p{L}\p{N}\s_-]/gu, "").trim().replace(/\s/g, "-");
+  const isWiki = (config) => config.core?.links === "wiki";
+  /** Where a note with this title lives: `<prefix><Title>.md` in a wiki repo, the title's slug in a relative one. */
+  const noteFile = (config, title) => `${config.plans.dir}/${config.plans.prefix ?? ""}${isWiki(config) ? title : titleSlug(title)}.md`;
+  /** A link from a note in plans.dir to a repo file (null: the note itself), in the repo's link form. */
+  function linkTo(config, file, heading, label) {
+    const base = file ? file.split("/").pop().replace(/\.md$/, "") : "";
+    if (isWiki(config)) {
+      const target = `${base}${heading ? `#${heading}` : ""}`;
+      return label && label !== (heading ?? base) ? `[[${target}|${label}]]` : `[[${target}]]`;
+    }
+    const rel = file ? encodeURI(relative(config.plans.dir, file).replace(/\\/g, "/")) : "";
+    return `[${label ?? heading ?? base}](${rel}${heading ? `#${headingSlug(heading)}` : ""})`;
+  }
+  function renderNote(text, config, vars) {
+    const wiki = isWiki(config);
+    let t = text.replace(/\r\n/g, "\n");
+    for (const [name, on] of [["wiki", wiki], ["relative", !wiki], ["obsidian", (config.layers ?? []).includes("obsidian")]]) {
+      t = t.replace(new RegExp(`\\{\\{#${name}\\}\\}([\\s\\S]*?)\\{\\{/${name}\\}\\}`, "g"), (m, body) => (on ? body : ""));
+    }
+    t = t.replace(/^\{\{tags(?: ([^}]+))?\}\}\n/m, (m, extra) => {
+      const tags = [config.plans.tag, ...(extra ? extra.trim().split(/\s+/) : [])].filter(Boolean);
+      return tags.length ? `tags:\n${tags.map((x) => `  - ${x}`).join("\n")}\n` : "";
+    });
+    t = t.replace(/^\{\{purpose\}\} (.*)$/gm, (m, body) => (wiki ? `> [!abstract] Purpose\n> ${body}` : `**Purpose.** ${body}`));
+    t = t.replace(/\{\{link ([^}|]+?)(?:\|([^}]+))?\}\}/g, (m, target, label) => {
+      const [name, heading] = target.split("#");
+      return linkTo(config, name.trim() ? noteFile(config, name.trim()) : null, heading, label);
+    });
+    return render(t, vars).replace(/[ \t]+$/gm, "").replace(/\n{3,}/g, "\n\n");
+  }
+  /** The notes in plans.dir: [{ file, type, status }]. */
+  function existingNotes(config) {
+    const dir = config.plans.dir;
+    if (!existsSync(p(dir))) return [];
+    return readdirSync(p(dir)).filter((f) => f.endsWith(".md") && f.startsWith(config.plans.prefix ?? "")).sort().map((f) => {
+      const fm = /^---\r?\n([\s\S]*?)\r?\n---/.exec(readFileSync(p(`${dir}/${f}`), "utf8"))?.[1] ?? "";
+      const field = (k) => new RegExp(`^${k}:\\s*(.*?)\\s*$`, "m").exec(fm)?.[1];
+      return { file: `${dir}/${f}`, type: field("type"), status: field("status") };
+    });
+  }
+  const noteRow = (config, n) => `| ${linkTo(config, n.file)} | *what it owns* | ${n.type} · ${n.status} |`;
+  /** The hub lists every note: a new one gets its row at the end of the note table. */
+  function addToHub(config, file, result) {
+    if (!config.plans?.hub || !existsSync(p(config.plans.hub))) return;
+    const raw = readFileSync(p(config.plans.hub), "utf8");
+    const eol = raw.includes("\r\n") ? "\r\n" : "\n";
+    const ls = raw.split(/\r?\n/);
+    const h = ls.findIndex((l) => /^## The notes\s*$/i.test(l));
+    let end = h === -1 ? -1 : ls.findIndex((l, i) => i > h && /^## /.test(l));
+    if (end === -1) end = ls.length;
+    let last = -1;
+    for (let i = h + 1; h !== -1 && i < end; i++) if (/^\|.*\|\s*$/.test(ls[i])) last = i;
+    if (last === -1) { result.notes.push(config.plans.hub + ' has no note table under "## The notes"; add a row for ' + file + " by hand."); return; }
+    ls.splice(last + 1, 0, noteRow(config, existingNotes(config).find((n) => n.file === file)));
+    writeFileSync(p(config.plans.hub), ls.join(eol));
+    result.changed.push(config.plans.hub);
+  }
+
+  // ---- note: a plan note from its template (ADR-37, ADR-64) --------------------------------------
+  function note() {
+    const tpl = opts._[0];
+    const config = loadConfig();
+    const kinds = ["hub", "plan", "map", "research"];
+    if (!kinds.includes(tpl)) return fail(`unknown note template "${tpl ?? ""}"`, { templates: kinds });
+    if (!(config.layers ?? []).includes("plans")) return fail("notes belong to the plans layer, which is off", { enable: "plans" });
+    config.plans = { dir: "docs/plans", ...config.plans };
+    const title = typeof opts.title === "string" ? opts.title.trim() : tpl === "hub" ? "Overview" : "";
+    if (!title) return fail("--title TITLE is required");
+    if (tpl === "hub" && config.plans.hub) return fail(`the hub is already ${config.plans.hub}`);
+    const file = noteFile(config, title);
+    if (existsSync(p(file))) return fail(`${file} already exists`);
+    const result = newResult();
+    const where = [`| These notes | \`${config.plans.dir}/\` in the repo: real, version-controlled files |`];
+    if (existsSync(p(config.core?.brief ?? "docs/brief.md"))) where.push(`| The brief | ${linkTo(config, config.core?.brief ?? "docs/brief.md")}: what the project is, who it is for, its goals and non-goals |`);
+    if (config.layers.includes("decisions")) {
+      const d = config.decisions ?? {};
+      const index = d.form === "files" && !existsSync(p(d.file ?? "DECISIONS.md")) ? `${d.dir ?? "docs/decisions"}/README.md` : d.file ?? "DECISIONS.md";
+      where.push(`| Decisions | ${linkTo(config, index)}: why things are the way they are, one \`${d.id ?? "ADR-n"}\` entry per decision |`);
+    }
+    if (config.layers.includes("open-work")) where.push(`| Open work | ${linkTo(config, config.openWork?.register ?? "docs/issues.md")}: the register, one row per open item, each with an \`${config.openWork?.id ?? "ISS-n"}\` ID |`);
+    if (config.layers.includes("obsidian")) where.push(`| The Obsidian vault | sees \`${config.obsidian.target}/\` through a link at \`${config.obsidian.vaultFolder}\`: edit in Obsidian, commit from the repo |`);
+    const vars = {
+      PROJECT: config.project, DATE: today(), TITLE: title, NAME: isWiki(config) ? `${config.plans.prefix ?? ""}${title}` : title, CHECK_CMD, PLANS_DIR: config.plans.dir,
+      WHERE_ROWS: where.join("\n"),
+      NOTE_ROWS: existingNotes(config).filter((n) => n.type !== "hub").map((n) => noteRow(config, n)).join("\n"),
+    };
+    mkdirSync(dirname(p(file)), { recursive: true });
+    writeFileSync(p(file), renderNote(TEMPLATES[tpl], config, vars));
+    result.written.push(file);
+    if (tpl === "hub") {
+      config.plans.hub = file;
+      writeJson(p(".groundwork.json"), config);
+      result.changed.push(".groundwork.json");
+    } else addToHub(config, file, result);
+    result.check = runCheck();
+    out(result);
+  }
+
+  // ---- new: artifacts that carry an ID or are a record (ADR-69) ----------------
+  // Each refuses when the layer that holds it is off, and writes nothing (ADR-68).
+  function newArtifact() {
+    const KINDS = ["spec", "delta", "review", "idea"];
+    const kind = opts._[0];
+    if (!KINDS.includes(kind)) return fail("new <kind>: one of " + KINDS.join(", ") + " (plan notes are the note verb's)", { kinds: KINDS });
+    const title = typeof opts.title === "string" ? opts.title.trim() : "";
+    if (kind === "idea") return newIdea(title);
+    const config = loadConfig();
+    const need = { spec: "specs", delta: "spec-deltas", review: "review" }[kind];
+    if (!(config.layers ?? []).includes(need)) return fail("the " + need + " layer is off, so there is no place for a " + kind, { enable: need });
+    const result = newResult();
+    const put = (rel, text) => {
+      if (existsSync(p(rel))) return fail(rel + " already exists");
+      mkdirSync(dirname(p(rel)), { recursive: true });
+      writeFileSync(p(rel), text);
+      result.written.push(rel);
+      result.file = rel;
+      result.check = runCheck();
+      return out(result);
+    };
+    const dir = config.specs?.dir ?? "docs/specs";
+    const SP = idParts(config.specs?.id ?? "SPEC-n");
+    const specNumbers = () => (existsSync(p(dir)) ? readdirSync(p(dir)) : []).map((f) => new RegExp("^" + SP.src + "-[a-z0-9-]+\\.md$").exec(f)).filter(Boolean).map((m) => Number(m[1]));
+    if (kind === "spec" || kind === "delta") {
+      if (!title) return fail("--title T names the " + kind);
+      if (kind === "delta" && (config.specDeltas?.tool ?? "groundwork") !== "groundwork") return fail("this project's deltas belong to " + config.specDeltas.tool + ": start the change with that tool");
+      const slug = titleSlug(title);
+      if (!slug) return fail("the title has no letters or digits to name the file by");
+      if (kind === "delta") {
+        // --spec names the one spec the delta changes; the check holds its lines to it (spec-deltas/parse, ADR-66).
+        let front = "";
+        if (opts.spec !== undefined) {
+          const m = new RegExp("^" + SP.src + "$").exec(String(opts.spec).trim());
+          if (!m) return fail("--spec names a spec by its ID, like " + SP.label(1));
+          if (!specNumbers().includes(Number(m[1]))) return fail(SP.label(m[1]) + " does not exist in " + dir + ": a delta changes a spec that is there");
+          front = "spec: " + SP.label(m[1]) + "\n";
+          result.spec = SP.label(m[1]);
+        }
+        result.notes.push("Fill in Added, Changed or Removed with full requirement lines: the check fails a delta with none (spec-deltas/parse). An added requirement takes its spec's next free number.");
+        return put(dir + "/changes/" + slug + ".md", "---\nstatus: proposed\ndate: " + today() + "\n" + front + "---\n\n# " + title + "\n\n" + PLACEHOLDER + " why the change is wanted.\n\n## Added\n\n## Changed\n\n## Removed\n");
+      }
+      const n = Math.max(0, ...specNumbers()) + 1;
+      result.id = SP.label(n);
+      // Every section the specs README asks for, each placeholder marked (ADR-63).
+      return put(dir + "/" + SP.label(n) + "-" + slug + ".md", [
+        "---", "status: draft", "date: " + today(), "---", "",
+        "# " + SP.label(n) + " — " + title, "",
+        PLACEHOLDER + " the problem and the solution, from the user's side, in a paragraph.", "",
+        "## Requirements", "",
+        "- **" + SP.label(n) + ".1** — " + PLACEHOLDER + " When <trigger>, the system shall <response>.", "",
+        "## Implementation decisions", "",
+        PLACEHOLDER + " the modules built or changed, their interfaces, schema changes and API contracts. No file paths or code.", "",
+        "## Testing", "",
+        PLACEHOLDER + " what makes a good test here (external behaviour only), which modules are tested, and the tests in the repo to follow.", "",
+        "## Out of scope", "",
+        PLACEHOLDER + " what this spec leaves out, one line each with why.", "",
+      ].join("\n"));
+    }
+    // review
+    const target = typeof opts.target === "string" ? opts.target.replace(/\\/g, "/").replace(/^\.\//, "") : "";
+    if (!target) return fail("--target PATH names the file under review");
+    if (!existsSync(p(target))) return fail(target + " is not in the repo");
+    const mode = opts.mode === "inline" ? "inline" : "subagent";
+    const roles = typeof opts.roles === "string" ? opts.roles.split(",").map((r) => r.trim()).filter(Boolean) : [];
+    const unknown = roles.filter((r) => !ROLES.includes(r));
+    if (unknown.length) return fail("no such role: " + unknown.join(", "), { roles: ROLES });
+    const name = title || target.split("/").pop().replace(/\.md$/, "");
+    const rdir = config.review?.dir ?? "docs/reviews";
+    return put(rdir + "/" + today() + "-" + titleSlug(name) + ".md", "---\ntarget: " + target + "\ndate: " + today() + "\nroles: " + (roles.length ? roles.join(", ") : "zoom-out, design, comprehension") + "\nmode: " + mode + "\n---\n\n# Review — " + name + "\n\n## Findings\n\n- **F1** — [Major] " + PLACEHOLDER + " what is wrong, and where; one line per finding. — **declined:** " + PLACEHOLDER + " end it with **fixed**, an ISS row, or **declined:** and the reason. With no findings, replace this line with one that says so.\n");
+  }
+
+  /** This machine's vault: { vault, from: "groundwork" | "plan-notes" }, or { vault: null }. */
+  function rememberedVault() {
+    const own = readJson(USER_CONFIG, {})?.vault;
+    if (own) return { vault: own, from: "groundwork" };
+    const old = PLAN_NOTES_CONFIG ? readJson(PLAN_NOTES_CONFIG, {})?.vault : null;
+    return old ? { vault: old, from: "plan-notes" } : { vault: null };
+  }
+  /** An idea brief lives in the vault's Ideas/ folder, or in ideasDir, until a repo exists (ADR-18, ADR-52). */
+  function newIdea(title) {
+    if (!title) return fail("--title T names the idea");
+    const user = readJson(USER_CONFIG, {}) ?? {};
+    if (typeof opts["ideas-dir"] === "string") {
+      const ideasDir = resolve(opts["ideas-dir"]);
+      mkdirSync(dirname(USER_CONFIG), { recursive: true });
+      writeJson(USER_CONFIG, { ...user, ideasDir });
+      user.ideasDir = ideasDir;
+    }
+    const vault = rememberedVault().vault;
+    const folder = vault ? join(vault, "Ideas") : user.ideasDir ?? null;
+    // The script never picks a place on its own: with no vault and no ideasDir, it asks (ADR-52).
+    if (!folder) return out({ ok: false, needsFolder: true, error: "no vault and no ideasDir is remembered on this machine: ask the user for a folder, then pass --ideas-dir DIR (it is remembered in ~/.groundwork.json)" });
+    const file = join(folder, title.replace(/[\\/:*?"<>|]/g, "-") + ".md");
+    if (existsSync(file)) return fail(file + " already exists");
+    mkdirSync(folder, { recursive: true });
+    const author = typeof opts.author === "string" ? opts.author : git("config", "user.name") ?? "";
+    writeFileSync(file, render(TEMPLATES.brief, { PROJECT: title, AUTHOR: author, DATE: today() }));
+    out({ ok: true, file, from: vault ? "vault" : "ideasDir", notes: ["When a repo exists, start --brief " + file + " moves the brief in as docs/brief.md."] });
+  }
+
+  // ---- move-closed: the register's closed rows to the closed file (the closed-file feature) -------
+  function moveClosed() {
+    const config = loadConfig();
+    const ow = config.openWork ?? {};
+    if (!(config.layers ?? []).includes("open-work") || !(ow.features ?? []).includes("closed-file")) return fail("the closed-file feature of the register is off", { enable: "open-work --feature closed-file" });
+    const file = ow.closed.file;
+    const raw = readFileSync(p(ow.register), "utf8");
+    const eol = raw.includes("\r\n") ? "\r\n" : "\n";
+    const ls = raw.split(/\r?\n/);
+    const start = ls.findIndex((l) => /^## Closed\b/i.test(l));
+    if (start === -1) return fail(`${ow.register} has no "## Closed" section`);
+    let end = ls.findIndex((l, i) => i > start && /^## /.test(l));
+    if (end === -1) end = ls.length;
+    const ROW = new RegExp(`^\\|\\s*${idParts(ow.id).src}\\s*\\|`);
+    const moved = [];
+    const head = [];
+    const kept = ls.filter((l, i) => {
+      if (i <= start || i >= end) return true;
+      if (ROW.test(l)) { moved.push(l); return false; }
+      if (/^\|/.test(l) && head.length < 2) head.push(l);
+      return true;
+    });
+    if (!moved.length) return out({ ok: true, unchanged: true, note: "no closed rows in the register" });
+    const result = newResult({ moved: moved.length });
+    const wiki = isWiki(config);
+    const name = (rel) => rel.split("/").pop();
+    if (!existsSync(p(file))) {
+      const back = wiki ? `[[${name(ow.register).replace(/\.md$/, "")}]]` : `[the register](${name(ow.register)})`;
+      writeFileSync(p(file), ["# Issues — closed", "", `Closed rows moved out of ${back}. IDs stay unique across both files and are never reused.`, "", "## Closed", "", ...head, ...moved, ""].join(eol));
+      result.written.push(file);
+    } else {
+      writeFileSync(p(file), readFileSync(p(file), "utf8").replace(/\s*$/, "") + eol + moved.join(eol) + eol);
+      result.changed.push(file);
+    }
+    const pointer = wiki ? `Older closed rows are in [[${name(file).replace(/\.md$/, "")}]].` : `Older closed rows are in [${name(file)}](${name(file)}).`;
+    if (!kept.includes(pointer)) kept.splice(start + 1, 0, "", pointer);
+    writeFileSync(p(ow.register), kept.join(eol));
+    result.changed.push(ow.register);
+    result.check = runCheck();
+    out(result);
+  }
+
+  // ---- apply-delta: merge a proposed delta into the specs and mark it applied (ADR-45) ------------
+  function applyDelta() {
+    const config = loadConfig();
+    if (!(config.layers ?? []).includes("spec-deltas")) return fail("the spec-deltas layer is off", { enable: "spec-deltas" });
+    if ((config.specDeltas?.tool ?? "groundwork") !== "groundwork") return fail("this project's deltas belong to " + config.specDeltas.tool + ": apply the change with that tool");
+    const dir = config.specs?.dir ?? "docs/specs";
+    const slug = String(opts._[0] ?? "").replace(/\.md$/, "").split(/[\\/]/).pop();
+    if (!slug) return fail("apply-delta <slug>: name the delta file in " + dir + "/changes/");
+    const file = dir + "/changes/" + slug + ".md";
+    if (!existsSync(p(file))) return fail(file + " not found");
+    const SP = idParts(config.specs?.id ?? "SPEC-n");
+    const REQ = new RegExp("^(\\s*[-*]\\s+\\*\\*)" + SP.src + "\\.(\\d+)(\\*\\*\\s+—\\s+)(\\S.*)$");
+    const split = (rel) => { const raw = readFileSync(p(rel), "utf8"); return { eol: raw.includes("\r\n") ? "\r\n" : "\n", ls: raw.split(/\r?\n/) }; };
+    const delta = split(file);
+    const fmEnd = delta.ls[0] === "---" ? delta.ls.indexOf("---", 1) : -1;
+    const at = delta.ls.findIndex((l, i) => i < fmEnd && /^status:/.test(l));
+    const status = at === -1 ? null : delta.ls[at].replace(/^status:\s*/, "").trim();
+    if (status !== "proposed") return fail(file + " is " + (status ?? "without a status") + "; only a proposed delta is applied");
+    const items = [];
+    let kind = null;
+    let fence = false;
+    delta.ls.forEach((l) => {
+      if (/^\s*(```|~~~)/.test(l)) { fence = !fence; return; }
+      if (fence) return;
+      const h = /^##\s+(.+?)\s*$/.exec(l);
+      if (h) { kind = ["added", "changed", "removed"].find((k) => k === h[1].toLowerCase()) ?? null; return; }
+      const m = kind ? REQ.exec(l) : null;
+      if (m) items.push({ kind, n: Number(m[2]), m: Number(m[3]), text: m[5] });
+    });
+    if (!items.length) return fail(file + " names no requirement under Added, Changed or Removed");
+    const specFile = (n) => (existsSync(p(dir)) ? readdirSync(p(dir)) : []).find((f) => new RegExp("^" + SP.src + "-[a-z0-9-]+\\.md$").exec(f)?.[1] === String(n));
+    const open = new Map(); // spec number → { rel, eol, ls }
+    for (const item of items) {
+      const id = SP.label(item.n) + "." + item.m;
+      if (!open.has(item.n)) {
+        const name = specFile(item.n);
+        if (!name) return fail(id + " names " + SP.label(item.n) + ", which does not exist");
+        open.set(item.n, { rel: dir + "/" + name, ...split(dir + "/" + name) });
+      }
+      const spec = open.get(item.n);
+      const reqs = spec.ls.map((l, i) => ({ i, m: REQ.exec(l) })).filter((x) => x.m && Number(x.m[2]) === item.n);
+      const have = reqs.find((x) => Number(x.m[3]) === item.m);
+      if (item.kind === "added") {
+        if (item.m !== reqs.length + 1) return fail(id + " is added, so it takes the next free number: " + SP.label(item.n) + "." + (reqs.length + 1));
+        const line = "- **" + id + "** — " + item.text;
+        if (reqs.length) spec.ls.splice(reqs[reqs.length - 1].i + 1, 0, line);
+        else {
+          const h = spec.ls.findIndex((l) => /^## Requirements\s*$/i.test(l));
+          if (h === -1) spec.ls.push("## Requirements", "", line, "");
+          else spec.ls.splice(h + 1, 0, "", line);
+        }
+      } else {
+        if (!have) return fail(id + " is " + item.kind + ", but " + spec.rel + " has no such requirement");
+        if (/^removed\b/i.test(have.m[5])) return fail(id + " is " + item.kind + ", but the requirement was already removed");
+        spec.ls[have.i] = have.m[1] + id + have.m[4] + (item.kind === "removed" ? "removed (" + item.text.replace(/\.$/, "") + "; " + slug + ")" : item.text);
+      }
+    }
+    const result = newResult({ applied: items.length });
+    for (const spec of open.values()) { writeFileSync(p(spec.rel), spec.ls.join(spec.eol)); result.changed.push(spec.rel); }
+    delta.ls[at] = "status: applied";
+    writeFileSync(p(file), delta.ls.join(delta.eol));
+    result.changed.push(file);
+    result.check = runCheck();
+    out(result);
+  }
+
+  if (argv[0] === "note") note();
+  else if (argv[0] === "new") newArtifact();
+  else if (argv[0] === "move-closed") moveClosed();
+  else applyDelta();
+}
+
 // The summary never fails a session: any problem prints nothing and exits 0 (ADR-30).
 const SUMMARY = args.has("--summary");
 if (SUMMARY) {
@@ -1387,6 +1946,34 @@ if (layers.includes("session-hook")) {
   if (!(lines("AGENTS.md") ?? []).some((l) => l.includes(SUMMARY_CMD))) report("session-hook/command", "AGENTS.md", 1, `AGENTS.md carries the fallback for harnesses without hooks: run \`node ${SUMMARY_CMD}\` at the start of a session`);
 }
 
+// ---- growth hints (ADR-67) ----------------------------------------------------------------------
+// Signals that the project has outgrown its layers, each with the setup step it points to. A hint never fails the
+// check and changes nothing: the gardener lists them, and the session summary shows at most one.
+function growthHints() {
+  const hints = [];
+  const hint = (id, message, step) => hints.push({ id, message, step });
+  const dirHasMd = (rel) => { try { return readdirSync(join(root, rel)).some((f) => f.endsWith(".md")); } catch { return false; } };
+  if (layers.includes("open-work")) {
+    const closedRows = [...rows.values()].filter((r) => !r.open && r.file === ow.register).length;
+    if (!feat("closed-file") && closedRows > closedCfg.threshold) hint("closed-file", `the register holds ${closedRows} closed rows`, "enable open-work --feature closed-file");
+    const openRows = [...rows.values()].filter((r) => r.open).length;
+    if (!feat("focus") && openRows >= 15) hint("focus", `the register has ${openRows} open rows and no Current focus order`, "enable open-work --feature focus");
+  }
+  if (!layers.includes("specs")) for (const d of ["docs/specs", "specs"]) if (dirHasMd(d)) { hint("specs", `${d}/ holds specs while the Specs layer is off`, `enable specs --dir ${d}`); break; }
+  if (layers.includes("specs")) {
+    const states = [...specs.values()].map((s) => s.status);
+    if (!layers.includes("spec-deltas") && states.some((s) => s === "accepted" || s === "implemented")) hint("spec-deltas", "a spec is past draft, and changes to it have no delta to go through", "enable spec-deltas");
+    if (!layers.includes("traceability") && states.includes("implemented")) hint("traceability", "a spec is implemented, and nothing holds a test to each of its requirements", "enable traceability");
+  }
+  if (!layers.includes("spec-deltas") && exists("openspec")) hint("openspec", "an openspec/ folder is here", "enable spec-deltas");
+  if (!layers.includes("domain")) for (const f of ["GLOSSARY.md", "CONTEXT.md", "docs/glossary.md"]) if (exists(f)) { hint("domain", `${f} looks like a glossary`, `enable domain --file ${f}`); break; }
+  if (!layers.includes("architecture")) for (const f of ["ARCHITECTURE.md", "docs/architecture.md"]) if (exists(f)) { hint("architecture", `${f} looks like an architecture overview`, `enable architecture --file ${f}`); break; }
+  if (!layers.includes("plans") && dirHasMd("docs/plans")) hint("plans", "docs/plans/ holds notes while the Plans layer is off", "enable plans");
+  return hints;
+}
+const HINTS = growthHints();
+const hintLine = (h) => `Growth hint: ${h.message}. \`/groundwork ${h.step}\` would set that up, with your yes.`;
+
 /** The open-work summary a session starts from: counts by section, then the focus order. */
 function summary(now) {
   if (!layers.includes("open-work") || !exists(ow.register)) return [];
@@ -1446,8 +2033,10 @@ function summary(now) {
       if (date < ymd(reset)) out.push(`Re-rank due: the order (${date}) predates the last reset (${DAYS[nudge.weekday][0].toUpperCase()}${DAYS[nudge.weekday].slice(1)} ${String(nudge.hour).padStart(2, "0")}:${String(nudge.minute).padStart(2, "0")}).`);
     }
   }
-  const max = Math.max(2, Number(hookCfg.maxLines) || 12);
-  return out.length <= max ? out : [...out.slice(0, max - 1), `… ${out.length - max + 1} more line(s); the rest is in ${ow.register}`];
+  // At most one growth hint, and it keeps its line inside maxLines (ADR-67).
+  const extra = HINTS.length ? [hintLine(HINTS[0])] : [];
+  const max = Math.max(2, Number(hookCfg.maxLines) || 12) - extra.length;
+  return [...(out.length <= max ? out : [...out.slice(0, max - 1), `… ${out.length - max + 1} more line(s); the rest is in ${ow.register}`]), ...extra];
 }
 if (SUMMARY) {
   const text = summary(argVal("--now") ? new Date(argVal("--now")) : new Date()).join("\n");
@@ -1471,7 +2060,7 @@ if (config.checks?.project !== undefined) {
 // ---- report -----------------------------------------------------------------------------------
 const warnCount = [...warnings.values()].reduce((a, l) => a + l.length, 0);
 if (args.has("--json")) {
-  console.log(JSON.stringify({ ok: errors.length === 0, errors, warnings: [...warnings.values()].flat(), dropped }, null, 2));
+  console.log(JSON.stringify({ ok: errors.length === 0, errors, warnings: [...warnings.values()].flat(), dropped, hints: HINTS }, null, 2));
 } else {
   for (const e of errors) console.log(`${e.file}:${e.line}  [${e.check}] ${e.message}`);
   if (warnCount) {

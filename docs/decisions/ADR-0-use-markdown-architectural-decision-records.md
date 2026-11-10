@@ -8,6 +8,8 @@ informed:
 
 # ADR-0 — Use Markdown Architectural Decision Records
 
+> In the context of a project that needs a durable record of why structural choices were made, facing a choice between running every decision through a full EGM design cycle and keeping no record at all, we decided to record decisions as MADR 4.0.0 files in `docs/decisions/`, to achieve explicit assumptions, consequences and a Confirmation target kept apart from the approved design, accepting that the project maintains two durable document types.
+
 ## Context and Problem Statement
 
 CouldHappen needs a durable place to record packaging and workspace decisions without turning every decision into a full EGM design cycle. The approved design remains the normative product specification, but the project also needs to preserve why structural choices were made, the alternatives considered, and how compliance will be confirmed.

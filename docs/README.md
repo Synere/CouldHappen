@@ -18,9 +18,10 @@ Each fact has one home; other documents link to it rather than restating it.
 | Setup and release steps | [Setup](setup.md) |
 | Per-host differences and status | [Host integrations](reference-hosts.md) |
 | What was observed, and when | [Validation results](validation-results.md), using the [validation procedure](validation.md) |
-| Current state and next steps | [Implementation progress](implementation-progress.md) |
+| Open work and next steps, as `ISS-n` rows | [Issues register](issues.md) |
+| Plans for work not built yet, and research notes | [docs/plans/](plans/), such as the [writing-style package](plans/writing-style-package.md) |
 | Requirements and architecture | [Approved design](designs/couldhappen.md) and [distribution and workspaces](designs/distribution-and-workspaces.md) |
-| Why a decision was made | [Architectural decisions](decisions/README.md) |
+| Why a decision was made | [Architectural decisions](decisions/README.md); [ADR-8](decisions/ADR-8-open-work-in-the-register.md) says which system owns which document |
 | Visual system | [DESIGN.md](../DESIGN.md), [product context](../PRODUCT.md), [reader surface direction](designs/woven/reader-surface-direction.md) |
 
 Supporting material:

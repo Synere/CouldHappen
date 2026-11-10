@@ -17,6 +17,10 @@ For each configuration:
 
 Mechanical tests use barriers around a real accepted HTTP save to demonstrate pause acknowledgment waits; identical uncertain retries preserve one entry; generation changes do not replay absent old text; helper restarts start closed; invalid public files retain a coherent view. PNG tests compare IDAT bytes and absence of metadata. Git tests use isolated repositories. Browser tests use temporary services/data, test actual HMR with draft/anchor preservation, and probe private paths through both services. These are necessary checks, not a replacement for the scene above.
 
+## Evidence levels
+
+Keep these separate: implemented behavior (source and scripts); automated checks (tests, check, build); visual observations (reviewer screenshots with synthetic data); and actual host/story observations. Only the last establishes that something works on a host. What is still unobserved is in the Unverified section of the [issues register](issues.md).
+
 ## Session-log checklist
 
 Run this against every exported host transcript before recording results. Each item maps to a rule in the writer skill's "Always"/"Never" lists; a "no" is a skill or host finding, not just a story note.

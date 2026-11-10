@@ -1,6 +1,6 @@
 # Progress log (history)
 
-> **History, not current instructions.** This is the full implementation handoff as it stood on 2026-11-05, kept as a dated log. The short current handoff is [implementation progress](../implementation-progress.md); add new dated entries at the end of this file.
+> **History, not current instructions.** This is the full implementation handoff as it stood on 2026-11-05, kept as a dated log. Entries were appended until 2026-11-11; it is now frozen. Open work is in the [issues register](../issues.md), and what changed is in the git log and the register's Closed rows ([ADR-8](../decisions/ADR-8-open-work-in-the-register.md)).
 
 Date: 2026-11-04, Asia/Manila. This continuation completed the remaining application implementation and the Woven UI finish pass. The approved first-scope application surface is implemented and mechanically checked. Native-host execution, supplied story/card scenes, fresh-context continuation, checkpoint-limited Undo, and the literal comp pixel gates remain unperformed or intentionally open. This handoff does not convert those into passes.
 

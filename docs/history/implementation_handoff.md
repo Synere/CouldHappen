@@ -1,6 +1,6 @@
 # CouldHappen implementation handoff
 
-> Application implementation began after this original handoff. For the current code, checks, open work, and next-session entry point, read [implementation progress](../implementation-progress.md). The state statements below preserve the design-to-implementation handoff as it existed before application work.
+> Application implementation began after this original handoff. For open work and the next-session entry point, read the [issues register](../issues.md) and [AGENTS.md](../../AGENTS.md). The state statements below preserve the design-to-implementation handoff as it existed before application work.
 
 * **Date:** 2026-11-04 (Asia/Manila)
 * **State:** All design sections approved; predecessor reconciliation complete; final destination saved; focused creative-initiative amendment approved and applied.

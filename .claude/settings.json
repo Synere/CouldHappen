@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node scripts/groundwork-check.mjs --summary --hook"
+          }
+        ]
+      }
+    ]
+  }
+}
