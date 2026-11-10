@@ -6,10 +6,10 @@ CouldHappen turns your existing coding agent into a storyteller and game master,
 
 <!-- dev-only -->
 <p align="center">
-  <img src="docs/images/story-cast.png" alt="The Story tab showing prose beside the cast panel, with a scene picture and a character portrait." width="900">
+  <img src="docs/images/story-cast.png" alt="The Story tab in a writer-chosen blood-moon theme, showing prose, a character portrait and description, and the character sheet with stats." width="900">
 </p>
 
-<p align="center"><sub>A story in progress in the stock reader. The writer created the scene pictures and portraits for this session.</sub></p>
+<p align="center"><sub>A story in progress. The writer chose the theme, created the artwork, and added the stats for this particular session.</sub></p>
 <!-- /dev-only -->
 
 ## What you can do

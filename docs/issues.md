@@ -64,5 +64,5 @@ whose blockers are all closed.
 | --- | --- | --- | --- |
 | ISS-1 | Re-test the fixes on a host | 2026-11-11 | The author observed the standing wait starting after setup and `portrait` working in several later sessions |
 | ISS-3 | Fresh-context continuation | 2026-11-11 | The author continued the fiction after a fresh-context restart on Claude Code and opencode |
-| ISS-6 | Retake the README screenshots | 2026-11-11 | Story, Director and empty Story shots retaken in the restyled stock reader; the director-export shot shows a player-built reader and was kept |
+| ISS-6 | Retake the README screenshots | 2026-11-11 | Director and empty Story shots retaken in the restyled reader, the Story shot with that session's package theme and sheet applied to a throwaway copy; the director-export shot shows a player-built reader and was kept |
 | ISS-5 | Publish by the ADR-4 checklist | 2026-11-11 | Done on 2026-11-05: v0.1.7 was published from the fresh history; releases since are built from tags by `release.yml` |
