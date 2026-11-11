@@ -1,4 +1,12 @@
+---
+type: research
+status: completed
+updated: 2026-11-11
+---
+
 # Previous-project carry-over audit
+
+**Purpose.** A record of what was investigated before the design was approved. It is kept as evidence and is not updated.
 
 > Historical research record. Current scope and implementation decisions are in the [approved design](../designs/couldhappen.md); start a future implementation session with the [handoff](../history/implementation_handoff.md). Document paths were normalized during organization; byte-exact earlier files are preserved in the [archive](../history/archive/README.md).
 

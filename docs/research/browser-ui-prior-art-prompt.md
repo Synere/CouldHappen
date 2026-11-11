@@ -1,4 +1,12 @@
+---
+type: research
+status: completed
+updated: 2026-11-11
+---
+
 # Research prompt: how do agent skills drive a browser UI?
+
+**Purpose.** The research prompt behind the [browser UI prior-art findings](browser-ui-prior-art-findings.md), kept so the question can be asked again.
 
 Paste everything below the line into ChatGPT (deep research / web browsing on). Bring the answer back to the repo and compare it with the "Our design" section.
 

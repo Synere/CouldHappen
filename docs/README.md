@@ -30,7 +30,7 @@ Supporting material:
 | --- | --- |
 | Creative initiative | [Core principle](designs/couldhappen.md#creative-initiative) and [optional practice examples](designs/creative-practice-examples.md). Examples are possibilities, not required systems. |
 | Visual provenance | [Direction record](designs/impeccable_direction_notes.md), [design sitemap](designs/SITEMAP.md), and the [selected Woven reference](designs/woven/woven.png). |
-| Research | [Browser handoff](research/browser_handoff_research.md), [host capabilities](research/host_compatibility_notes.md), [accepted carry-over](research/carryover_audit.md), and [portrait findings](research/prior_imagery_findings.md). Source inspection, not observed operation. |
+| Research | [Browser handoff](research/browser_handoff_research.md), [host capabilities](research/host_compatibility_notes.md), [accepted carry-over](research/carryover_audit.md), [portrait findings](research/prior_imagery_findings.md), and the [browser UI prior-art findings](research/browser-ui-prior-art-findings.md) with [their prompt](research/browser-ui-prior-art-prompt.md). Source inspection, not observed operation. |
 | Reviews | [Concept-review synthesis](reviews/goldfish_review_report.md), the [packaging review](reviews/2026-11-05_packaging-goldfish-review.md) and its [resolution](reviews/2026-11-05_packaging-resolution.md), and the [review index](reviews/README.md). |
 | History | [docs/history/](history/README.md): planning notes, the original implementation handoff, the design's alternatives and implementation plan, the progress log, and archives. Not current instructions. |
 

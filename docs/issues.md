@@ -4,7 +4,7 @@ The single register of open work for CouldHappen: to-dos, pending decisions, ope
 unverified facts, each with a stable `ISS-n` ID. A row is one short line. Its Source links to the item's home
 section: a heading that starts with its ID (`## ISS-n — title`) in another file, which holds the reasoning.
 
-- **Next ID: ISS-18.** IDs are never reused. Code comments and commits may cite them.
+- **Next ID: ISS-19.** IDs are never reused. Code comments and commits may cite them.
 - **New item:** write its home section first, then add a row here whose Source links to it, and bump Next ID.
 - **Resolved item:** move the row to Closed with the date and a one-line resolution, and update its home section.
 
@@ -19,6 +19,15 @@ each home section before its row. A spec past draft never homes a ticket. Work t
 whose blockers are all closed.
 
 **Credit.** The ticket method is adapted from `to-tickets` in Matt Pocock's skills (MIT), https://github.com/mattpocock/skills, Copyright (c) 2026 Matt Pocock.
+
+## Current focus
+
+Work order from 2026-11-11. The author's ranking: one `N. ISS-n — why` line per item, in order. The detail stays in each row and its home section.
+
+1. ISS-17 — a fresh design review comes before the drift check of the same documents
+2. ISS-4 — the drift report is the other gate before a wider release
+3. ISS-2 — more hosts widen what the release is known to work on
+4. ISS-7 — character-brains needs a host with subagents, which the host tests turn up
 
 ## To-do
 
@@ -48,6 +57,7 @@ whose blockers are all closed.
 | ISS-10 | Dependency audit: two low dev-tooling findings (`deepmerge` under `@sveltejs/vite-plugin-svelte`) | web | an upstream patch lands, or a deliberate override is chosen | [known limitations](plans/known-limitations.md#iss-10--dependency-audit) |
 | ISS-11 | Native assurance: checkpoint examples are off by default; a clean tree does not prove the world record complete | checkpoints | native checkpoint hooks are activated or observed on a host | [known limitations](plans/known-limitations.md#iss-11--native-assurance) |
 | ISS-12 | Portrait framing: revisit the 4:3 contain treatment with the Director | reader | a real portrait library shows problems with it | [known limitations](plans/known-limitations.md#iss-12--portrait-framing) |
+| ISS-18 | Writer-listening status: the reader cannot show whether the writer has a wait running | reader | the next round of reader work is chosen | [prior-art findings](research/browser-ui-prior-art-findings.md#iss-18--writer-listening-status) |
 
 ## Unverified
 

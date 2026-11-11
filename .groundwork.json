@@ -1,7 +1,7 @@
 {
   "groundwork": 1,
   "project": "CouldHappen",
-  "preset": "small",
+  "preset": "large",
   "layers": [
     "core",
     "decisions",
@@ -42,7 +42,14 @@
   "openWork": {
     "register": "docs/issues.md",
     "id": "ISS-n",
-    "features": []
+    "features": [
+      "focus"
+    ],
+    "focus": {
+      "nudge": "off",
+      "groups": true,
+      "readers": "summary"
+    }
   },
   "plans": {
     "dir": "docs/plans",
@@ -51,7 +58,8 @@
   "sessionHook": {
     "maxLines": 12,
     "harnesses": [
-      "claude"
+      "claude",
+      "codex"
     ]
   }
 }
