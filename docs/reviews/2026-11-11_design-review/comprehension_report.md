@@ -1,0 +1,49 @@
+# Comprehension test: CouldHappen design
+
+* **Stage:** 6 (Comprehension Test), EGM design review for ISS-17, 2026-11-11
+* **Target:** `docs/designs/couldhappen.md`, lines 1-355. The document has no implementation plan of its own, so there is no detailed range.
+* **Reviewer:** `egm-comprehension` (Sonnet), which read the target alone with no linked files and no other context.
+
+## What this proposes
+
+CouldHappen is a package: a directory of skills, templates, small Python helpers and a Svelte browser UI. A coding agent you already use (Codex, Claude Code, or Pi with OpenRouter) runs it as an author and game master. The human opens the directory in the host and asks the agent to "set up". The agent starts a local Python file helper and a Vite dev server, and the human plays in the browser. There are two logs: Story, which holds human actions and writer prose, and Director, which holds discussion, preferences, card imports and Undo requests. The writer keeps its own private world records and a re-entry index, so that a fresh session can continue. Git checkpoints, with host hooks where available, support an honest Undo that then waits for new Director direction. No new agent runtime or controller is added. The design is also an experiment in how much creative practice the agent can develop for itself. It says which claims still need real observation: waiting overhead, hook enforcement and fresh-session continuity.
+
+## How the existing system works, per this document
+
+The document says the system is built and approved, with later changes folded into the text. The host runs the writer. The Python helper:
+
+* serializes browser appends to `public/story.md` and `public/director.md`;
+* serves public snapshots, which the browser polls about once a second;
+* offers a "wait for input" command.
+
+The writer edits the same files with ordinary tools. Before it edits, it asks the helper for an acknowledged pause on browser writes. A separate "prose-production block" can be engaged for longer composition. Human entries carry `pending`, `addressed` or `deferred` metadata. A save receipt means only that the entry was saved, not that the writer has read it. The writer must keep a standing local wait running before each turn ends. A Git completion hook, active only while play is "armed", checks for changes that have no checkpoint.
+
+## Findings
+
+The document mostly holds together, and the reviewer could paraphrase every section. Most gaps are terms and details left to linked files. In a few places the document also contradicts itself about which of its statements are current.
+
+1. **Major. Lines 4, 19, 55, 305, 311.** The document says it is current, but it keeps layers of history and dated asides, such as "added on 2026-11-04" and "Later, an optional Director package…". A reader cannot tell which statements are the originally approved design and which came later. Line 19 describes the Woven anthology at length as "the selected visual reference", and then ADR-6 replaces its pale surface. The reader has to reach the end of the paragraph, and open DESIGN.md, to learn what the current visual is. Line 315 and the Non-Goals (line 66) still call Woven "the current visual reference", which conflicts with line 19. The document should say once which visual reference is authoritative.
+2. **Major. Lines 305, 233, 239.** Commands appear without the document ever defining a command-line tool:
+   * `writer claim`, `recover` and `writer close`
+   * `wait --timeout 0`
+   * `python -m helpers checkpoint check` and `checkpoint inspect --ref`
+   * `import-card`
+
+   They look like parts of one tool, `python -m helpers`, but the document never says so. A parenthesis explains "armed", but how the writer claims, arms and closes is spread across the document. A new reader cannot tell what "claiming" a writer means, or how claiming relates to the edit pause and the production block. Three controls share the same vocabulary: the edit pause, the production block, and the armed or claimed state. The document needs one place that lists the writer-control states and the command that changes each one.
+3. **Major. Lines 233, 239 (standing wait), and Goal 1.** The document uses six wait terms as if the reader knows them: "local wait", "standing local wait", "serviced command wait", "yielded command", "native monitor/event" and "background `wait --timeout 0`". A reader can infer the intent: the agent must always have a pending background command that returns when input arrives. The document never states that plainly. It also never says what "serviced" means beyond the host returning results. One sentence reads as contradictory: "a background `wait --timeout 0` is the preferred standing wait; it returns as soon as an entry is pending". A zero timeout normally returns at once, so the reader cannot tell whether 0 means "no timeout" or "check once".
+4. **Major. Lines 132-144.** The decision table cites IDs T1-T15, and the document never says where these were defined. The ADRs and `technical_plan_decisions.md` are linked, but the table rows don't explain themselves. Examples are "T5–T6 Markdown entries with stable identities, roles, boundaries, and human-input dispositions in entry metadata" and "T3 Continue in the current session after Undo". Some rows are grouped (T5-T6, T9-T10) without saying why. Separately, line 19 links ADR-6 but states nothing about it beyond the visual change.
+5. **Major. Lines 174-175, 184, 205-210.** The entry format is only partly defined. The document says each entry needs "a stable ID, an author role, explicit boundaries, and ordinary unescaped prose", and that the exact delimiter syntax lives in the public contract. A reader can't picture a log file from that. "Boundaries" is ambiguous: it could mean delimiters between entries or scene boundaries. The document also doesn't say how a "request ID" differs from an "entry ID"; line 208 says "client-generated entry/request ID". For the "helper generation/compatibility value" at line 210, it describes the mechanism but never says what the value is or who increments it. It also never says what a stale request being invalidated after a restart looks like to the user.
+6. **Major. Lines 51, 277-287, versus the first-demonstration description and Goal 7.** Undo depends on Git checkpoints. Yet beyond "writer chooses meaningful commit timing", the document never says who commits or when, or what the hook prevents. The Undo section assumes checkpoints exist. If the last checkpoint is far back, it says only "explain coarser restoration". It mentions reconstruction without Git as a fallback but never describes it. That may be intentional, but the reader gets no worked example.
+7. **Major. Lines 21, 53, 141, 165.** The wording of the three reference hosts' roles is inconsistent. Line 21 calls Claude Code and Codex "required support targets" and Pi an "additional reference". Line 53 asks for "at least one suitable existing-host OpenRouter route". Line 141 gives a validation order. Goal 9 makes an OpenRouter route a requirement and Pi is the selected route, so a reader cannot tell whether Pi itself is required. Line 165 mentions the "Impeccable precedent" as a prior example that was inspected, without saying what Impeccable is.
+8. **Major. Lines 175, 253, 311.** Features that appear late are defined only by pointers. Director packages don't appear in the Overview, Goals, Critical User Journeys or the architecture diagram. A table cell introduces the per-character `portrait_button` and `present: false`. `card.md` and `card.json` appear only in the import paragraph. The reader gets the impression that the design grew by accretion.
+9. **Minor to Major. Lines 5, 7, 66, 241-261.** Several project terms are never defined:
+   * **MightHappen** (line 66) is called an "earlier project" with "optional read-only history", but nothing says what it was or how it relates.
+   * **Writer, Director, player and human** are used interchangeably in places. The human is both "player" and "Director", depending on the channel.
+   * **The creative-initiative paragraph** (line 247) is in the second person ("Take initiative… your available capabilities"). That makes it an agent-facing prompt inside a design document. A reader cannot tell whether it is the text of the skill or a description of it; "Place this principle near the beginning of the main writer skill" suggests it quotes the skill.
+   * **"Delegated work" and "delegates"** assume sub-agents without introducing them, although line 55 calls delegation optional.
+10. **Nit. Lines 177, 179.** `START_HERE.md`, `helpers/` and `web/` are named "provisionally". Elsewhere `python -m helpers` is stated as fact, so the names are settled. "Provisionally" is stale wording for a document that says it is implemented.
+11. **Nit. Lines 21, 332.** The first demonstration is described twice: once in the Overview and again in the validation boundary. The Overview packs five items into one sentence ending "honest Git-supported Undo followed by waiting for direction". It could be a short numbered list.
+12. **Nit. Line 341.** The Open Questions say an independent review "has not run", while the Status says the document is approved and current. Both can be true, but a line on what the approval was based on would help.
+13. **Nit. Terms without a gloss.** HMR, loopback, Vite and Svelte are general engineering terms and need no gloss. "SillyTavern PNG and JSON cards" (line 45) is never explained. A reader who doesn't know SillyTavern won't know that a card is a character definition, which can be embedded in a PNG. A short gloss is warranted.
+
+The reviewer could not check the linked files, which the task told it not to open. These claims therefore rest wholly on links: the entry syntax, the endpoint names, the command set, the `public/cast.json` fields, and per-host status.

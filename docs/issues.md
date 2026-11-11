@@ -24,10 +24,9 @@ whose blockers are all closed.
 
 Work order from 2026-11-11. The author's ranking: one `N. ISS-n — why` line per item, in order. The detail stays in each row and its home section.
 
-1. ISS-17 — a fresh design review comes before the drift check of the same documents
-2. ISS-4 — the drift report is the other gate before a wider release
-3. ISS-2 — more hosts widen what the release is known to work on
-4. ISS-7 — character-brains needs a host with subagents, which the host tests turn up
+1. ISS-4 — the drift report is the gate before a wider release, now that the design review's fixes have landed
+2. ISS-2 — more hosts widen what the release is known to work on
+3. ISS-7 — character-brains needs a host with subagents, which the host tests turn up
 
 ## To-do
 
@@ -36,7 +35,6 @@ Work order from 2026-11-11. The author's ranking: one `N. ISS-n — why` line pe
 | ISS-2 | Test more hosts, any order: Codex CLI, Claude Code (with skill discovery), Pi with OpenRouter | hosts | — | [host validation](plans/host-validation.md#iss-2--more-hosts) |
 | ISS-4 | Run `egm-drift-report` over the design, distribution design and public contract before a wider release | docs | — | [public release](plans/public-release.md#iss-4--drift-report) |
 | ISS-7 | Try character-brains on a host with subagents, with game-master layers 1 to 4 | packages | — | [host validation](plans/host-validation.md#iss-7--try-character-brains) |
-| ISS-17 | Run a fresh EGM design review of the approved design | docs | — | [public release](plans/public-release.md#iss-17--egm-design-review) |
 
 ## Decisions pending
 
@@ -74,5 +72,6 @@ Work order from 2026-11-11. The author's ranking: one `N. ISS-n — why` line pe
 | --- | --- | --- | --- |
 | ISS-1 | Re-test the fixes on a host | 2026-11-11 | The author observed the standing wait starting after setup and `portrait` working in several later sessions |
 | ISS-3 | Fresh-context continuation | 2026-11-11 | The author continued the fiction after a fresh-context restart on Claude Code and opencode |
+| ISS-17 | Run a fresh EGM design review of the approved design | 2026-11-11 | Stages 5-8 ran on Sonnet with no Blockers; 7 Major and 6 Nit fixes were applied to the design and the rest declined with reasons ([review record](reviews/2026-11-11_design-review/consolidated_review_report.md)) |
 | ISS-6 | Retake the README screenshots | 2026-11-11 | Director and empty Story shots retaken in the restyled reader, the Story shot with that session's package theme and sheet applied to a throwaway copy; the director-export shot shows a player-built reader and was kept |
 | ISS-5 | Publish by the ADR-4 checklist | 2026-11-11 | Done on 2026-11-05: v0.1.7 was published from the fresh history; releases since are built from tags by `release.yml` |

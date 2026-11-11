@@ -19,3 +19,5 @@ Reading receipts describe the original filenames, line ranges, and hashes at rev
 For present implementation scope use the [approved design](../designs/couldhappen.md) and [implementation handoff](../history/implementation_handoff.md).
 
 A separate [packaging review packet](2026-11-05_packaging-goldfish-review-packet.md) is prepared for a fresh-context Goldfish-style review of the proposed distribution and story-workspace model. The [manual Goldfish-style review](2026-11-05_packaging-goldfish-review.md) returned **accept with changes**. The documented findings were resolved in the [resolution record](2026-11-05_packaging-resolution.md); the author authorized skipping the focused re-review, so the decision is accepted without a certified EGM re-review.
+
+The [2026-11-11 design review](2026-11-11_design-review/consolidated_review_report.md) is a fresh EGM review (Stages 5 to 8) of the approved design. Its findings were resolved in the [resolution record](2026-11-11_design-review/goldfish_review_report.md), and the accepted fixes were applied to the design.

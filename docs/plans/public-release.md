@@ -21,3 +21,5 @@ Retake the screenshots in the README and on GitHub for the restyled reader ([ADR
 ## ISS-17 — EGM design review
 
 The design's Open Questions say a fresh EGM design review of the [approved design](../designs/couldhappen.md) has not run, and that the predecessor reconciliation does not replace it.
+
+**Closed 2026-11-11.** Stages 5 to 8 of an EGM review ran in consolidated mode, every reviewer on Sonnet; Stage 9 was skipped because the design has no implementation plan of its own. No stage found a Blocker. The author auto-accepted the proposed fixes: the status and review line are current, DESIGN.md is named as the one visual reference, command detail the public contract already holds was removed, the standing wait and the three writer controls are defined once, and a single-user Non-Goal was added. The critic's requests for new Alternatives, Risks and threat-model sections were declined. The reports and the resolution record are in [the review folder](../reviews/2026-11-11_design-review/consolidated_review_report.md). ISS-4's drift check now runs against the revised text.
