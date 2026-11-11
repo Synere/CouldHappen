@@ -4,7 +4,7 @@ The single register of open work for CouldHappen: to-dos, pending decisions, ope
 unverified facts, each with a stable `ISS-n` ID. A row is one short line. Its Source links to the item's home
 section: a heading that starts with its ID (`## ISS-n — title`) in another file, which holds the reasoning.
 
-- **Next ID: ISS-19.** IDs are never reused. Code comments and commits may cite them.
+- **Next ID: ISS-24.** IDs are never reused. Code comments and commits may cite them.
 - **New item:** write its home section first, then add a row here whose Source links to it, and bump Next ID.
 - **Resolved item:** move the row to Closed with the date and a one-line resolution, and update its home section.
 
@@ -24,16 +24,24 @@ whose blockers are all closed.
 
 Work order from 2026-11-11. The author's ranking: one `N. ISS-n — why` line per item, in order. The detail stays in each row and its home section.
 
-1. ISS-4 — the drift report is the gate before a wider release, now that the design review's fixes have landed
-2. ISS-2 — more hosts widen what the release is known to work on
-3. ISS-7 — character-brains needs a host with subagents, which the host tests turn up
+1. ISS-19 — the two writer-control bugs the drift report found can strand a session after a restart
+2. ISS-20 — the remaining drift fixes gate a wider release; ISS-20 to ISS-23 can go in any order
+3. ISS-21 — the writer relies on `card.md` holding the whole card
+4. ISS-22 — small reader and contract fixes from the same report
+5. ISS-23 — the design text catches up with the shipped skill
+6. ISS-2 — more hosts widen what the release is known to work on
+7. ISS-7 — character-brains needs a host with subagents, which the host tests turn up
 
 ## To-do
 
 | ID | Item | Area | Blocked by / phase | Source |
 | --- | --- | --- | --- | --- |
 | ISS-2 | Test more hosts, any order: Codex CLI, Claude Code (with skill discovery), Pi with OpenRouter | hosts | — | [host validation](plans/host-validation.md#iss-2--more-hosts) |
-| ISS-4 | Run `egm-drift-report` over the design, distribution design and public contract before a wider release | docs | — | [public release](plans/public-release.md#iss-4--drift-report) |
+| ISS-19 | `close` refuses while blocked; `wait` errors on an unowned or closing helper even while a pause is persisted | helpers | — | [public release](plans/public-release.md#iss-19--writer-controls-after-close-and-restart) |
+| ISS-20 | `validate` names the file for every error; `cast.json` rejects unknown top-level fields | helpers | — | [public release](plans/public-release.md#iss-20--validation-names-the-file) |
+| ISS-21 | Lossless `card.md` (envelope, lorebook names, falsy fields); `portrait` guidance for a JSON-card import | helpers | — | [public release](plans/public-release.md#iss-21--lossless-card-copy-and-portrait-guidance) |
+| ISS-22 | Vite denies `START_HERE.md`; portrait button names a lost connection; contract says how the reader settles uncertain saves | web | — | [public release](plans/public-release.md#iss-22--reader-boundary-and-save-wording) |
+| ISS-23 | Design names `voice.md` and `what-this-can-do.md` and keeps one creative-practice file; link-check wording | docs | — | [public release](plans/public-release.md#iss-23--design-text-catches-up) |
 | ISS-7 | Try character-brains on a host with subagents, with game-master layers 1 to 4 | packages | — | [host validation](plans/host-validation.md#iss-7--try-character-brains) |
 
 ## Decisions pending
@@ -70,6 +78,7 @@ Work order from 2026-11-11. The author's ranking: one `N. ISS-n — why` line pe
 
 | ID | Item | Closed | Resolution |
 | --- | --- | --- | --- |
+| ISS-4 | Run `egm-drift-report` over the design, distribution design and public contract | 2026-11-11 | 13 drifts, no Blocker ([report](reviews/2026-11-11_DRIFT_REPORT.md)); the fixes are ISS-19 to ISS-23 |
 | ISS-1 | Re-test the fixes on a host | 2026-11-11 | The author observed the standing wait starting after setup and `portrait` working in several later sessions |
 | ISS-3 | Fresh-context continuation | 2026-11-11 | The author continued the fiction after a fresh-context restart on Claude Code and opencode |
 | ISS-17 | Run a fresh EGM design review of the approved design | 2026-11-11 | Stages 5-8 ran on Sonnet with no Blockers; 7 Major and 6 Nit fixes were applied to the design and the rest declined with reasons ([review record](reviews/2026-11-11_design-review/consolidated_review_report.md)) |
