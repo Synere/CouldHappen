@@ -1,4 +1,4 @@
-// groundwork-check v13 — installed by the groundwork skill; `groundwork doctor --fix` replaces it when a newer
+// groundwork-check v14 — installed by the groundwork skill; `groundwork doctor --fix` replaces it when a newer
 // version ships (ADR-22). Checks only your project keeps go in a separate script without this header line.
 //
 // The deterministic checks for the layers a project has switched on (ADR-12). Settings come from
@@ -1957,7 +1957,9 @@ function growthHints() {
     const closedRows = [...rows.values()].filter((r) => !r.open && r.file === ow.register).length;
     if (!feat("closed-file") && closedRows > closedCfg.threshold) hint("closed-file", `the register holds ${closedRows} closed rows`, "enable open-work --feature closed-file");
     const openRows = [...rows.values()].filter((r) => r.open).length;
-    if (!feat("focus") && openRows >= 15) hint("focus", `the register has ${openRows} open rows and no Current focus order`, "enable open-work --feature focus");
+    // A register that already has a Current focus block only needs the feature switched on (ISS-24).
+    if (!feat("focus") && focusBlock()) hint("focus", "the register has a Current focus order while openWork.focus is off", "enable open-work --feature focus");
+    else if (!feat("focus") && openRows >= 15) hint("focus", `the register has ${openRows} open rows and no Current focus order`, "enable open-work --feature focus");
   }
   if (!layers.includes("specs")) for (const d of ["docs/specs", "specs"]) if (dirHasMd(d)) { hint("specs", `${d}/ holds specs while the Specs layer is off`, `enable specs --dir ${d}`); break; }
   if (layers.includes("specs")) {
