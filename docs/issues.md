@@ -4,7 +4,7 @@ The single register of open work for CouldHappen: to-dos, pending decisions, ope
 unverified facts, each with a stable `ISS-n` ID. A row is one short line. Its Source links to the item's home
 section: a heading that starts with its ID (`## ISS-n — title`) in another file, which holds the reasoning.
 
-- **Next ID: ISS-24.** IDs are never reused. Code comments and commits may cite them.
+- **Next ID: ISS-31.** IDs are never reused. Code comments and commits may cite them.
 - **New item:** write its home section first, then add a row here whose Source links to it, and bump Next ID.
 - **Resolved item:** move the row to Closed with the date and a one-line resolution, and update its home section.
 
@@ -43,6 +43,13 @@ Work order from 2026-11-11. The author's ranking: one `N. ISS-n — why` line pe
 | ISS-22 | Vite denies `START_HERE.md`; portrait button names a lost connection; contract says how the reader settles uncertain saves | web | — | [public release](plans/public-release.md#iss-22--reader-boundary-and-save-wording) |
 | ISS-23 | Design names `voice.md` and `what-this-can-do.md` and keeps one creative-practice file; link-check wording | docs | — | [public release](plans/public-release.md#iss-23--design-text-catches-up) |
 | ISS-7 | Try character-brains on a host with subagents, with game-master layers 1 to 4 | packages | — | [host validation](plans/host-validation.md#iss-7--try-character-brains) |
+| ISS-24 | character-brains-plus package and script core: fact visibility classes, `know` with how and confidence, the brief builder, generated views | packages | — | [character-brains-plus](plans/character-brains-plus.md#iss-24--knowledge-isolation) |
+| ISS-25 | character-brains-plus: migrate method-only brain files into the log; `reconcile` after a Director Undo | packages | ISS-24 | [character-brains-plus](plans/character-brains-plus.md#iss-25--migration-and-undo) |
+| ISS-26 | character-brains-plus: body, mood and desire state, `tick` decay, words not numbers in the brief | packages | ISS-24 | [character-brains-plus](plans/character-brains-plus.md#iss-26--body-mood-and-desire) |
+| ISS-27 | character-brains-plus: beliefs, claims with a contradiction warning, what each thinks others know | packages | ISS-24 | [character-brains-plus](plans/character-brains-plus.md#iss-27--beliefs-claims-and-other-minds) |
+| ISS-28 | character-brains-plus: the `BODY`, `UNSURE` and `REMEMBERS` answer keys, wants, intents, vetoes, the off-screen call | packages | ISS-24 | [character-brains-plus](plans/character-brains-plus.md#iss-28--agency-and-life-off-screen) |
+| ISS-29 | character-brains-plus: `review` for card drift, with a proposal for game-master | packages | ISS-24, ISS-28 | [character-brains-plus](plans/character-brains-plus.md#iss-29--drift-review) |
+| ISS-30 | Both brain packages: no desire for a character under 18 or with no age (for opencode) | packages | ISS-26 | [character-brains-plus](plans/character-brains-plus.md#iss-30--age-gate-on-desire) |
 
 ## Decisions pending
 

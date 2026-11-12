@@ -42,6 +42,8 @@ If more characters qualify than the fidelity allows, keep the ones with the most
 
 At most the fidelity's calls per turn. If more characters qualify, call the ones with the most at stake in this moment, then the one the player addressed first. You play the others from their files. Say nothing about this to the player.
 
+A character played from the file knows too much: you know everything, and their file cannot stop you. Keep scenes with more present characters than the budget short, or play from the file only the characters whose knowledge cannot change the scene.
+
 Skip the brain entirely when the beat is mechanical (a door opens, a bus arrives) or when nothing in the character's inner state changes the scene.
 
 ## The brief (what a brain receives)
@@ -58,6 +60,7 @@ WHO THEY ARE
 card: want / fear / secret / attitude (from their game-master cast card, one line each)
 look: frame, colouring, and one physical detail (from the brain file)
 voice: their voice card: rhythm, the words they reach for, their tic, what they do with silence, one thing they would never say
+desire: the line under "Desire" in their file, word for word, if it has one
 memory: six bullets at most, from their digest
 owed: open threads that involve them (a promise, a debt, a grudge), as they remember them
 they know: established facts they could know, and the hidden truths listed under "Knows" in their file
@@ -75,6 +78,7 @@ HIDES: what they will not show
 SAYS: one to three short lines, in their voice, as they would actually say them
 DOES: one physical action
 TELL: one involuntary detail a careful observer would catch
+DECIDES: a lasting intention they form now (to leave, to refuse, to do something later), or (none)
 ```
 
 **What they may know.** A hidden truth (a fact with `"known": false`, usually behind a layer 4 revelation) enters a brief only if its id is under "Knows" in that character's file. Their own `secret` is always theirs. When a character learns something in the story, add the fact id and the entry to their file in the same turn.
@@ -90,8 +94,9 @@ A brain sees the beat, not the room, so left alone it writes finished, quotable 
 
 ## The block (what comes back)
 
-Strict six-key format, plain text, no prose around it. Anything outside the keys is discarded.
+Strict seven-key format, plain text, no prose around it. Anything outside the keys is discarded.
 
+- `DECIDES` is the one key that can change the scene rather than colour it. Honour it: let them leave, refuse, or carry the intention into later scenes, and add it to their file under "Memory". If you cannot honour it, note in the file why not. A character who cannot leave is a puppet.
 - `SAYS` is used as dialogue, cut, or replaced with silence when the brain marks it `(nothing)`. You do not embroider it. `TELL` may also be dropped. The others shape how you write the character.
 - `SAYS` is ordinary first, short, with at most one imperfection, no aphorisms, and no stage directions inside the quotation. It never writes anyone else's lines, including the player's.
 - Swap test: if another character could say the line unchanged, cut it. A silent character is better than a ventriloquist's doll.
@@ -118,7 +123,7 @@ Append it to the brain file under "Memory". Newest last. When the memory passes 
 
 ## When a session ends
 
-Start a fresh subagent with the file's card, look, knows and memory, write `session: new`, and continue. Do not apologise to the player or explain; the fiction does not notice.
+Start a fresh subagent with the file's card, look, desire, knows and memory, write `session: new`, and continue. Do not apologise to the player or explain; the fiction does not notice.
 
 ## Cost
 

@@ -22,7 +22,7 @@ You play the whole cast, so every character knows what you know. A brain fixes t
 
 It needs [game-master](../game-master/PACKAGE.md) with layers 1 to 4 on, and keeps no second set of records:
 
-- A brain's sheet is the character's **layer 3 cast card** (`want`, `fear`, `secret`, `voice`, `attitude`), plus a `look` line in the brain file.
+- A brain's sheet is the character's **layer 3 cast card** (`want`, `fear`, `secret`, `voice`, `attitude`), plus a `look` line and an optional `desire` line in the brain file.
 - What the character **may know** is limited by layer 1 facts and the **layer 4** hidden truths (facts with `"known": false`). The brain file lists the fact ids that character has learned, and the brief never carries any other hidden truth.
 - Open **layer 2** threads that involve the character (a promise, a debt, a relationship) go into the brief as what they remember being owed.
 
