@@ -19,9 +19,10 @@ If the Director says "you decide", propose numbers for this story's cast and wai
 
 ## 1. Check the prerequisites
 
-1. **game-master.** `tools/gm_state.py` and `notes/gm/` exist. If not, the Director must agree to game-master first; apply it with its own `APPLY.md`.
-2. **Layers.** Run `python tools/gm_state.py layers`. Turn on any of 2, 3 and 4 that is off with `python tools/gm_state.py layers --on 2 3 4`, then follow step 3 of game-master's APPLY.md ("Switching on a further layer") for each one you turned on.
-3. **Subagents.** Confirm from your own tools that you can start a subagent session with a brief and read its answer, and whether you can resume one later by id. If you cannot start one, stop and tell the Director the package cannot run here. If you cannot resume, every brain is ephemeral (one call, no kept session); say so, and record it.
+1. **Not the plus package.** If `notes/brains/events.jsonl` exists, this story uses [character-brains-plus](../character-brains-plus/PACKAGE.md). Stop: the two cannot be installed together. Tell the Director, and do not write brain files beside its log.
+2. **game-master.** `tools/gm_state.py` and `notes/gm/` exist. If not, the Director must agree to game-master first; apply it with its own `APPLY.md`.
+3. **Layers.** Run `python tools/gm_state.py layers`. Turn on any of 2, 3 and 4 that is off with `python tools/gm_state.py layers --on 2 3 4`, then follow step 3 of game-master's APPLY.md ("Switching on a further layer") for each one you turned on.
+4. **Subagents.** Confirm from your own tools that you can start a subagent session with a brief and read its answer, and whether you can resume one later by id. If you cannot start one, stop and tell the Director the package cannot run here. If you cannot resume, every brain is ephemeral (one call, no kept session); say so, and record it.
 
 ## 2. Install
 

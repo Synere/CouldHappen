@@ -1,7 +1,7 @@
 ---
 type: plan
 status: proposed
-updated: 2026-11-12
+updated: 2026-11-13
 ---
 
 # Character brains plus
@@ -15,6 +15,8 @@ Every ticket edits only `.agents/skills/couldhappen/packages/character-brains-pl
 ## ISS-24 — Knowledge isolation
 
 F1, F2, F3 and the F12 text. The core every other ticket builds on.
+
+**Done 2026-11-13.** Choices made where the text above left room, for the later tickets to build on: `brief` prints one JSON object like every command and `--text` prints the bare brief; `add` also takes `--age` and `--threads` (the `knows_threads` list, replaced whole); `char`, `world`, `session` and `compress` are the setup events whose `entry` may be null; every command rewrites the views, since a view also follows game-master; besides refusing a scene file, `brief` refuses to emit any text holding an entry id, a fact-shaped id, a game-master id or a file path. Until ISS-25, Undo is manual: `check` warns about events citing a missing entry and the protocol says to `unlearn`. New ops go in `VALIDATE` and `FOLD`, new brief sections in `BRIEF_SECTIONS`, new answer keys in `ANSWER_KEYS`.
 
 - The package folder, `PACKAGE.md` and `APPLY.md`, and its row in `packages/INDEX.md` beside the method-only package, saying when to pick which. The two cannot be installed together: plus refuses over method-only brain files unless it migrates them (ISS-25), and the method-only `APPLY.md` refuses when `notes/brains/events.jsonl` exists.
 - `files/brains.py`, installed as `tools/brains.py`: stdlib only, same conventions as `gm_state.py` (`--root .`, one JSON object out, exit 0 ok, 1 warning, 2 error). Reads game-master state by replaying `notes/gm/deltas.jsonl` through `gm_state.py`, never by copying it.
