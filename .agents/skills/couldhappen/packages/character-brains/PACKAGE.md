@@ -1,7 +1,7 @@
 ---
 name: character-brains
 summary: Recurring characters get their own subagent brain that sees only what that character perceives, so they keep their own minds, secrets and voices across scenes.
-couldhappen: 0.1.20
+couldhappen: 0.1.23
 includes: method
 requires: game-master with layers 1 to 4 on, and a host that can start subagent sessions
 touches: notes/brains/ (private protocol and one file per character), game-master layers, START_HERE.md, notes/packages.md. No public file, helper or reader code changes.
