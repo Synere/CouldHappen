@@ -60,7 +60,7 @@ WHO THEY ARE
 card: want / fear / secret / attitude (from their game-master cast card, one line each)
 look: frame, colouring, and one physical detail (from the brain file)
 voice: their voice card: rhythm, the words they reach for, their tic, what they do with silence, one thing they would never say
-desire: the line under "Desire" in their file, word for word, if it has one
+desire: the line under "Desire" in their file, word for word
 memory: six bullets at most, from their digest
 owed: open threads that involve them (a promise, a debt, a grudge), as they remember them
 they know: established facts they could know, and the hidden truths listed under "Knows" in their file

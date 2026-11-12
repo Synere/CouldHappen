@@ -12,7 +12,7 @@ Frame, colouring and one recurring physical detail, in one line. A brain will re
 
 ## Desire
 
-Optional, one line, written plainly: what they want sexually or physically, what they refuse, what they would never admit. Leave it out when it does not belong in the story. Their limits are authoritative: cut anything a brain writes that crosses them.
+One line, written plainly: what they want sexually or physically, what they refuse, what they would never admit. 
 
 ## Knows
 

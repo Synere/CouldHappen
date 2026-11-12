@@ -28,7 +28,7 @@ If the Director says "you decide", propose numbers for this story's cast and wai
 
 1. Copy [files/PROTOCOL.md](files/PROTOCOL.md) to `notes/brains/PROTOCOL.md`. Fill its "Fidelity" section with the Director's answers and the date, and note whether sessions can be resumed.
 2. Copy [files/brain-template.md](files/brain-template.md) to `notes/brains/TEMPLATE.md`. It is a template, not a character.
-3. For each recurring character who already qualifies under the protocol's "Who gets a brain", make sure they have a layer 3 cast card, then copy the template to `notes/brains/<npc id>.md` and fill it: `look`, a `desire` line if the story calls for one, the fact ids they know, and a first memory from the story so far. Do not start sessions yet; the first scene they are in does that.
+3. For each recurring character who already qualifies under the protocol's "Who gets a brain", make sure they have a layer 3 cast card, then copy the template to `notes/brains/<npc id>.md` and fill it: `look`, a `desire` line, the fact ids they know, and a first memory from the story so far. Do not start sessions yet; the first scene they are in does that.
 
 Private notes under `notes/` need no pause. Nothing here touches public files.
 
