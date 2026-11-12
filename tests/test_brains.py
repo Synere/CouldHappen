@@ -326,9 +326,10 @@ class BrainsTest(unittest.TestCase):
         self.assertEqual([(k['data']['fact'], k['data']['how'], k['entry']) for k in knows], [('F2', 'migrated', self.entry)])
         joined = ' '.join(out['warnings'])
         for needle in ('names no fact id', 'names F99, not a game-master fact', 'Desire line is kept only',
-                       'split into 2 episodes', 'no know event was invented'):
+                       'state oren --set desire.limits', 'split into 2 episodes', 'no know event was invented'):
             self.assertIn(needle, joined)
         brief = self.brief('oren')
+        self.assertNotIn('DESIRE', brief)  # never guessed into fields; the writer records it with state
         self.assertIn(text(2), brief)
         self.assertNotIn('migrated', brief)
         self.assertEqual(self.brains('check')['ok'], True)
@@ -406,6 +407,154 @@ class BrainsTest(unittest.TestCase):
                          [('world', True)])
         self.assertEqual(self.brains('check')['ok'], True)
 
+    # ---- body, mood and desire (ISS-26) ----
+
+    def state(self, *sets, npc='mara', expect=0, entry=None):
+        return self.brains('state', npc, '--set', *sets, '--entry', entry or self.entry, expect=expect)
+
+    def block(self, brief, title):
+        return brief.split(f'\n\n{title}\n')[1].split('\n\n')[0].split('\n') if f'\n\n{title}\n' in brief else []
+
+    def test_levels_reach_the_brief_as_words_never_numbers(self):
+        self.cast()
+        self.state('affect.energy=0', 'affect.pain=1', 'affect.fear=2', 'affect.shame=3', 'affect.arousal=4',
+                   'affect.intoxication=5', 'affect.valence=-2', 'affect.mood=tense, watching the door')
+        lines = self.block(self.brief(), 'HOW THEY ARE')
+        self.assertEqual(lines, ['mood: tense, watching the door', 'spirits: low', 'energy: none', 'pain: a little',
+                                 'fear: some', 'shame: a lot', 'arousal: badly', 'intoxication: overwhelming'])
+        for value, word in ((-3, 'wretched'), (-1, 'a little low'), (1, 'a little lifted'), (2, 'good'), (3, 'elated')):
+            self.state(f'affect.valence={value}')
+            self.assertIn(f'spirits: {word}', self.block(self.brief(), 'HOW THEY ARE'))
+        self.assertNotRegex('\n'.join(self.block(self.brief(), 'HOW THEY ARE')), r'\d')
+
+    def test_empty_fields_are_left_out_and_an_empty_value_clears(self):
+        self.cast()
+        brief = self.brief()
+        self.assertNotIn('HOW THEY ARE', brief)
+        self.assertNotIn('DESIRE', brief)
+        self.state('affect.fear=0', 'affect.valence=0', 'body.clothes=a wet oilskin', 'desire.wants=to be chosen')
+        self.assertEqual(self.block(self.brief(), 'HOW THEY ARE'), ['wearing: a wet oilskin'])  # 0 is an absence
+        self.state('body.clothes=', 'desire.wants=')
+        brief = self.brief()
+        self.assertNotIn('HOW THEY ARE', brief)
+        self.assertNotIn('DESIRE', brief)
+        self.assertEqual(self.brains('state', 'mara')['state'], {'affect': {'fear': 0, 'valence': 0}})
+
+    def test_body_marks_say_who_can_see_them_and_desire_comes_before_now(self):
+        self.cast()
+        self.state('body.condition=a cracked rib', 'body.marks.burn=a burn on one wrist',
+                   'body.marks.burn.seen_by=anyone', 'body.marks.tattoo=a gull under the left breast',
+                   'body.marks.tattoo.seen_by=juno', 'body.marks.bruise=a bruise on the hip',
+                   'body.marks.bruise.seen_by=nobody', 'body.carrying=a gutting knife',
+                   'body.capacities=cannot lift the left arm', 'desire.orientation=women, mostly',
+                   'desire.limits=nothing in front of others', 'desire.never_admits=that she misses Juno',
+                   'desire.current=the player, a little')
+        brief = self.brief()
+        self.assertEqual(self.block(brief, 'HOW THEY ARE'), [
+            'condition: a cracked rib',
+            'marks: a bruise on the hip (hidden); a burn on one wrist (anyone can see it); '
+            'a gull under the left breast (seen by Juno Ash)',
+            'carrying: a gutting knife', 'capacities: cannot lift the left arm'])
+        self.assertEqual(self.block(brief, 'DESIRE'), [
+            'orientation: women, mostly', 'limits (never crossed, whatever happens): nothing in front of others',
+            'would never admit: that she misses Juno', 'right now: the player, a little'])
+        order = [brief.index(h) for h in ('WHAT THEY KNOW', 'HOW THEY ARE', 'DESIRE', '\n\nNOW\n', 'ANSWER')]
+        self.assertEqual(order, sorted(order))
+        self.assertEqual(self.brief().encode(), brief.encode())  # same state, same bytes
+        self.state('body.marks.bruise=')
+        self.assertNotIn('bruise', self.brief())
+        view = (self.root / 'notes/brains/mara.md').read_text(encoding='utf-8')
+        self.assertIn('- body.marks.tattoo: a gull under the left breast (seen by Juno Ash)', view)
+        self.assertIn('- desire.limits: nothing in front of others', view)
+
+    def test_tick_moves_each_level_one_step_toward_baseline(self):
+        self.cast()
+        self.brains('add', 'mara', '--baseline', 'valence=1', 'fear=1')
+        self.state('affect.valence=-2', 'affect.fear=4', 'affect.energy=0', 'affect.shame=1', 'affect.pain=3',
+                   'affect.intoxication=2', 'affect.arousal=0')
+        out = self.brains('tick', 'mara', '--entry', self.entry)
+        self.assertEqual(out['moved'], {'valence': [-2, -1], 'energy': [0, 1], 'fear': [4, 3], 'shame': [1, 0]})
+        affect = self.brains('state', 'mara')['affect']
+        self.assertEqual((affect['pain'], affect['intoxication']), (3, 2))  # only at a scene boundary
+        out = self.brains('tick', 'mara', '--scene-end', '--entry', self.entry)
+        self.assertEqual(out['moved'], {'valence': [-1, 0], 'energy': [1, 2], 'pain': [3, 2], 'fear': [3, 2],
+                                        'intoxication': [2, 1]})
+        for _ in range(2):
+            self.brains('tick', 'mara', '--scene-end', '--entry', self.entry)
+        affect = self.brains('state', 'mara')['affect']
+        self.assertEqual(affect, {'valence': 1, 'fear': 1, 'energy': 3, 'shame': 0, 'pain': 0, 'intoxication': 0,
+                                  'arousal': 0})
+        count = len(self.events())
+        out = self.brains('tick', 'mara', '--scene-end', '--entry', self.entry, expect=1)
+        self.assertEqual(out['moved'], {})
+        self.assertEqual(len(self.events()), count)  # nothing to move, nothing recorded
+        self.state('affect.pain=2')
+        self.assertIn('until a scene boundary (pain', self.brains('tick', 'mara', '--entry', self.entry,
+                                                                  expect=1)['warnings'][0])
+        self.assertEqual(self.brains('tick', 'mara', '--entry', self.entry + 'x', '--scene-end', expect=2)['ok'], False)
+
+    def test_baseline_is_where_an_unset_level_stands(self):
+        self.cast()
+        self.brains('add', 'juno', '--baseline', 'valence=-1', 'energy=2')
+        self.assertEqual(self.block(self.brief('juno'), 'HOW THEY ARE'), ['spirits: a little low', 'energy: some'])
+        self.brains('add', 'juno', '--baseline', 'fear=2')  # a later add keeps the rest of the baseline
+        self.assertEqual(self.brains('state', 'juno')['affect'], {'valence': -1, 'energy': 2, 'fear': 2})
+        for bad in ('fear=6', 'valence=-4', 'mood=1', 'fear=lots'):
+            self.assertIn('baseline', self.brains('add', 'juno', '--baseline', bad, expect=2)['error'])
+
+    def test_state_validates_every_field_before_appending(self):
+        self.cast()
+        log = (self.root / 'notes/brains/events.jsonl').read_bytes()
+        bad = {'affect.fear=6': 'from 0 to 5', 'affect.energy=-1': 'from 0 to 5', 'affect.valence=4': 'from -3 to 3',
+               'affect.valence=-4': 'from -3 to 3', 'affect.fear=a lot': 'whole number', 'affect.joy=2': "no 'joy'",
+               'mood=calm': "state has no 'mood'", 'affect.mood.tone=x': 'single value',
+               'body.marks=a scar': 'holds fields', 'body.marks.burn.seen_by=nobody-here': 'is not cast',
+               'body.marks.burn.seen_by=anyone': 'needs its text first', 'desire.limits=' + 'x' * 301: 'at most 300',
+               'affect.fear': 'PATH=VALUE'}
+        for item, needle in bad.items():
+            self.assertIn(needle, self.state(item, expect=2)['error'], item)
+        self.assertIn('from 0 to 5', self.state('affect.fear=3', 'affect.pain=9', expect=2)['error'])  # all or nothing
+        self.assertEqual((self.root / 'notes/brains/events.jsonl').read_bytes(), log)  # nothing was appended
+        self.assertIn('needs --entry', self.brains('state', 'mara', '--set', 'affect.fear=2', expect=2)['error'])
+        self.assertIn('no brain yet', self.state('affect.fear=2', npc='nobody', expect=2)['error'])
+        ev = self.state('affect.fear=3', 'body.marks.burn=a burn', 'body.marks.burn.seen_by=juno,mara')
+        self.assertEqual(self.events()[-1]['data'], {'set': [['affect.fear', 3], ['body.marks.burn.text', 'a burn'],
+                                                             ['body.marks.burn.seen_by', ['juno', 'mara']]]})
+        self.assertEqual(self.events()[-1]['seq'], ev['seq'])
+        self.assertEqual(self.brains('check')['ok'], True)
+
+    def test_reconcile_replays_state_and_tick_without_what_was_undone(self):
+        self.cast()
+        undone = self.add_entry('The boat capsized.')
+        self.state('affect.fear=4', 'body.condition=soaked through', entry=undone)
+        self.state('affect.pain=2')
+        self.brains('tick', 'mara', '--scene-end', '--entry', self.entry)
+        self.assertEqual(self.brains('state', 'mara')['affect'], {'fear': 3, 'pain': 1})
+        story = self.root / 'public/story.md'
+        story.write_text(story.read_text(encoding='utf-8').replace(files.entry('The boat capsized.', id=undone), ''),
+                         encoding='utf-8', newline='\n')
+        done = self.brains('reconcile', '--apply')
+        self.assertEqual([e['op'] for e in done['set_aside']], ['state'])
+        self.assertEqual(self.brains('state', 'mara')['affect'], {'pain': 1})  # the tick stands, on what is left
+        brief = self.brief()
+        self.assertNotIn('soaked', brief)
+        self.assertEqual(self.block(brief, 'HOW THEY ARE'), ['pain: a little'])
+
+    def test_reconcile_sets_aside_a_mark_seen_by_someone_no_longer_cast(self):
+        self.cast()
+        undone = self.add_entry('A stranger arrives.')
+        self.entry, kept = undone, self.entry
+        self.gm([{'op': 'set', 'kind': 'npc', 'id': 'oren', 'fields': {'name': 'Oren'}}])
+        self.entry = kept
+        self.state('body.marks.scar=a scar', 'body.marks.scar.seen_by=oren')
+        story = self.root / 'public/story.md'
+        story.write_text(story.read_text(encoding='utf-8').replace(files.entry('A stranger arrives.', id=undone), ''),
+                         encoding='utf-8', newline='\n')
+        self.assertEqual(run(self.root, 'gm_state.py', 'reconcile', '--apply').returncode, 0)
+        out = self.brains('reconcile', '--apply')
+        self.assertEqual([(e['op'], 'oren' in e['why']) for e in out['set_aside']], [('state', True)])
+        self.assertNotIn('scar', self.brief())
+
     def test_needs_game_master(self):
         (self.root / 'tools' / 'gm_state.py').unlink()
         self.assertIn('game-master is not installed', self.brains('init', expect=2)['error'])
@@ -421,8 +570,10 @@ class BrainsDocs(unittest.TestCase):
         protocol = (plus / 'files/PROTOCOL.md').read_text(encoding='utf-8')
         self.assertIn('knows too much', protocol)
         self.assertIn('DECIDES', protocol)
+        self.assertIn('**`limits` is authoritative.**', protocol)
+        self.assertIn('cut that output', protocol)
         for command in ('init', 'add', 'world', 'know', 'unlearn', 'remember', 'compress', 'session', 'brief',
-                        'view', 'check', 'migrate', 'reconcile'):
+                        'view', 'check', 'migrate', 'reconcile', 'state', 'tick'):
             self.assertIn(f'brains.py {command}', protocol + (plus / 'APPLY.md').read_text(encoding='utf-8'), command)
 
 

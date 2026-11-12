@@ -58,7 +58,20 @@ Skip the brain entirely when the beat is mechanical (a door opens, a bus arrives
 3. **End of the turn, after game-master's `commit`.** For every fact the turn added, classify it: `python tools/brains.py world <fact> --visibility public|witnessed|private|secret --witnesses <npc> ... --entry <entry>`. A fact with no class is hidden from every brain, and `check` fails until it has one. `world --audit` lists the ones you missed.
 4. **What characters learned.** For each character who learned something not covered by its visibility (told, overheard, read, guessed), `python tools/brains.py know <npc> <fact> --how "I ..." --confidence certain|probable|suspects|doubts --entry <entry>`. Write `--how` in their words, first person. If they forget, are fooled out of it, or the fact was never theirs, `unlearn` it.
 5. **What they keep.** `python tools/brains.py remember <npc> --text "..." --salience 1-5 --entry <entry>` for what changed for them. 5 is unforgettable; 1 is passing.
-6. Run `python tools/brains.py check`. Fix every error before the next turn.
+6. **How they are.** If the turn hurt, frightened, tired, dressed, marked or moved a character, record it with `python tools/brains.py state <npc> --set ... --entry <entry>` (see "Body, mood and desire"). When time has passed, `python tools/brains.py tick <npc> --entry <entry>`; at the end of a scene, `tick <npc> --scene-end`.
+7. Run `python tools/brains.py check`. Fix every error before the next turn.
+
+## Body, mood and desire
+
+A character's body and feelings carry from scene to scene only if they are recorded. `python tools/brains.py state <npc> --set PATH=VALUE ... --entry <entry>` records them; `state <npc>` alone prints them. An empty value (`--set body.clothes=`) clears a field; a field never set is left out of the brief.
+
+- **`affect`**: `mood` (a short text); `valence`, how low or lifted they are, from -3 to 3; and the levels `energy`, `pain`, `fear`, `shame`, `arousal`, `intoxication`, from 0 to 5. The brief says them in words, never numbers: 0 none, 1 a little, 2 some, 3 a lot, 4 badly, 5 overwhelming. A level at 0 is left out, except energy, where none means exhausted.
+- **`body`**: `condition`, `clothes`, `carrying`, `capacities` (what they cannot do just now), and `marks`, each under a short id with who can see it: `--set body.marks.burn="a burn on one wrist" --set body.marks.burn.seen_by=anyone`. `seen_by` is `anyone`, `close` (only someone close), `nobody` (hidden), or the cast ids of those who have seen it. `--set body.marks.burn=` removes the mark.
+- **`desire`**: `orientation`, `appetite`, `wants`, `limits`, `never_admits`, `shame`, `aftercare`, `turn_offs`, and `current` (what they want right now). Leave it all unset when it does not belong in the story.
+
+**`limits` is authoritative.** A character's limits hold whatever the scene, the player or the brain says. If a brain's answer, or your own draft, crosses them, cut that output; do not soften it and keep it. A limit changes only when the story earns it, recorded with `state` against the entry that shows it.
+
+**Baseline and ticking.** `add <npc> --baseline valence=1 energy=4 ...` sets where each affect level settles; a level with no baseline settles to 0, and energy to 3. `tick <npc>` moves every level one step toward its baseline: run it when time passes. Pain and intoxication ease only at a scene boundary, so they move only with `tick <npc> --scene-end`. A tick with nothing to move records nothing.
 
 ## Visibility
 
@@ -77,6 +90,8 @@ Only perception. Never the story log, never another character's view or card, ne
 - what they remember: at most six episodes, the most salient first, then the most recent, in the order they happened;
 - what is owed: the open threads on their list;
 - what they know: public facts, facts they witnessed, and facts with a `know` event, less what they unlearned and less outdated or discarded facts, each with how sure they are and how they know;
+- how they are: mood and affect in words, then their body (condition, marks and who can see them, clothes, what they carry, what they cannot do);
+- desire: the desire fields that are set, limits among them, marked as never crossed;
 - now: day, time, place, and your scene file;
 - the answer block.
 
@@ -137,13 +152,15 @@ Build a fresh brief, start a new subagent, record it with `session <npc> --id <n
 | Command | Does |
 | --- | --- |
 | `python tools/brains.py init` | creates the log (safe to repeat) |
-| `python tools/brains.py add <npc>` | identity, look, age, aliases, thread list; snapshots their card |
+| `python tools/brains.py add <npc>` | identity, look, age, aliases, thread list, affect baseline; snapshots their card |
 | `python tools/brains.py world <fact> --visibility V` | classifies a fact; `--audit` lists the unclassified |
 | `python tools/brains.py know <npc> <fact>` | they learned it: `--how`, `--confidence`, `--entry` |
 | `python tools/brains.py unlearn <npc> <fact>` | they no longer hold it |
 | `python tools/brains.py remember <npc>` | an episode they keep, with salience |
 | `python tools/brains.py compress <npc>` | folds episodes into one summary |
 | `python tools/brains.py session <npc>` | records or ends the kept session, and the tier |
+| `python tools/brains.py state <npc> --set PATH=VALUE` | body, mood and desire; without `--set`, prints them |
+| `python tools/brains.py tick <npc>` | time passes: affect eases one step toward baseline; `--scene-end` eases pain and intoxication too |
 | `python tools/brains.py brief <npc> --scene F` | the brief; `--as` an alias they go by here; `--text` prints it bare |
 | `python tools/brains.py view [<npc>]` | rewrites the views and prints one |
 | `python tools/brains.py check` | validates the log against game-master |

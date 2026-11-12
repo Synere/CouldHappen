@@ -2,8 +2,9 @@
 
 Usage (from the workspace root):  python tools/brains.py <command> [--root .]
   init                                 create notes/brains/events.jsonl (safe to repeat)
-  add <npc> [--name N] [--age N] [--look T] [--alias A ...] [--threads T ...]
-                                       record a character's identity and snapshot their game-master card
+  add <npc> [--name N] [--age N] [--look T] [--alias A ...] [--threads T ...] [--baseline FIELD=N ...]
+                                       record a character's identity and snapshot their game-master card;
+                                       --baseline is the affect they settle back to (valence, energy, ...)
   world <fact> --visibility public|witnessed|private|secret [--witnesses N ...]
                                        classify a game-master fact for the brains
   world --audit                        list game-master facts no brain classification covers yet
@@ -13,6 +14,10 @@ Usage (from the workspace root):  python tools/brains.py <command> [--root .]
   remember <npc> --text T [--salience 1-5] --entry E   an episode the character keeps
   compress <npc> --replace SEQ ... --text T [--salience 1-5]   fold episodes into one summary
   session <npc> (--id ID | --end) [--tier persistent|ephemeral]   the kept subagent session
+  state <npc> [--set PATH=VALUE ...] --entry E   body, mood and desire (affect.fear=3, body.clothes=...,
+                                       desire.limits=...; an empty value clears); without --set, print it
+  tick <npc> [--scene-end] --entry E   time passes: each affect level one step toward baseline
+                                       (pain and intoxication only with --scene-end)
   brief <npc> --scene FILE [--as ALIAS] [--text]   the only way to build a brain's brief
   view [<npc>]                         rewrite the generated views and print one
   check                                validate the log against game-master
@@ -30,7 +35,8 @@ decided only by world classifications and know/unlearn events. Stdlib only; no n
 
 Extending: a new event op needs a validator in VALIDATE (checks it against the current state before
 it is appended) and a folder in FOLD (applies it on replay). A new brief section is a function added
-to BRIEF_SECTIONS."""
+to BRIEF_SECTIONS. A new state field is an entry in STATE_SCHEMA; a per-person or per-item group is a
+('keyed', {field: spec}) entry, like body.marks."""
 import argparse
 import importlib.util
 import json
@@ -67,6 +73,31 @@ ANSWER_HELP = {
     'DECIDES': 'a lasting intention they form now (to leave, to refuse, to do something later), or (none)'}
 CONFIDENCE_WORDS = {'certain': '', 'probable': 'probably', 'suspects': 'you suspect this',
                     'doubts': 'you doubt this'}
+
+# ---- body, mood and desire (ISS-26) ----
+# A spec is ('text',), ('level', low, high), ('seen',) (who can see a mark), a dict of named fields, or
+# ('keyed', spec): items under any id, each with that spec. State paths are dotted: affect.fear, body.marks.burn.
+TEXT, LEVEL = ('text',), ('level', 0, 5)
+STATE_SCHEMA = {
+    'affect': {'mood': TEXT, 'valence': ('level', -3, 3), 'energy': LEVEL, 'pain': LEVEL, 'fear': LEVEL,
+               'shame': LEVEL, 'arousal': LEVEL, 'intoxication': LEVEL},
+    'body': {'condition': TEXT, 'marks': ('keyed', {'text': TEXT, 'seen_by': ('seen',)}), 'clothes': TEXT,
+             'carrying': TEXT, 'capacities': TEXT},
+    'desire': {'orientation': TEXT, 'appetite': TEXT, 'wants': TEXT, 'limits': TEXT, 'never_admits': TEXT,
+               'shame': TEXT, 'aftercare': TEXT, 'turn_offs': TEXT, 'current': TEXT}}
+AFFECT_LEVELS = tuple(k for k, spec in STATE_SCHEMA['affect'].items() if spec[0] == 'level')
+DEFAULT_BASELINE = {'energy': 3}  # every other affect level settles to 0
+BOUNDARY_ONLY = ('pain', 'intoxication')  # these ease only at a scene boundary (tick --scene-end)
+LEVEL_WORDS = ('none', 'a little', 'some', 'a lot', 'badly', 'overwhelming')
+VALENCE_WORDS = {-3: 'wretched', -2: 'low', -1: 'a little low', 0: 'even', 1: 'a little lifted', 2: 'good',
+                 3: 'elated'}
+SEEN = {'anyone': 'anyone can see it', 'close': 'only someone close can see it', 'nobody': 'hidden'}
+STATE_LABELS = {
+    'affect.mood': 'mood', 'body.condition': 'condition', 'body.clothes': 'wearing',
+    'body.carrying': 'carrying', 'body.capacities': 'capacities', 'desire.orientation': 'orientation',
+    'desire.appetite': 'appetite', 'desire.wants': 'wants', 'desire.limits': 'limits (never crossed, whatever happens)',
+    'desire.never_admits': 'would never admit', 'desire.shame': 'ashamed of wanting', 'desire.aftercare': 'after, needs',
+    'desire.turn_offs': 'turned off by', 'desire.current': 'right now'}
 
 
 class Fail(Exception):
@@ -133,7 +164,7 @@ def method_only_files(root):
 
 
 def new_state():
-    return {'chars': {}, 'world': {}, 'knows': {}, 'unlearned': {}, 'episodes': {}}
+    return {'chars': {}, 'world': {}, 'knows': {}, 'unlearned': {}, 'episodes': {}, 'states': {}}
 
 
 def text_ok(value):
@@ -195,6 +226,10 @@ def v_char(state, gm_state, ev):
     for tid in d.get('knows_threads', []):
         if tid not in gm_state['threads']:
             raise Fail(f'{tid} is not a game-master thread (is layer 2 on?)')
+    for field, value in d.get('baseline', {}).items():
+        if field not in AFFECT_LEVELS:
+            raise Fail(f'baseline {field}: a baseline is set for ' + ', '.join(AFFECT_LEVELS))
+        check_value(STATE_SCHEMA['affect'][field], value, f'baseline {field}', state, gm_state)
     return []
 
 
@@ -268,8 +303,77 @@ def v_session(state, gm_state, ev):
     return []
 
 
+def state_spec(path):
+    """(parts, spec) for a dotted state path, or Fail naming what the path may hold."""
+    parts, spec = path.split('.'), STATE_SCHEMA
+    for i, part in enumerate(parts):
+        if isinstance(spec, dict):
+            if part not in spec:
+                where = '.'.join(parts[:i]) or 'state'
+                raise Fail(f'{path}: {where} has no {part!r}; it holds ' + ', '.join(spec))
+            spec = spec[part]
+        elif spec[0] == 'keyed':
+            if not ID_RE.match(part):
+                raise Fail(f'{path}: {part!r} is not a short id (letters, digits, - and _)')
+            spec = spec[1]
+        else:
+            raise Fail(f'{path}: {".".join(parts[:i])} is a single value')
+    return parts, spec
+
+
+def check_value(spec, value, path, state, gm_state):
+    """Fail unless value fits a leaf spec."""
+    if spec == TEXT:
+        if not text_ok(value):
+            raise Fail(f'{path} must be a text of at most {MAX_TEXT} characters')
+    elif isinstance(spec, tuple) and spec[0] == 'level':
+        if not (isinstance(value, int) and not isinstance(value, bool) and spec[1] <= value <= spec[2]):
+            raise Fail(f'{path} is a whole number from {spec[1]} to {spec[2]}')
+    elif spec == ('seen',):
+        if isinstance(value, list):
+            lost = [w for w in value if not isinstance(w, str) or (w not in state['chars'] and w not in gm_state['npcs'])]
+            if not value or lost:
+                raise Fail(f'{path}: cast ids, or one of {", ".join(SEEN)}'
+                           + (f'; {", ".join(map(str, lost))} is not cast' if lost else ''))
+        elif value not in SEEN:
+            raise Fail(f'{path} is one of {", ".join(SEEN)}, or the cast ids of who can see it')
+    else:
+        raise Fail(f'{path} holds fields; set one of them ({path}.<field>=...)')
+
+
+def v_state(state, gm_state, ev):
+    need_char(state, ev['npc'])
+    pairs = ev['data'].get('set')
+    if not isinstance(pairs, list) or not pairs:
+        raise Fail('give at least one --set PATH=VALUE')
+    for pair in pairs:
+        if not (isinstance(pair, list) and len(pair) == 2 and isinstance(pair[0], str)):
+            raise Fail('state data is a list of [path, value] pairs')
+        path, value = pair
+        _, spec = state_spec(path)
+        if value is not None:
+            check_value(spec, value, path, state, gm_state)
+    trial = {'states': {ev['npc']: json.loads(json.dumps(state['states'].get(ev['npc'], {})))}}
+    f_state(trial, ev)
+    marks = trial['states'][ev['npc']].get('body', {}).get('marks', {})
+    if len(marks) > MAX_LIST:
+        raise Fail(f'at most {MAX_LIST} marks')
+    bare = [m for m, mark in marks.items() if 'text' not in mark]
+    if bare:
+        raise Fail(f'a mark needs its text first: --set body.marks.{bare[0]}="..."')
+    return []
+
+
+def v_tick(state, gm_state, ev):
+    need_char(state, ev['npc'])
+    if not isinstance(ev['data'].get('boundary'), bool):
+        raise Fail('tick data needs boundary: true or false')
+    return []
+
+
 VALIDATE = {'char': v_char, 'world': v_world, 'know': v_know, 'unlearn': v_unlearn,
-            'remember': v_remember, 'compress': v_compress, 'session': v_session}
+            'remember': v_remember, 'compress': v_compress, 'session': v_session, 'state': v_state,
+            'tick': v_tick}
 
 
 # Folders: (state, event) -> None. They apply an already-validated event on replay and never consult game-master.
@@ -317,8 +421,61 @@ def f_session(state, ev):
         char['tier'] = ev['data']['tier']
 
 
+def put(tree, parts, value):
+    """Set a dotted path in a nested dict; None clears it, and any group left empty goes too."""
+    if len(parts) == 1:
+        if value is None:
+            tree.pop(parts[0], None)
+        else:
+            tree[parts[0]] = value
+        return
+    child = tree.setdefault(parts[0], {})
+    put(child, parts[1:], value)
+    if not child:
+        tree.pop(parts[0])
+
+
+def f_state(state, ev):
+    tree = state['states'].setdefault(ev['npc'], {})
+    for path, value in ev['data']['set']:
+        put(tree, path.split('.'), value)
+
+
+def current_affect(state, npc):
+    """Affect level -> value: what was set, else the baseline set at add. A level never given is absent."""
+    set_now = state['states'].get(npc, {}).get('affect', {})
+    return {**state['chars'].get(npc, {}).get('baseline', {}),
+            **{k: v for k, v in set_now.items() if k in AFFECT_LEVELS}}
+
+
+def baseline_of(state, npc, field):
+    return state['chars'].get(npc, {}).get('baseline', {}).get(field, DEFAULT_BASELINE.get(field, 0))
+
+
+def tick_moves(state, npc, boundary):
+    """Affect level -> (from, to): one step toward baseline; pain and intoxication only at a boundary."""
+    moves = {}
+    affect = current_affect(state, npc)
+    for field in AFFECT_LEVELS:
+        if field not in affect:
+            continue
+        value, target = affect[field], baseline_of(state, npc, field)
+        if value != target and (boundary or field not in BOUNDARY_ONLY):
+            moves[field] = (value, value + (1 if target > value else -1))
+    return moves
+
+
+def f_tick(state, ev):
+    """Recomputed on replay, so after a reconcile a tick eases what is left, not what was set aside."""
+    moves = tick_moves(state, ev['npc'], ev['data']['boundary'])
+    tree = state['states'].setdefault(ev['npc'], {})
+    for field, (_, new) in moves.items():
+        put(tree, ['affect', field], new)
+
+
 FOLD = {'char': f_char, 'world': f_world, 'know': f_know, 'unlearn': f_unlearn,
-        'remember': f_remember, 'compress': f_compress, 'session': f_session}
+        'remember': f_remember, 'compress': f_compress, 'session': f_session, 'state': f_state,
+        'tick': f_tick}
 
 
 def replay(events):
@@ -437,6 +594,56 @@ def sec_knows(b, npc, ctx):
     return ['WHAT THEY KNOW'] + lines + ['They know nothing else about the world.']
 
 
+def cast_name(b, cid):
+    return (b.state['chars'].get(cid) or b.gm_state['npcs'].get(cid) or {}).get('name') or cid
+
+
+def state_line(path, value):
+    """One brief line for a state value, in words, never numbers; None when there is nothing to say."""
+    field = path.split('.')[-1]
+    if path == 'affect.valence':
+        return None if value == 0 else 'spirits: ' + VALENCE_WORDS[value]
+    if path.startswith('affect.') and field in AFFECT_LEVELS:
+        # energy at 0 is exhaustion and is said; any other level at 0 is an absence, left out
+        return None if value == 0 and field != 'energy' else f'{field}: {LEVEL_WORDS[value]}'
+    return f'{STATE_LABELS[path]}: {value}'
+
+
+def mark_text(b, mark):
+    seen = mark.get('seen_by')
+    if seen is None:
+        return mark['text']
+    who = SEEN[seen] if isinstance(seen, str) else 'seen by ' + ', '.join(cast_name(b, c) for c in seen)
+    return f'{mark["text"]} ({who})'
+
+
+def state_lines(b, npc, group):
+    values = dict(b.state['states'].get(npc, {}).get(group, {}))
+    if group == 'affect':
+        values.update(current_affect(b.state, npc))
+    lines = []
+    for field in STATE_SCHEMA[group]:  # schema order, so the same state gives the same brief
+        if field not in values:
+            continue
+        if group == 'body' and field == 'marks':
+            lines.append('marks: ' + '; '.join(mark_text(b, values[field][m]) for m in sorted(values[field])))
+        else:
+            line = state_line(f'{group}.{field}', values[field])
+            if line:
+                lines.append(line)
+    return lines
+
+
+def sec_body(b, npc, ctx):
+    lines = state_lines(b, npc, 'affect') + state_lines(b, npc, 'body')
+    return ['HOW THEY ARE'] + lines if lines else []
+
+
+def sec_desire(b, npc, ctx):
+    lines = state_lines(b, npc, 'desire')
+    return ['DESIRE'] + lines if lines else []
+
+
 def sec_now(b, npc, ctx):
     sit = b.gm_state['situation']
     when = ', '.join(x for x in (f'day {sit["day"]}' if sit.get('day') else '', sit.get('time', ''),
@@ -449,7 +656,8 @@ def sec_answer(b, npc, ctx):
     return ['ANSWER'] + [f'{k}: {ANSWER_HELP[k]}' for k in ANSWER_KEYS]
 
 
-BRIEF_SECTIONS = [sec_header, sec_who, sec_memory, sec_owed, sec_knows, sec_now, sec_answer]
+BRIEF_SECTIONS = [sec_header, sec_who, sec_memory, sec_owed, sec_knows, sec_body, sec_desire, sec_now,
+                  sec_answer]
 
 
 def read_scene(path):
@@ -531,6 +739,22 @@ def render_view(b, npc):
             + (f' (how: {h["how"]}; entry {h["entry"]})' if h.get('how') else '') for fid, h in held.items()] or ['- nothing']
     out += ['', '## Episodes', '']
     out += [f'- seq {e["seq"]} [salience {e["salience"]}] {e["text"]}' for e in live_episodes(b.state, npc)] or ['- none']
+    out += ['', '## State', '']
+    tree, affect = b.state['states'].get(npc, {}), current_affect(b.state, npc)
+    rows = []
+    for field in AFFECT_LEVELS:
+        if field in affect:
+            words = (VALENCE_WORDS if field == 'valence' else LEVEL_WORDS)[affect[field]]
+            rows.append(f'- affect.{field}: {affect[field]} ({words}; baseline {baseline_of(b.state, npc, field)})')
+    for group in STATE_SCHEMA:
+        for field, value in tree.get(group, {}).items():
+            if group == 'affect' and field in AFFECT_LEVELS:
+                continue
+            if group == 'body' and field == 'marks':
+                rows += [f'- body.marks.{m}: {mark_text(b, value[m])}' for m in sorted(value)]
+            else:
+                rows.append(f'- {group}.{field}: {value}')
+    out += rows or ['- nothing set']
     return '\n'.join(out) + '\n'
 
 
@@ -621,6 +845,12 @@ def dependency(state, gm_state, ev):
             return 'witnesses ' + ', '.join(lost) + ' are no longer cast'
     if op == 'unlearn' and not holds(state, npc, fid):
         return f'{npc} no longer held {fid} to unlearn'
+    if op == 'state':
+        for path, value in d.get('set', []):
+            if path.endswith('.seen_by') and isinstance(value, list):
+                lost = [w for w in value if w not in state['chars'] and w not in gm_state['npcs']]
+                if lost:
+                    return f'{path} names {", ".join(lost)}, no longer cast'
     if op == 'compress':
         live = state['episodes'].get(npc, {})
         lost = [str(q) for q in d.get('replaces', []) if q not in live]
@@ -798,7 +1028,9 @@ def migrate_file(b, path, entry, entries):
         if not items(secs[title]):
             continue
         if title == 'Desire':
-            warns.append(f'{name}: the Desire line is kept only in the legacy copy; this version has no place for it yet')
+            warns.append(f'{name}: the Desire line is kept only in the legacy copy, never split by guesswork. Record '
+                         f'it with python tools/brains.py state {npc} --set desire.limits=... desire.wants=... '
+                         '--entry E, limits first')
         elif title == 'Sheet':
             warns.append(f'{name}: the Sheet is kept only in the legacy copy; remember what of it the character keeps')
         elif title not in KNOWN_SECTIONS:
@@ -836,6 +1068,11 @@ def cmd_add(args):
         data['aliases'] = sorted(set(old.get('aliases', [])) | set(args.alias))
     if args.threads is not None:
         data['knows_threads'] = args.threads
+    if args.baseline:
+        data['baseline'] = dict(old.get('baseline', {}))
+        for item in args.baseline:
+            field, _, raw = item.partition('=')
+            data['baseline'][field] = parse_level(raw, f'baseline {field}')
     ev, warns = b.append(args.npc, 'char', data, args.entry, args.why or f'brain for {args.npc}')
     return {'seq': ev['seq'], 'npc': args.npc}, warns
 
@@ -888,6 +1125,58 @@ def cmd_session(args):
     ev, warns = b.append(args.npc, 'session', {'session': None if args.end else args.id, 'tier': args.tier},
                          args.entry, args.why or ('session ended' if args.end else 'session started'))
     return {'seq': ev['seq']}, warns
+
+
+def parse_level(raw, path):
+    try:
+        return int(raw)
+    except ValueError:
+        raise Fail(f'{path} is a whole number, not {raw!r}')
+
+
+def parse_set(item):
+    """PATH=VALUE as [path, value]: an empty value clears; a mark's own path sets its text."""
+    path, eq, raw = item.partition('=')
+    if not eq:
+        raise Fail(f'--set {item!r}: write PATH=VALUE, for example affect.fear=3 (an empty value clears)')
+    parts, spec = state_spec(path)
+    raw = raw.strip()
+    if not raw:
+        return [path, None]
+    if isinstance(spec, dict) and 'text' in spec:
+        parts, spec = parts + ['text'], spec['text']
+    path = '.'.join(parts)
+    if isinstance(spec, tuple) and spec[0] == 'level':
+        return [path, parse_level(raw, path)]
+    if spec == ('seen',):
+        return [path, raw if raw in SEEN else sorted({w.strip() for w in raw.split(',') if w.strip()})]
+    return [path, raw]
+
+
+def cmd_state(args):
+    b = Brains(args.root)
+    need_char(b.state, args.npc)
+    if not args.set:
+        return {'npc': args.npc, 'state': b.state['states'].get(args.npc, {}),
+                'affect': current_affect(b.state, args.npc),
+                'baseline': {f: baseline_of(b.state, args.npc, f) for f in AFFECT_LEVELS}}, []
+    pairs = [parse_set(item) for group in args.set for item in group]
+    ev, warns = b.append(args.npc, 'state', {'set': pairs}, args.entry, args.why or f'{args.npc} state changed')
+    return {'seq': ev['seq'], 'state': b.state['states'].get(args.npc, {})}, warns
+
+
+def cmd_tick(args):
+    b = Brains(args.root)
+    need_char(b.state, args.npc)
+    moves = tick_moves(b.state, args.npc, args.scene_end)
+    if not moves:
+        held = [f for f in BOUNDARY_ONLY if f in tick_moves(b.state, args.npc, True)]
+        return {'moved': {}}, [f'{args.npc}: nothing to move toward baseline'
+                               + (f' until a scene boundary ({", ".join(held)}: tick --scene-end)' if held else '')
+                               + '; nothing recorded']
+    ev, warns = b.append(args.npc, 'tick', {'boundary': args.scene_end}, args.entry,
+                         args.why or ('the scene ended' if args.scene_end else 'time passed'))
+    return {'seq': ev['seq'], 'moved': {f: list(m) for f, m in moves.items()}}, warns
 
 
 def cmd_brief(args):
@@ -970,7 +1259,8 @@ def cmd_reconcile(args):
 
 COMMANDS = {'init': cmd_init, 'add': cmd_add, 'world': cmd_world, 'know': cmd_know, 'unlearn': cmd_unlearn,
             'remember': cmd_remember, 'compress': cmd_compress, 'session': cmd_session, 'brief': cmd_brief,
-            'view': cmd_view, 'check': cmd_check, 'migrate': cmd_migrate, 'reconcile': cmd_reconcile}
+            'view': cmd_view, 'check': cmd_check, 'migrate': cmd_migrate, 'reconcile': cmd_reconcile,
+            'state': cmd_state, 'tick': cmd_tick}
 
 
 def parser():
@@ -994,6 +1284,8 @@ def parser():
     s.add_argument('--look')
     s.add_argument('--alias', nargs='*', default=[])
     s.add_argument('--threads', nargs='*', help='the game-master thread ids this character knows (replaces the list)')
+    s.add_argument('--baseline', nargs='*', default=[], metavar='FIELD=N',
+                   help='affect levels they settle back to: ' + ', '.join(AFFECT_LEVELS))
     s = cmd('world', npc=False)
     s.add_argument('fact', nargs='?')
     s.add_argument('--visibility', choices=VISIBILITY)
@@ -1016,6 +1308,12 @@ def parser():
     s.add_argument('--id')
     s.add_argument('--end', action='store_true')
     s.add_argument('--tier', choices=TIERS)
+    s = cmd('state')
+    s.add_argument('--set', nargs='+', action='append', metavar='PATH=VALUE',
+                   help='affect.<level>=N, affect.mood=..., body.<field>=..., body.marks.<id>=... and '
+                        'body.marks.<id>.seen_by=anyone|close|nobody|<cast ids>, desire.<field>=...')
+    s = cmd('tick')
+    s.add_argument('--scene-end', action='store_true', help='a scene boundary: pain and intoxication ease too')
     s = cmd('brief', entry=False)
     s.add_argument('--scene', required=True)
     s.add_argument('--as', dest='alias')
