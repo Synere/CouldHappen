@@ -1106,7 +1106,7 @@ if (layers.includes("decisions") && decisionsCfg.form !== "list") {
         const n = Number(m[1]);
         const e = get(n);
         if (!e) report("decisions/citations", f, i + 1, `${idLabel(n)} is cited but not defined`);
-        else if ((e.status === "superseded" || e.status === "rejected") && f !== e.file && !/Supersede|Superseded|Refines/.test(line)) {
+        else if ((e.status === "superseded" || e.status === "rejected") && f !== e.file && !/supersede|refines/i.test(line)) {
           warn("decisions/citations", f, i + 1, `${idLabel(n)} is ${e.status}; cite its successor`);
         }
       }
