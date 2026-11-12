@@ -30,7 +30,6 @@ Work order from 2026-11-11. The author's ranking: one `N. ISS-n — why` line pe
 4. ISS-22 — small reader and contract fixes from the same report
 5. ISS-23 — the design text catches up with the shipped skill
 6. ISS-2 — more hosts widen what the release is known to work on
-7. ISS-7 — character-brains needs a host with subagents, which the host tests turn up
 
 ## To-do
 
@@ -42,7 +41,6 @@ Work order from 2026-11-11. The author's ranking: one `N. ISS-n — why` line pe
 | ISS-21 | Lossless `card.md` (envelope, lorebook names, falsy fields); `portrait` guidance for a JSON-card import | helpers | — | [public release](plans/public-release.md#iss-21--lossless-card-copy-and-portrait-guidance) |
 | ISS-22 | Vite denies `START_HERE.md`; portrait button names a lost connection; contract says how the reader settles uncertain saves | web | — | [public release](plans/public-release.md#iss-22--reader-boundary-and-save-wording) |
 | ISS-23 | Design names `voice.md` and `what-this-can-do.md` and keeps one creative-practice file; link-check wording | docs | — | [public release](plans/public-release.md#iss-23--design-text-catches-up) |
-| ISS-7 | Try character-brains on a host with subagents, with game-master layers 1 to 4 | packages | — | [host validation](plans/host-validation.md#iss-7--try-character-brains) |
 | ISS-24 | character-brains-plus package and script core: fact visibility classes, `know` with how and confidence, the brief builder, generated views | packages | — | [character-brains-plus](plans/character-brains-plus.md#iss-24--knowledge-isolation) |
 | ISS-25 | character-brains-plus: migrate method-only brain files into the log; `reconcile` after a Director Undo | packages | ISS-24 | [character-brains-plus](plans/character-brains-plus.md#iss-25--migration-and-undo) |
 | ISS-26 | character-brains-plus: body, mood and desire state, `tick` decay, words not numbers in the brief | packages | ISS-24 | [character-brains-plus](plans/character-brains-plus.md#iss-26--body-mood-and-desire) |
@@ -85,6 +83,7 @@ Work order from 2026-11-11. The author's ranking: one `N. ISS-n — why` line pe
 
 | ID | Item | Closed | Resolution |
 | --- | --- | --- | --- |
+| ISS-7 | Try character-brains on a host with subagents, with game-master layers 1 to 4 | 2026-11-12 | The author is playing a live 0.1.22 story with it on Claude Code with Opus, all game-master layers on, and reports it works well |
 | ISS-4 | Run `egm-drift-report` over the design, distribution design and public contract | 2026-11-11 | 13 drifts, no Blocker ([report](reviews/2026-11-11_DRIFT_REPORT.md)); the fixes are ISS-19 to ISS-23 |
 | ISS-1 | Re-test the fixes on a host | 2026-11-11 | The author observed the standing wait starting after setup and `portrait` working in several later sessions |
 | ISS-3 | Fresh-context continuation | 2026-11-11 | The author continued the fiction after a fresh-context restart on Claude Code and opencode |

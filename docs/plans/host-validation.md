@@ -30,6 +30,8 @@ After reentry from files alone, continue the fiction through browser input and c
 
 Try character-brains on a host with subagents, from a fresh release workspace with game-master layers 1 to 4 ([ADR-7](../decisions/ADR-7-character-brains-and-voice.md)).
 
+**Closed 2026-11-12.** The author is playing a live 0.1.22 story with character-brains on Claude Code with Opus, with every game-master layer on, and reports it works well.
+
 ## ISS-13 — Native checkpoint hooks
 
 Not yet observed on any host: native checkpoint hooks reached and trusted.
