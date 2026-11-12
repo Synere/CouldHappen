@@ -63,6 +63,7 @@ Skip the brain entirely when the beat is mechanical (a door opens, a bus arrives
 7. **What they believe and what they said.** If a character came to believe something, true or not, record it with `believe`; if they told someone something that matters later (a lie, a promise, a threat, what they kept back), record it with `claim`; if the turn changed how they stand with someone, record it in `state` under `people` (see "Beliefs, claims and other people").
 8. **What they want and mean to do.** Keep `want` and `intent` current (see "Wants, intents and vetoes"): close an intent the turn carried out or let go.
 9. Run `python tools/brains.py check`. Fix every error before the next turn, and read every warning: a contradiction warning means a character told someone two opposite things.
+10. **At a chapter boundary, and every ten scenes** (game-master's scene count), run the drift review: `python tools/brains.py review --propose` (see "Drift review").
 
 ## Body, mood and desire
 
@@ -89,11 +90,28 @@ What a character *knows* is a game-master fact, true by construction. What they 
 
 A character with no aims only reacts. These records give a brain something to pursue, and keep the writer honest when the story overrides it.
 
-- **Wants** are standing: what the character's life is pulling toward, beyond this scene. `python tools/brains.py want <npc> --text "..." --weight 1-5 [--conflict "..."] --entry <entry>`. The weight (1 passing, 5 what their life turns on) ranks them and is never printed; `--conflict` is what pulls against it, and the brief gives it beside the want. A character holds at most three wants and the brief gives the top two, heaviest first. When a want is met, given up or turned, `want <npc> --retire <seq> --entry <entry>`; with `--text`, the new want replaces it in one event. A want that contradicts the card is a story beat; when it lasts, update the card through game-master.
+- **Wants** are standing: what the character's life is pulling toward, beyond this scene. `python tools/brains.py want <npc> --text "..." --weight 1-5 [--conflict "..."] --entry <entry>`. The weight (1 passing, 5 what their life turns on) ranks them and is never printed; `--conflict` is what pulls against it, and the brief gives it beside the want. A character holds at most three wants and the brief gives the top two, heaviest first. When a want is met, given up or turned, `want <npc> --retire <seq> --entry <entry>`; with `--text`, the new want replaces it in one event. A want that contradicts the card is a story beat; when it lasts, update the card through game-master (drift review lists the candidates).
 - **Intents** are what they mean to do, each with a horizon: `now` (this beat), `scene` (before it ends), `day`, or `long`. `python tools/brains.py intent <npc> --text "..." --horizon now|scene|day|long --entry <entry>`. At most three are active; the brief gives them all, nearest horizon first. Close one with `intent <npc> --done <seq>` when it is carried out, or `--drop <seq>` when they let it go (with `--entry`); give `--text` too to close one and add another in one event.
 - **Vetoes.** `DECIDES` may name leaving, refusing, or a later act. Honour it: let them leave, refuse, or carry it as an intent. When the story truly cannot (the door is barred, the act would break canon or a limit, the player already made it moot), record why: `python tools/brains.py veto <npc> --kind leave|refuse|later|other --reason "..." [--decides "..."] [--intent <seq>] --entry <entry>`. `--intent` closes the intent it overrides. A veto is your record, not the character's: the brief never shows it, so if the character felt the refusal, `remember` that too. A character whose decisions are often vetoed is a puppet; drift review counts them.
 
 Every `want`, `intent`, `veto` and `offscreen` event records game-master's scene count, so a later review can tell how long an intent has stood and how many vetoes fell in ten scenes.
+
+## Drift review
+
+A card is written once and a brain moves on. `python tools/brains.py review [--npc <npc>] [--propose]` says where they have parted, per character. Run it at each chapter boundary and every ten scenes, and whenever a character starts to feel off. It changes nothing but the views and, with `--propose`, `notes/brains/card-proposal.json`. Each finding is a warning, so it exits 1 when there is something to look at.
+
+- **Card changed since the snapshot.** A card field game-master changed after the character was last `add`ed. The brief already uses the new card; check that their wants and memories still fit it, then take a new snapshot with `python tools/brains.py add <npc>`.
+- **Beside the card.** The script does not read meaning, so it never says a record contradicts the card. It sets beside the card everything recorded since the last snapshot that could: each standing want and each `day` or `long` intent beside the card's `want`, and each memory of salience 4 or more (at most six) beside its `attitude`, both texts shown. You judge. Where the character has truly moved, change the card; where they have not, take a new snapshot so the review stops listing what you have already weighed.
+- **More than two vetoes in ten scenes.** Their decisions keep being overridden, and a character who cannot act is a puppet. Honour the next `DECIDES` you can.
+- **Stale intents.** An active intent is stale once the scene count has moved past the one it was recorded in by: 1 scene for `now` and `scene`, 3 for `day`, 10 for `long`. Close it (`intent <npc> --done` or `--drop <seq>`), or, if it still stands, close it and give it again with `--text` so it counts from now.
+- **Persistent with no session.** The tier says persistent but no session is kept. Record one with `session <npc> --id`, or retire them with `session <npc> --end --tier ephemeral`.
+
+**The proposal is yours to merge, never a delta.** `--propose` rewrites `notes/brains/card-proposal.json` on every run (an empty `ops` list means nothing to merge). It never writes `notes/gm/pending.json` and never commits. Its `ops` are game-master `npc` `set` ops in the delta format: a proposed `want` is the character's heaviest standing want recorded since the snapshot, when it differs from the card; an attitude is never proposed, since it is yours to write from the memories listed under `evidence`. To turn it into a game-master change:
+
+1. Read each op against its `evidence` and keep only the ones the story has earned. Rewrite a text in the card's own register, and add an `attitude` (or any other card field) yourself if the evidence calls for it.
+2. Put the ops you keep into `notes/gm/pending.json` as a delta: `{"entry": "<the entry that shows the change>", "why": "<what changed in them>", "ops": [...]}`. The entry is the story or Director entry where the change showed, never the review.
+3. `python tools/gm_state.py check`, then `commit`, as with any delta.
+4. `python tools/brains.py add <npc>` to take a new snapshot, then `review` again: what you merged or set aside no longer appears.
 
 ## Off-screen calls
 
@@ -223,6 +241,7 @@ Build a fresh brief, start a new subagent, record it with `session <npc> --id <n
 | `python tools/brains.py view [<npc>]` | rewrites the views and prints one |
 | `python tools/brains.py check` | validates the log against game-master |
 | `python tools/brains.py reconcile [--apply]` | after an Undo: sets aside events whose entry is gone, and what depends on them |
+| `python tools/brains.py review [--npc N] [--propose]` | drift review: card changed since the snapshot, aims beside the card, vetoes in ten scenes, stale intents, persistent with no session; `--propose` writes `notes/brains/card-proposal.json` |
 | `python tools/brains.py migrate` | moves method-only brain files into the log, once, at apply |
 
 Every command prints one JSON object and exits 0 when all is well, 1 with warnings, 2 on an error.

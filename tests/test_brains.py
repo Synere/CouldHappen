@@ -910,6 +910,122 @@ class BrainsTest(unittest.TestCase):
         self.assertIn('more than 3 standing wants', out['set_aside'][1]['why'])
         self.assertEqual(self.brains('check')['ok'], True)
 
+    # ---- drift review (ISS-29) ----
+
+    def scenes(self, n):
+        """Move game-master's scene count on by n, one situation op per scene."""
+        start = json.loads(run(self.root, 'brains.py', 'review').stdout)['scene']
+        self.gm([{'op': 'set', 'kind': 'situation', 'fields': {'scene': f'scene {start + k + 1}'}} for k in range(n)])
+
+    def review(self, *extra, expect=1):
+        return self.brains('review', *extra, expect=expect)
+
+    def test_review_reports_card_fields_changed_since_the_snapshot(self):
+        self.cast()
+        self.assertEqual(self.review(expect=0)['warnings'], [])
+        self.gm([{'op': 'set', 'kind': 'npc', 'id': 'mara', 'fields': {'attitude': 'owes the player now'}}])
+        out = self.review()
+        self.assertEqual(out['characters']['mara']['card_changed'],
+                         [{'field': 'attitude', 'snapshot': 'wary of the player', 'now': 'owes the player now'}])
+        self.assertEqual(out['characters']['juno']['card_changed'], [])
+        self.assertIn('brains.py add mara', out['warnings'][0])
+        self.brains('add', 'mara')  # a new snapshot settles it
+        self.assertEqual(self.review(expect=0)['characters']['mara']['card_changed'], [])
+
+    def test_review_sets_wants_intents_and_episodes_beside_the_card_with_both_texts(self):
+        self.cast()
+        self.want('An old want, from before the snapshot.', 2)
+        self.brains('add', 'mara')  # the snapshot: what came before it was already weighed
+        self.want('To leave the harbour and never pay.', 5)
+        self.want('To keep Juno close.', 2)
+        self.intent('Sell the boat to the tide office.', 'long')
+        self.intent('Get the lantern off the bollard.', 'now')  # a momentary intent is not set beside the card
+        self.brains('remember', 'mara', '--text', 'The player stood up for me at the weigh-house.', '--salience', '4',
+                    '--entry', self.entry)
+        self.brains('remember', 'mara', '--text', 'Rain on the pier.', '--entry', self.entry)  # salience 3: left out
+        r = self.review()
+        beside = r['characters']['mara']['beside_card']
+        self.assertEqual([(c['field'], c['kind'], c['text']) for c in beside], [
+            ('want', 'want', 'To leave the harbour and never pay.'), ('want', 'want', 'To keep Juno close.'),
+            ('want', 'intent', 'Sell the boat to the tide office.'),
+            ('attitude', 'episode', 'The player stood up for me at the weigh-house.')])
+        self.assertEqual({c['card'] for c in beside}, {'to clear her debt', 'wary of the player'})
+        line = next(w for w in r['warnings'] if 'never pay' in w)
+        self.assertIn("card says 'to clear her debt'", line)
+        self.assertIn('Judge whether it contradicts', line)  # a candidate, never a verdict
+        self.assertEqual(r['characters']['juno']['beside_card'], [])  # nothing recorded for Juno
+
+    def test_review_flags_more_than_two_vetoes_in_ten_scenes(self):
+        self.cast()
+        for reason in ('the door is barred', 'the player already paid'):
+            self.brains('veto', 'mara', '--kind', 'leave', '--reason', reason, '--entry', self.entry)
+        self.assertFalse(self.review(expect=0)['characters']['mara']['puppet'])
+        self.scenes(9)
+        self.brains('veto', 'mara', '--kind', 'refuse', '--reason', 'it would break canon', '--entry', self.entry)
+        r = self.review()['characters']['mara']
+        self.assertTrue(r['puppet'])
+        self.assertEqual([v['scene'] for v in r['vetoes_in_window']], [0, 0, 9])
+        self.scenes(1)  # the first two fall out of the window
+        r = self.review(expect=0)['characters']['mara']
+        self.assertEqual(([v['scene'] for v in r['vetoes_in_window']], r['puppet']), ([9], False))
+
+    def test_review_finds_intents_gone_stale_for_their_horizon(self):
+        self.cast()
+        for text_, horizon in (('Now.', 'now'), ('This scene.', 'scene'), ('Today.', 'day')):
+            self.intent(text_, horizon)
+        self.brains('add', 'mara')  # staleness does not wait on the snapshot
+        self.assertEqual(self.review(expect=0)['characters']['mara']['stale_intents'], [])
+
+        def stale():
+            return [i['horizon'] for i in self.review()['characters']['mara']['stale_intents']]
+        self.scenes(1)
+        self.assertEqual(stale(), ['now', 'scene'])
+        self.scenes(2)
+        self.assertEqual(stale(), ['now', 'scene', 'day'])
+        day = [e for e in self.events() if e['op'] == 'intent'][-1]['seq']
+        self.brains('intent', 'mara', '--drop', str(day), '--text', 'For good.', '--horizon', 'long',
+                    '--entry', self.entry)  # recorded at scene 3
+        self.scenes(9)
+        self.assertEqual(stale(), ['now', 'scene'])
+        self.scenes(1)
+        self.assertEqual(stale(), ['now', 'scene', 'long'])
+        self.assertIn('has stood 10 scene(s)', self.review()['warnings'][-1])
+
+    def test_review_flags_a_persistent_tier_with_no_session(self):
+        self.cast()
+        self.brains('session', 'mara', '--id', 'sess-1', '--tier', 'persistent')
+        self.assertFalse(self.review(expect=0)['characters']['mara']['persistent_without_session'])
+        self.brains('session', 'mara', '--end')  # the tier stays persistent
+        r = self.review('--npc', 'mara')
+        self.assertEqual(list(r['characters']), ['mara'])
+        self.assertTrue(r['characters']['mara']['persistent_without_session'])
+        self.assertIn('session mara --id', r['warnings'][0])
+        self.assertIn('no brain yet', self.review('--npc', 'nobody', expect=2)['error'])
+
+    def test_propose_writes_a_proposal_for_the_writer_and_never_touches_game_master(self):
+        self.cast()
+        self.want('To leave the harbour and never pay.', 5)
+        self.want('To keep Juno close.', 2)
+        self.brains('remember', 'mara', '--text', 'The player stood up for me.', '--salience', '5', '--entry', self.entry)
+        gm_dir = self.root / 'notes/gm'
+        before = {p.name: p.read_bytes() for p in gm_dir.iterdir()}
+        self.assertNotIn('pending.json', before)
+        out = self.review('--propose')
+        self.assertEqual((out['proposal'], out['proposed_ops']), ('notes/brains/card-proposal.json', 1))
+        self.assertEqual({p.name: p.read_bytes() for p in gm_dir.iterdir()}, before)  # no pending, no commit
+        proposal = json.loads((self.root / 'notes/brains/card-proposal.json').read_text(encoding='utf-8'))
+        self.assertEqual(proposal['ops'], [{'op': 'set', 'kind': 'npc', 'id': 'mara',
+                                            'fields': {'want': 'To leave the harbour and never pay.'}}])
+        self.assertEqual((proposal['entry'], proposal['why']), (None, None))
+        self.assertEqual([c['kind'] for c in proposal['evidence']['mara']], ['want', 'want', 'episode'])
+        self.assertNotIn('juno', proposal['evidence'])
+        self.gm(proposal['ops'])  # the writer merges it into a delta: it is valid as it stands
+        self.assertEqual(self.review()['characters']['mara']['card_changed'][0]['field'], 'want')
+        self.brains('add', 'mara')
+        out = self.review('--propose', expect=0)
+        self.assertEqual(out['proposed_ops'], 0)  # rewritten, so the old proposal does not linger
+        self.assertEqual(json.loads((self.root / 'notes/brains/card-proposal.json').read_text())['ops'], [])
+
     def test_needs_game_master(self):
         (self.root / 'tools' / 'gm_state.py').unlink()
         self.assertIn('game-master is not installed', self.brains('init', expect=2)['error'])
@@ -933,7 +1049,7 @@ class BrainsDocs(unittest.TestCase):
         self.assertIn('cut that output', protocol)
         for command in ('init', 'add', 'world', 'know', 'unlearn', 'remember', 'compress', 'session', 'brief',
                         'view', 'check', 'migrate', 'reconcile', 'state', 'tick', 'believe', 'claim', 'want',
-                        'intent', 'veto', 'offscreen', 'settings'):
+                        'intent', 'veto', 'offscreen', 'settings', 'review'):
             self.assertIn(f'brains.py {command}', protocol + (plus / 'APPLY.md').read_text(encoding='utf-8'), command)
 
 

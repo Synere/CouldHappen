@@ -39,6 +39,9 @@ Usage (from the workspace root):  python tools/brains.py <command> [--root .]
   migrate [--entry E]                  move method-only brain files into the log (originals kept in notes/brains/legacy/)
   reconcile [--apply]                  after a Director Undo: set aside events whose entry is gone, and what
                                        depends on them, into notes/brains/withdrawn.jsonl (dry run without --apply)
+  review [--npc N] [--propose]         drift review: card changed since the snapshot, aims set beside the card,
+                                       vetoes in ten scenes, stale intents, persistent with no session; --propose
+                                       writes notes/brains/card-proposal.json (never notes/gm/, never commits)
 
 Every command prints one JSON object. Exit 0 ok, 1 warning, 2 error.
 
@@ -161,6 +164,18 @@ OFFSCREEN_ANSWER_HELP = {
     'DECIDES': 'a lasting intention they form (to leave, to refuse, to do something later), or (nothing)',
     'CHANGES': 'how they are different after it (mood, body, what they want), or (nothing)'}
 SETTINGS = {'offscreen': False}  # off-screen calls are off until the Director turns them on at apply
+
+# ---- drift review (ISS-29) ----
+# An active intent is stale once game-master's scene count has moved this many scenes past the one it was
+# recorded in: a "now" or "scene" intent should not outlive its scene, a "day" one three scenes, a "long" one ten
+# (restate it, close and re-add, to show it still stands).
+STALE_AFTER = {'now': 1, 'scene': 1, 'day': 3, 'long': 10}
+VETO_WINDOW, VETO_LIMIT = 10, 2  # more than two vetoes in the last ten scenes makes a puppet
+# The script does not read meaning, so it never claims a contradiction. It sets beside the card what could
+# contradict it, recorded since the card was last snapshotted (add): every standing want and every day or long
+# intent beside the card's want, and every remembered episode of salience 4 or more beside its attitude.
+DRIFT_HORIZONS, DRIFT_SALIENCE = ('day', 'long'), 4
+PROPOSAL = 'card-proposal.json'
 
 
 class Fail(Exception):
@@ -646,6 +661,7 @@ def f_char(state, ev):
     char = state['chars'].setdefault(ev['npc'], {'aliases': [], 'knows_threads': [], 'session': None,
                                                  'tier': 'ephemeral'})
     char.update(ev['data'])
+    char['snapshot_seq'] = ev['seq']  # drift review counts the evidence recorded after the last card snapshot
 
 
 def f_world(state, ev):
@@ -1395,6 +1411,72 @@ def plan_reconcile(b):
     return kept, aside
 
 
+# ---- drift review (ISS-29) -------------------------------------------------------------------
+
+def review_char(b, npc):
+    """What has drifted for one character: their card, their aims beside it, their vetoes, their intents, their tier."""
+    char, card = b.state['chars'][npc], b.gm_state['npcs'].get(npc, {})
+    snap, since, scene = char.get('card', {}), char.get('snapshot_seq', 0), b.gm_state['scene_count']
+    ops = {ev['seq']: ev['op'] for ev in b.events}
+    changed = [{'field': k, 'snapshot': snap.get(k), 'now': card.get(k)}
+               for k in CARD_FIELDS if snap.get(k) != card.get(k)]
+    beside = []
+    if card.get('want'):
+        beside += [{'field': 'want', 'card': card['want'], 'kind': 'want', 'seq': w['seq'], 'text': w['text']}
+                   for w in sorted(b.state['wants'].get(npc, {}).values(), key=lambda w: (-w['weight'], -w['seq']))
+                   if w['seq'] > since]
+        beside += [{'field': 'want', 'card': card['want'], 'kind': 'intent', 'seq': i['seq'], 'text': i['text']}
+                   for i in active_intents(b, npc) if i['seq'] > since and i['horizon'] in DRIFT_HORIZONS]
+    if card.get('attitude'):
+        eps = [e for e in live_episodes(b.state, npc) if e['seq'] > since and e['salience'] >= DRIFT_SALIENCE
+               and ops.get(e['seq']) in ('remember', 'offscreen')]  # a compress summary folds older memories
+        beside += [{'field': 'attitude', 'card': card['attitude'], 'kind': 'episode', 'seq': e['seq'],
+                    'text': e['text']} for e in eps[-MAX_EPISODES:]]
+    vetoes = [{k: v[k] for k in ('seq', 'kind', 'reason', 'scene')} for v in b.state['vetoes'].get(npc, [])
+              if v['scene'] > scene - VETO_WINDOW]
+    stale = [{'seq': i['seq'], 'text': i['text'], 'horizon': i['horizon'], 'scene': i['scene'],
+              'scenes': scene - i['scene']} for i in active_intents(b, npc)
+             if scene - i['scene'] >= STALE_AFTER[i['horizon']]]
+    return {'card_at': char.get('card_at'), 'card_changed': changed, 'beside_card': beside,
+            'vetoes_in_window': vetoes, 'puppet': len(vetoes) > VETO_LIMIT, 'stale_intents': stale,
+            'persistent_without_session': char.get('tier') == 'persistent' and not char.get('session')}
+
+
+def review_warnings(npc, r):
+    out = [f'{npc}: card {c["field"]} changed in game-master since the snapshot (seq {r["card_at"]}): '
+           f'{c["snapshot"]!r} -> {c["now"]!r}. Check their wants and memories still fit, then take a new '
+           f'snapshot: python tools/brains.py add {npc}' for c in r['card_changed']]
+    out += [f'{npc}: {c["kind"]} seq {c["seq"]} beside the card\'s {c["field"]}: card says {c["card"]!r}; '
+            f'{c["kind"]} says {c["text"]!r}. Judge whether it contradicts the card' for c in r['beside_card']]
+    if r['puppet']:
+        out.append(f'{npc}: {len(r["vetoes_in_window"])} vetoes in the last {VETO_WINDOW} scenes (more than '
+                   f'{VETO_LIMIT}): their decisions keep being overridden; honour the next DECIDES you can')
+    out += [f'{npc}: intent seq {i["seq"]} ({i["horizon"]}) has stood {i["scenes"]} scene(s): {i["text"]!r}. '
+            f'Close it (intent {npc} --done or --drop {i["seq"]}) or restate it' for i in r['stale_intents']]
+    if r['persistent_without_session']:
+        out.append(f'{npc}: persistent tier with no kept session. Record one (session {npc} --id ...) '
+                   f'or retire them (session {npc} --end --tier ephemeral)')
+    return out
+
+
+def card_proposal(b, reviews):
+    """A draft for the writer, never a game-master delta: ops to copy into notes/gm/pending.json, with evidence.
+    Only the want gets a proposed text (the heaviest standing want recorded since the snapshot, when it differs
+    from the card); an attitude is the writer's to write from the episodes listed."""
+    ops, evidence = [], {}
+    for npc, r in reviews.items():
+        beside = r['beside_card']
+        if beside:
+            evidence[npc] = beside
+        top = next((c for c in beside if c['kind'] == 'want'), None)
+        if top and top['text'] != top['card']:
+            ops.append({'op': 'set', 'kind': 'npc', 'id': npc, 'fields': {'want': top['text']}})
+    return {'about': 'A drift-review proposal from tools/brains.py review, not a game-master delta. Copy the ops '
+                     'you accept into notes/gm/pending.json, set entry and why, run gm_state.py check and commit, '
+                     'then take a new snapshot with brains.py add <npc>.',
+            'scene': b.gm_state['scene_count'], 'entry': None, 'why': None, 'ops': ops, 'evidence': evidence}
+
+
 # ---- migrate (ISS-25) ------------------------------------------------------------------------
 
 # Guidance lines of the method-only brain template; a file copied from it may still hold them.
@@ -1864,11 +1946,29 @@ def cmd_reconcile(args):
     return {'set_aside': listed, 'applied': True, 'remaining': len(kept)}, []
 
 
+def cmd_review(args):
+    """Drift review: read-only except the views and, with --propose, notes/brains/card-proposal.json."""
+    b = Brains(args.root)
+    npcs = [args.npc] if args.npc else sorted(b.state['chars'])
+    for npc in npcs:
+        need_char(b.state, npc)
+    reviews = {npc: review_char(b, npc) for npc in npcs}
+    warns = [w for npc in npcs for w in review_warnings(npc, reviews[npc])]
+    out = {'scene': b.gm_state['scene_count'], 'characters': reviews}
+    if args.propose:  # always rewritten, so a proposal never outlives the review it came from
+        proposal = card_proposal(b, reviews)
+        b.gm.write_text(brains_dir(args.root) / PROPOSAL, json.dumps(proposal, ensure_ascii=False, indent=2) + '\n')
+        out['proposal'] = f'notes/brains/{PROPOSAL}'
+        out['proposed_ops'] = len(proposal['ops'])
+    return out, warns
+
+
 COMMANDS = {'init': cmd_init, 'add': cmd_add, 'world': cmd_world, 'know': cmd_know, 'unlearn': cmd_unlearn,
             'remember': cmd_remember, 'compress': cmd_compress, 'session': cmd_session, 'brief': cmd_brief,
             'view': cmd_view, 'check': cmd_check, 'migrate': cmd_migrate, 'reconcile': cmd_reconcile,
             'state': cmd_state, 'tick': cmd_tick, 'believe': cmd_believe, 'claim': cmd_claim, 'want': cmd_want,
-            'intent': cmd_intent, 'veto': cmd_veto, 'offscreen': cmd_offscreen, 'settings': cmd_settings}
+            'intent': cmd_intent, 'veto': cmd_veto, 'offscreen': cmd_offscreen, 'settings': cmd_settings,
+            'review': cmd_review}
 
 
 def parser():
@@ -1969,6 +2069,10 @@ def parser():
     s.add_argument('--entry', help='the entry the migrated memories cite (default: the last story entry)')
     s = cmd('reconcile', npc=False, entry=False)
     s.add_argument('--apply', action='store_true', help='set the events aside; without it, only list them')
+    s = cmd('review', npc=False, entry=False)
+    s.add_argument('--npc', help='review one character (default: every character with a brain)')
+    s.add_argument('--propose', action='store_true',
+                   help=f'also write notes/brains/{PROPOSAL}, card changes for you to merge into a game-master delta')
     return p
 
 

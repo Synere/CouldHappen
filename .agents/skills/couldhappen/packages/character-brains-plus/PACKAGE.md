@@ -27,6 +27,7 @@ The two cannot be installed together: both keep their files in `notes/brains/`. 
 - Beliefs that can be wrong, a record of every lie, promise and threat a character made and to whom (with a warning when they contradict themselves to the same person), and what each character makes of the others: trust, fear, debt, and who they think knows what.
 - A body and a mood that carry between scenes: pain, fear, fatigue and drink that ease with time, marks and clothes, and, where the story wants it, desire with limits the writer never crosses.
 - Characters with aims of their own: standing wants, intentions they carry from scene to scene, and decisions to leave or refuse that the writer honours or records why not. If the Director wants it, one character a scene boundary also lives a little off-screen, and the player finds only the traces.
+- A drift review at each chapter and every ten scenes that says when a card has fallen behind its character, when a character's decisions keep being overridden, and which intentions have gone stale, with a proposed card change the writer merges through game-master.
 
 ## How it fits game-master
 
@@ -42,7 +43,7 @@ As with the method-only package, the Director chooses how many characters keep a
 
 ## What it changes
 
-`tools/brains.py`, a private protocol at `notes/brains/PROTOCOL.md`, the log `notes/brains/events.jsonl`, one generated view per character at `notes/brains/<npc id>.md`, and a section in `START_HERE.md`. It switches on any game-master layer from 2 to 4 that is off, after asking. Nothing public changes; the player sees only the story.
+`tools/brains.py`, a private protocol at `notes/brains/PROTOCOL.md`, the log `notes/brains/events.jsonl`, one generated view per character at `notes/brains/<npc id>.md`, a drift-review proposal at `notes/brains/card-proposal.json` when the writer asks for one, and a section in `START_HERE.md`. It switches on any game-master layer from 2 to 4 that is off, after asking. Nothing public changes; the player sees only the story.
 
 ## Limits
 
