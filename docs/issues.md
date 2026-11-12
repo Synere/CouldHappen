@@ -41,7 +41,6 @@ Work order from 2026-11-11. The author's ranking: one `N. ISS-n — why` line pe
 | ISS-21 | Lossless `card.md` (envelope, lorebook names, falsy fields); `portrait` guidance for a JSON-card import | helpers | — | [public release](plans/public-release.md#iss-21--lossless-card-copy-and-portrait-guidance) |
 | ISS-22 | Vite denies `START_HERE.md`; portrait button names a lost connection; contract says how the reader settles uncertain saves | web | — | [public release](plans/public-release.md#iss-22--reader-boundary-and-save-wording) |
 | ISS-23 | Design names `voice.md` and `what-this-can-do.md` and keeps one creative-practice file; link-check wording | docs | — | [public release](plans/public-release.md#iss-23--design-text-catches-up) |
-| ISS-30 | Both brain packages: no desire for a character under 18 or with no age (for opencode) | packages | ISS-26 | [character-brains-plus](plans/character-brains-plus.md#iss-30--age-gate-on-desire) |
 
 ## Decisions pending
 
@@ -62,6 +61,7 @@ Work order from 2026-11-11. The author's ranking: one `N. ISS-n — why` line pe
 | ISS-10 | Dependency audit: two low dev-tooling findings (`deepmerge` under `@sveltejs/vite-plugin-svelte`) | web | an upstream patch lands, or a deliberate override is chosen | [known limitations](plans/known-limitations.md#iss-10--dependency-audit) |
 | ISS-11 | Native assurance: checkpoint examples are off by default; a clean tree does not prove the world record complete | checkpoints | native checkpoint hooks are activated or observed on a host | [known limitations](plans/known-limitations.md#iss-11--native-assurance) |
 | ISS-12 | Portrait framing: revisit the 4:3 contain treatment with the Director | reader | a real portrait library shows problems with it | [known limitations](plans/known-limitations.md#iss-12--portrait-framing) |
+| ISS-30 | Both brain packages: no desire for a character under 18 or with no age | packages | the author does it separately (ISS-26 has landed) | [character-brains-plus](plans/character-brains-plus.md#iss-30--age-gate-on-desire) |
 | ISS-18 | Writer-listening status: the reader cannot show whether the writer has a wait running | reader | the next round of reader work is chosen | [prior-art findings](research/browser-ui-prior-art-findings.md#iss-18--writer-listening-status) |
 
 ## Unverified
