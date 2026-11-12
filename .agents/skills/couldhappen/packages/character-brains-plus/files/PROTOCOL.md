@@ -59,7 +59,8 @@ Skip the brain entirely when the beat is mechanical (a door opens, a bus arrives
 4. **What characters learned.** For each character who learned something not covered by its visibility (told, overheard, read, guessed), `python tools/brains.py know <npc> <fact> --how "I ..." --confidence certain|probable|suspects|doubts --entry <entry>`. Write `--how` in their words, first person. If they forget, are fooled out of it, or the fact was never theirs, `unlearn` it.
 5. **What they keep.** `python tools/brains.py remember <npc> --text "..." --salience 1-5 --entry <entry>` for what changed for them. 5 is unforgettable; 1 is passing.
 6. **How they are.** If the turn hurt, frightened, tired, dressed, marked or moved a character, record it with `python tools/brains.py state <npc> --set ... --entry <entry>` (see "Body, mood and desire"). When time has passed, `python tools/brains.py tick <npc> --entry <entry>`; at the end of a scene, `tick <npc> --scene-end`.
-7. Run `python tools/brains.py check`. Fix every error before the next turn.
+7. **What they believe and what they said.** If a character came to believe something, true or not, record it with `believe`; if they told someone something that matters later (a lie, a promise, a threat, what they kept back), record it with `claim`; if the turn changed how they stand with someone, record it in `state` under `people` (see "Beliefs, claims and other people").
+8. Run `python tools/brains.py check`. Fix every error before the next turn, and read every warning: a contradiction warning means a character told someone two opposite things.
 
 ## Body, mood and desire
 
@@ -72,6 +73,15 @@ A character's body and feelings carry from scene to scene only if they are recor
 **`limits` is authoritative.** A character's limits hold whatever the scene, the player or the brain says. If a brain's answer, or your own draft, crosses them, cut that output; do not soften it and keep it. A limit changes only when the story earns it, recorded with `state` against the entry that shows it.
 
 **Baseline and ticking.** `add <npc> --baseline valence=1 energy=4 ...` sets where each affect level settles; a level with no baseline settles to 0, and energy to 3. `tick <npc>` moves every level one step toward its baseline: run it when time passes. Pain and intoxication ease only at a scene boundary, so they move only with `tick <npc> --scene-end`. A tick with nothing to move records nothing.
+
+## Beliefs, claims and other people
+
+What a character *knows* is a game-master fact, true by construction. What they *believe* may be wrong, and the brief gives a wrong belief exactly as it gives a right one: the brain must not be able to tell.
+
+- **Beliefs.** `python tools/brains.py believe <npc> --text "..." --truth true|false|unknown --confidence certain|probable|suspects|doubts [--about <fact>] --entry <entry>`. Record one when a character is fooled, misreads something, guesses, or holds an opinion the scene will test. `--truth` is for you, the writer, and the view; the brief never prints it, nor the fact named with `--about` (it may be a fact the character has never been told). A character holds at most twelve beliefs. When one is overturned or dropped, `believe <npc> --retire <seq> --entry <entry>`; to change it, give `--retire <seq>` with the new `--text`. If the character learns the fact itself, also record `know`.
+- **Claims.** `python tools/brains.py claim <npc> --to player|<npc> --text "..." --truth true|false|unknown --kind lie|truth|half-truth|promise|threat|boast|omission [--about <fact>] --entry <entry>`. Record a claim when a character says something they will have to live with: a lie, a promise or threat they may be held to, a boast, or (`omission`) what they kept back, written as what was left out. A `lie` is `false` and a `truth` is `true` by their kind. The brief gives the last six claims, those to people present first, with their kind, so a brain remembers what it told whom. The player always counts as present.
+- **Contradictions.** Give `--about` whenever a claim concerns a game-master fact. Two claims to the same person about the same fact, one `true` and one `false`, are a contradiction: `claim` and `check` both warn. It is a story beat, not an error: that person may notice. Claims with no `--about`, or labelled `unknown`, are never compared; the script does not read their texts.
+- **Other people.** `state <npc> --set people.<cast id or player>.<field>=...` records how a character stands with each person: `trust`, `attraction`, `fear` from 0 to 5; `debt` from -5 (they owe that person everything) to 5 (that person owes them everything); `last`, the last thing that passed between them; and `thinks_knows.<fact>=knows|doesnt|unsure`, what they think that person knows, at most four facts each. A `thinks_knows` is refused for a fact the character does not hold: they cannot wonder who knows what they do not know exists. The brief gives at most three people (those present first, then the most recently recorded), levels in words, and two of the facts (what they think the other does not know first, then what they are unsure of). `--set people.juno=` clears a person.
 
 ## Visibility
 
@@ -90,8 +100,11 @@ Only perception. Never the story log, never another character's view or card, ne
 - what they remember: at most six episodes, the most salient first, then the most recent, in the order they happened;
 - what is owed: the open threads on their list;
 - what they know: public facts, facts they witnessed, and facts with a `know` event, less what they unlearned and less outdated or discarded facts, each with how sure they are and how they know;
+- what they believe: their active beliefs, each with how sure they are, never whether it is true;
 - how they are: mood and affect in words, then their body (condition, marks and who can see them, clothes, what they carry, what they cannot do);
 - desire: the desire fields that are set, limits among them, marked as never crossed;
+- other people: at most three, with trust, attraction, fear and debt in words, the last thing between them, and two facts they think that person does or does not know;
+- what they have told people: the last six claims, to people present first, with their kind;
 - now: day, time, place, and your scene file;
 - the answer block.
 
@@ -140,7 +153,7 @@ At a scene's end, `remember` what changed for each character who was called. Whe
 After a Director Undo, `brief` refuses until both logs are reconciled, so no brain is told what never happened. In this order:
 
 1. `python tools/gm_state.py reconcile`, then, if it lists deltas to set aside, `python tools/gm_state.py reconcile --apply`. Game-master goes first: a brain event can rest on a fact that game-master sets aside.
-2. `python tools/brains.py reconcile` lists every brain event whose entry is gone, and every event that depends on one (an `unlearn` of what was learned there, a `compress` that folded its episode, anything about a fact game-master no longer has). `python tools/brains.py reconcile --apply` moves them into `notes/brains/withdrawn.jsonl`, so they leave every brief and view.
+2. `python tools/brains.py reconcile` lists every brain event whose entry is gone, and every event that depends on one (an `unlearn` of what was learned there, a `compress` that folded its episode, a `believe --retire` of a belief set aside, anything about a fact game-master no longer has or a person no longer cast). `python tools/brains.py reconcile --apply` moves them into `notes/brains/withdrawn.jsonl`, so they leave every brief and view.
 3. `python tools/brains.py check`. If something the character still knows was only recorded in a set-aside event, record it again against an entry that stands.
 
 ## When a session ends
@@ -159,7 +172,9 @@ Build a fresh brief, start a new subagent, record it with `session <npc> --id <n
 | `python tools/brains.py remember <npc>` | an episode they keep, with salience |
 | `python tools/brains.py compress <npc>` | folds episodes into one summary |
 | `python tools/brains.py session <npc>` | records or ends the kept session, and the tier |
-| `python tools/brains.py state <npc> --set PATH=VALUE` | body, mood and desire; without `--set`, prints them |
+| `python tools/brains.py state <npc> --set PATH=VALUE` | body, mood, desire and `people` (how they stand with others); without `--set`, prints them |
+| `python tools/brains.py believe <npc>` | a belief, true or not: `--text`, `--truth`, `--confidence`, `--about`; `--retire SEQ` drops one |
+| `python tools/brains.py claim <npc> --to W` | what they told someone: `--text`, `--truth`, `--kind`, `--about` |
 | `python tools/brains.py tick <npc>` | time passes: affect eases one step toward baseline; `--scene-end` eases pain and intoxication too |
 | `python tools/brains.py brief <npc> --scene F` | the brief; `--as` an alias they go by here; `--text` prints it bare |
 | `python tools/brains.py view [<npc>]` | rewrites the views and prints one |

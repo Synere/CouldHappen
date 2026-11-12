@@ -8,6 +8,8 @@ A view shows you, the writer, a character at a glance. Unlike a brief, it carrie
 - **Card snapshot.** The game-master card as it was when the character was last added, with the game-master seq it was taken at. A field marked "(changed since)" differs from the card now.
 - **Knows.** Every fact the brief would carry: its id, how it is held (`public`, `witnessed`, `private`, `secret`, or `know`), the confidence, the text, and for a `know`, how they learned it and the entry.
 - **Episodes.** Every live memory with its seq and salience. Use the seq numbers with `compress`.
-- **State.** Body, mood and desire as recorded with `state`: each affect level as a number with its word and the baseline it settles to (a level never set and with no baseline is not shown), then every body and desire field by its path, marks by id with who can see them. The paths are the ones `state --set` takes.
+- **State.** Body, mood and desire as recorded with `state`: each affect level as a number with its word and the baseline it settles to (a level never set and with no baseline is not shown), then every body and desire field by its path, marks by id with who can see them, and each person under `people` (trust, attraction, fear, debt, the last thing between them, and what the character thinks they know, by fact id). The paths are the ones `state --set` takes.
+- **Beliefs.** Every active belief with its seq, its truth label (`true`, `false`, `unknown`), its confidence and the fact it is about. The brief carries the text and confidence only. Use the seq with `believe --retire`.
+- **Claims.** Everything the character has told someone, with its seq, who was told, its kind and truth label, and the fact it is about.
 
 The brief itself is built separately, by `python tools/brains.py brief`, and never carries ids or paths.

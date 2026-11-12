@@ -15,7 +15,13 @@ Usage (from the workspace root):  python tools/brains.py <command> [--root .]
   compress <npc> --replace SEQ ... --text T [--salience 1-5]   fold episodes into one summary
   session <npc> (--id ID | --end) [--tier persistent|ephemeral]   the kept subagent session
   state <npc> [--set PATH=VALUE ...] --entry E   body, mood and desire (affect.fear=3, body.clothes=...,
-                                       desire.limits=...; an empty value clears); without --set, print it
+                                       desire.limits=...; an empty value clears); without --set, print it.
+                                       Edges to others: people.<cast id|player>.trust|attraction|fear (0-5),
+                                       .debt (-5 to 5), .last, .thinks_knows.<fact>=knows|doesnt|unsure
+  believe <npc> --text T --truth true|false|unknown --confidence C [--about FACT] [--retire SEQ] --entry E
+  believe <npc> --retire SEQ --entry E  what the character believes, true or not (at most 12 held)
+  claim <npc> --to player|<npc> --text T --truth true|false|unknown --kind K [--about FACT] --entry E
+                                       what they told someone: lie, truth, half-truth, promise, threat, boast, omission
   tick <npc> [--scene-end] --entry E   time passes: each affect level one step toward baseline
                                        (pain and intoxication only with --scene-end)
   brief <npc> --scene FILE [--as ALIAS] [--text]   the only way to build a brain's brief
@@ -77,14 +83,22 @@ CONFIDENCE_WORDS = {'certain': '', 'probable': 'probably', 'suspects': 'you susp
 # ---- body, mood and desire (ISS-26) ----
 # A spec is ('text',), ('level', low, high), ('seen',) (who can see a mark), a dict of named fields, or
 # ('keyed', spec): items under any id, each with that spec. State paths are dotted: affect.fear, body.marks.burn.
+# A ('choice', values) leaf is one of those words. A keyed group may name what its keys must be as a third
+# element, checked against the brain's state when a value is set: 'person' (a cast id, or player, never the
+# character themself) and 'fact' (a game-master fact the character holds, so they know it exists).
 TEXT, LEVEL = ('text',), ('level', 0, 5)
+THINKS = ('knows', 'doesnt', 'unsure')
 STATE_SCHEMA = {
     'affect': {'mood': TEXT, 'valence': ('level', -3, 3), 'energy': LEVEL, 'pain': LEVEL, 'fear': LEVEL,
                'shame': LEVEL, 'arousal': LEVEL, 'intoxication': LEVEL},
     'body': {'condition': TEXT, 'marks': ('keyed', {'text': TEXT, 'seen_by': ('seen',)}), 'clothes': TEXT,
              'carrying': TEXT, 'capacities': TEXT},
     'desire': {'orientation': TEXT, 'appetite': TEXT, 'wants': TEXT, 'limits': TEXT, 'never_admits': TEXT,
-               'shame': TEXT, 'aftercare': TEXT, 'turn_offs': TEXT, 'current': TEXT}}
+               'shame': TEXT, 'aftercare': TEXT, 'turn_offs': TEXT, 'current': TEXT},
+    # ISS-27: what the character makes of each other person. debt above 0 is owed to the character, below 0
+    # is what they owe. thinks_knows is what they think that person knows, by fact id.
+    'people': ('keyed', {'trust': LEVEL, 'attraction': LEVEL, 'fear': LEVEL, 'debt': ('level', -5, 5),
+                         'last': TEXT, 'thinks_knows': ('keyed', ('choice', THINKS), 'fact')}, 'person')}
 AFFECT_LEVELS = tuple(k for k, spec in STATE_SCHEMA['affect'].items() if spec[0] == 'level')
 DEFAULT_BASELINE = {'energy': 3}  # every other affect level settles to 0
 BOUNDARY_ONLY = ('pain', 'intoxication')  # these ease only at a scene boundary (tick --scene-end)
@@ -98,6 +112,22 @@ STATE_LABELS = {
     'desire.appetite': 'appetite', 'desire.wants': 'wants', 'desire.limits': 'limits (never crossed, whatever happens)',
     'desire.never_admits': 'would never admit', 'desire.shame': 'ashamed of wanting', 'desire.aftercare': 'after, needs',
     'desire.turn_offs': 'turned off by', 'desire.current': 'right now'}
+
+# ---- beliefs, claims and other minds (ISS-27) ----
+TRUTH = ('true', 'false', 'unknown')  # recorded for the writer; the brief never prints it
+CLAIM_KINDS = ('lie', 'truth', 'half-truth', 'promise', 'threat', 'boast', 'omission')
+KIND_WORDS = {'lie': 'a lie', 'truth': 'the truth', 'half-truth': 'a half-truth', 'promise': 'a promise',
+              'threat': 'a threat', 'boast': 'a boast', 'omission': 'kept back'}
+KIND_TRUTH = {'lie': 'false', 'truth': 'true'}  # the two kinds whose truth label follows from the kind
+PLAYER = 'player'
+MAX_BELIEFS, MAX_CLAIMS, MAX_THINKS = 12, 6, 4
+MAX_PEOPLE, MAX_PROPOSITIONS = 3, 2  # in the brief: people, and what each is thought to know
+THINKS_WORDS = {'knows': 'you think they know', 'doesnt': 'you think they do not know',
+                'unsure': 'you are not sure they know'}
+THINKS_ORDER = {'doesnt': 0, 'unsure': 1, 'knows': 2}  # what the brief shows first: what they think is safe
+EDGE_LABELS = {'trust': 'trust', 'attraction': 'attraction', 'fear': 'fear of them'}
+EDGE_WORDS = ('none', 'a little', 'some', 'a lot', 'deeply', 'utterly')  # 0 to 5, as LEVEL_WORDS for affect
+DEBT_WORDS = ('nothing', 'a little', 'something', 'a lot', 'a great deal', 'everything')
 
 
 class Fail(Exception):
@@ -164,7 +194,9 @@ def method_only_files(root):
 
 
 def new_state():
-    return {'chars': {}, 'world': {}, 'knows': {}, 'unlearned': {}, 'episodes': {}, 'states': {}}
+    # touched: npc -> person -> the seq of the last state event about them, to rank people in the brief
+    return {'chars': {}, 'world': {}, 'knows': {}, 'unlearned': {}, 'episodes': {}, 'states': {},
+            'beliefs': {}, 'claims': {}, 'touched': {}}
 
 
 def text_ok(value):
@@ -321,11 +353,42 @@ def state_spec(path):
     return parts, spec
 
 
+def keyed_ids(path):
+    """(kind, key) for each key in a valid path whose group says what its keys must be ('person', 'fact')."""
+    out, spec = [], STATE_SCHEMA
+    for part in path.split('.'):
+        if isinstance(spec, dict):
+            spec = spec[part]
+        else:
+            if len(spec) > 2:
+                out.append((spec[2], part))
+            spec = spec[1]
+    return out
+
+
+def check_key(kind, key, path, npc, state, gm_state):
+    """Fail unless a key fits what its group holds: a person, or a fact the character knows exists."""
+    if kind == 'person':
+        if key == npc:
+            raise Fail(f'{path}: a character\'s edges are to other people, not to themself')
+        if key != PLAYER and key not in state['chars'] and key not in gm_state['npcs']:
+            raise Fail(f'{path}: {key} is not cast; a person is a cast id or {PLAYER}')
+    elif kind == 'fact':
+        if key not in gm_state['facts']:
+            raise Fail(f'{path}: {key} is not a game-master fact')
+        if key not in allowed_facts(state, gm_state, npc):
+            raise Fail(f'{path}: {npc} does not know {key} exists, so cannot think anything about who knows it. '
+                       f'Record know first if they learned it.')
+
+
 def check_value(spec, value, path, state, gm_state):
     """Fail unless value fits a leaf spec."""
     if spec == TEXT:
         if not text_ok(value):
             raise Fail(f'{path} must be a text of at most {MAX_TEXT} characters')
+    elif isinstance(spec, tuple) and spec[0] == 'choice':
+        if value not in spec[1]:
+            raise Fail(f'{path} is one of {", ".join(spec[1])}')
     elif isinstance(spec, tuple) and spec[0] == 'level':
         if not (isinstance(value, int) and not isinstance(value, bool) and spec[1] <= value <= spec[2]):
             raise Fail(f'{path} is a whole number from {spec[1]} to {spec[2]}')
@@ -351,17 +414,89 @@ def v_state(state, gm_state, ev):
             raise Fail('state data is a list of [path, value] pairs')
         path, value = pair
         _, spec = state_spec(path)
-        if value is not None:
+        if value is not None:  # clearing needs no check: what it names may be long gone
+            for kind, key in keyed_ids(path):
+                check_key(kind, key, path, ev['npc'], state, gm_state)
             check_value(spec, value, path, state, gm_state)
     trial = {'states': {ev['npc']: json.loads(json.dumps(state['states'].get(ev['npc'], {})))}}
     f_state(trial, ev)
-    marks = trial['states'][ev['npc']].get('body', {}).get('marks', {})
+    tree = trial['states'][ev['npc']]
+    marks = tree.get('body', {}).get('marks', {})
     if len(marks) > MAX_LIST:
         raise Fail(f'at most {MAX_LIST} marks')
     bare = [m for m, mark in marks.items() if 'text' not in mark]
     if bare:
         raise Fail(f'a mark needs its text first: --set body.marks.{bare[0]}="..."')
+    people = tree.get('people', {})
+    if len(people) > MAX_LIST:
+        raise Fail(f'at most {MAX_LIST} people; clear one with --set people.<id>=')
+    for pid, edge in people.items():
+        if len(edge.get('thinks_knows', {})) > MAX_THINKS:
+            raise Fail(f'people.{pid}.thinks_knows: at most {MAX_THINKS} facts; clear one first '
+                       f'(--set people.{pid}.thinks_knows.<fact>=)')
     return []
+
+
+def v_believe(state, gm_state, ev):
+    need_char(state, ev['npc'])
+    d, active = ev['data'], state['beliefs'].get(ev['npc'], {})
+    if 'retire' not in d and 'text' not in d:
+        raise Fail('give the belief (--text, --truth, --confidence), or --retire SEQ, or both to replace one')
+    if 'retire' in d and d['retire'] not in active:
+        raise Fail(f'seq {d["retire"]} is not an active belief of {ev["npc"]} (see python tools/brains.py view)')
+    if 'text' in d:
+        if not text_ok(d['text']):
+            raise Fail(f'--text must be a non-empty text of at most {MAX_TEXT} characters')
+        if d.get('truth') not in TRUTH:
+            raise Fail('--truth is one of ' + ', '.join(TRUTH) + ': whether the belief is so (the brief never says)')
+        if d.get('confidence') not in CONFIDENCE:
+            raise Fail('--confidence is one of ' + ', '.join(CONFIDENCE))
+        if d.get('about') is not None:
+            need_fact(gm_state, d['about'], live=False)
+        if len(active) - ('retire' in d) >= MAX_BELIEFS:
+            raise Fail(f'{ev["npc"]} holds {MAX_BELIEFS} beliefs already, the most a brain keeps. '
+                       'Retire one first, or replace it: believe ... --retire SEQ')
+    return []
+
+
+def contradiction(earlier, later):
+    """Whether a later claim contradicts an earlier one, by a fixed rule.
+
+    Two claims contradict when the same character told the same person something about the same game-master
+    fact (--about), and one claim is labelled true and the other false. A claim with no about, or labelled
+    unknown, never contradicts: the script does not read the texts."""
+    return (earlier['to'] == later['to'] and earlier.get('about') is not None
+            and earlier.get('about') == later.get('about')
+            and {earlier['truth'], later['truth']} == {'true', 'false'})
+
+
+def contradiction_warning(npc, earlier, later):
+    return (f'{npc} told {later["to"]} contradicting things about {later["about"]}: seq {earlier["seq"]} '
+            f'({earlier["kind"]}, {earlier["truth"]}) and seq {later["seq"]} ({later["kind"]}, {later["truth"]}). '
+            f'{later["to"]} may notice.')
+
+
+def v_claim(state, gm_state, ev):
+    need_char(state, ev['npc'])
+    d = ev['data']
+    to = d.get('to')
+    if to == ev['npc']:
+        raise Fail('--to is someone else: a character does not make claims to themself')
+    if to != PLAYER and to not in state['chars'] and to not in gm_state['npcs']:
+        raise Fail(f'--to is {PLAYER} or a cast id; {to} is not cast')
+    if not text_ok(d.get('text', '')):
+        raise Fail(f'--text must be a non-empty text of at most {MAX_TEXT} characters')
+    if d.get('kind') not in CLAIM_KINDS:
+        raise Fail('--kind is one of ' + ', '.join(CLAIM_KINDS))
+    if d.get('truth') not in TRUTH:
+        raise Fail('--truth is one of ' + ', '.join(TRUTH))
+    if d['kind'] in KIND_TRUTH and d['truth'] != KIND_TRUTH[d['kind']]:
+        raise Fail(f'a {d["kind"]} is {KIND_TRUTH[d["kind"]]} by its kind; use half-truth or another kind')
+    if d.get('about') is not None:
+        need_fact(gm_state, d['about'], live=False)
+    later = dict(d, seq=ev['seq'])
+    return [contradiction_warning(ev['npc'], c, later) for c in state['claims'].get(ev['npc'], [])
+            if contradiction(c, later)]
 
 
 def v_tick(state, gm_state, ev):
@@ -373,7 +508,7 @@ def v_tick(state, gm_state, ev):
 
 VALIDATE = {'char': v_char, 'world': v_world, 'know': v_know, 'unlearn': v_unlearn,
             'remember': v_remember, 'compress': v_compress, 'session': v_session, 'state': v_state,
-            'tick': v_tick}
+            'tick': v_tick, 'believe': v_believe, 'claim': v_claim}
 
 
 # Folders: (state, event) -> None. They apply an already-validated event on replay and never consult game-master.
@@ -438,7 +573,10 @@ def put(tree, parts, value):
 def f_state(state, ev):
     tree = state['states'].setdefault(ev['npc'], {})
     for path, value in ev['data']['set']:
-        put(tree, path.split('.'), value)
+        parts = path.split('.')
+        put(tree, parts, value)
+        if parts[0] == 'people' and len(parts) > 1:
+            state.setdefault('touched', {}).setdefault(ev['npc'], {})[parts[1]] = ev['seq']
 
 
 def current_affect(state, npc):
@@ -473,9 +611,25 @@ def f_tick(state, ev):
         put(tree, ['affect', field], new)
 
 
+def f_believe(state, ev):
+    d, beliefs = ev['data'], state['beliefs'].setdefault(ev['npc'], {})
+    if 'retire' in d:
+        beliefs.pop(d['retire'], None)
+    if 'text' in d:
+        beliefs[ev['seq']] = {'seq': ev['seq'], 'text': d['text'], 'truth': d['truth'],
+                              'confidence': d['confidence'], 'about': d.get('about'), 'entry': ev['entry']}
+
+
+def f_claim(state, ev):
+    d = ev['data']
+    state['claims'].setdefault(ev['npc'], []).append({
+        'seq': ev['seq'], 'to': d['to'], 'text': d['text'], 'truth': d['truth'], 'kind': d['kind'],
+        'about': d.get('about'), 'entry': ev['entry']})
+
+
 FOLD = {'char': f_char, 'world': f_world, 'know': f_know, 'unlearn': f_unlearn,
         'remember': f_remember, 'compress': f_compress, 'session': f_session, 'state': f_state,
-        'tick': f_tick}
+        'tick': f_tick, 'believe': f_believe, 'claim': f_claim}
 
 
 def replay(events):
@@ -644,6 +798,74 @@ def sec_desire(b, npc, ctx):
     return ['DESIRE'] + lines if lines else []
 
 
+def sec_believes(b, npc, ctx):
+    """Active beliefs, oldest first, with how sure they are. Never the truth label, never the about fact."""
+    lines = []
+    for seq in sorted(b.state['beliefs'].get(npc, {})):
+        belief = b.state['beliefs'][npc][seq]
+        word = CONFIDENCE_WORDS[belief['confidence']]
+        lines.append('- ' + belief['text'] + (f' ({word})' if word else ''))
+    return ['WHAT THEY BELIEVE'] + lines if lines else []
+
+
+def present_ids(b):
+    """Cast ids on stage now: game-master's situation.present, matched by id, name or alias, case-insensitively.
+    The player counts as present: every brain call is part of a scene played with them."""
+    here = {p.strip().lower() for p in b.gm_state['situation'].get('present', []) if isinstance(p, str)}
+    out = {PLAYER}
+    for cid in sorted(set(b.state['chars']) | set(b.gm_state['npcs'])):
+        char, card = b.state['chars'].get(cid, {}), b.gm_state['npcs'].get(cid, {})
+        names = [cid, char.get('name'), card.get('name'), *char.get('aliases', [])]
+        if any(n and n.lower() in here for n in names):
+            out.add(cid)
+    return out
+
+
+def person_name(b, pid):
+    return 'the player' if pid == PLAYER else cast_name(b, pid)
+
+
+def edge_lines(b, npc, pid, edge, held):
+    """The brief lines for one person: levels in words, the last thing between them, two propositions."""
+    # a level at 0 is an absence and is left out, as in HOW THEY ARE
+    parts = [f'{EDGE_LABELS[f]}: {EDGE_WORDS[edge[f]]}' for f in EDGE_LABELS if edge.get(f)]
+    debt = edge.get('debt', 0)
+    if debt:
+        parts.append(f'they owe you {DEBT_WORDS[debt]}' if debt > 0 else f'you owe them {DEBT_WORDS[-debt]}')
+    lines = ['  ' + '; '.join(parts)] if parts else []
+    if edge.get('last'):
+        lines.append('  last between you: ' + edge['last'])
+    # only facts the character holds now: an unlearn after the edge was set takes the proposition out too
+    order = list(b.gm_state['facts'])
+    thinks = sorted(((fid, w) for fid, w in edge.get('thinks_knows', {}).items() if fid in held),
+                    key=lambda p: (THINKS_ORDER[p[1]], order.index(p[0])))[:MAX_PROPOSITIONS]
+    lines += [f'  {THINKS_WORDS[w]}: {b.gm_state["facts"][fid]["text"]}' for fid, w in thinks]
+    return [person_name(b, pid)] + lines if lines else []
+
+
+def sec_others(b, npc, ctx):
+    """At most three people: those present first, then the most recently recorded, then by id."""
+    people = b.state['states'].get(npc, {}).get('people', {})
+    here, touched = present_ids(b), b.state['touched'].get(npc, {})
+    held = allowed_facts(b.state, b.gm_state, npc)
+    lines, shown = [], 0
+    for pid in sorted(people, key=lambda p: (p not in here, -touched.get(p, 0), p)):
+        more = edge_lines(b, npc, pid, people[pid], held)
+        if more and shown < MAX_PEOPLE:
+            lines += more
+            shown += 1
+    return ['OTHER PEOPLE'] + lines if lines else []
+
+
+def sec_claims(b, npc, ctx):
+    """Six claims at most: to people present first, newest first within each. The kind is said (the character
+    knows when they lied); the truth label is not."""
+    here = present_ids(b)
+    claims = sorted(b.state['claims'].get(npc, []), key=lambda c: (c['to'] not in here, -c['seq']))[:MAX_CLAIMS]
+    lines = [f'- to {person_name(b, c["to"])}, {KIND_WORDS[c["kind"]]}: {c["text"]}' for c in claims]
+    return ['WHAT THEY HAVE TOLD PEOPLE'] + lines if lines else []
+
+
 def sec_now(b, npc, ctx):
     sit = b.gm_state['situation']
     when = ', '.join(x for x in (f'day {sit["day"]}' if sit.get('day') else '', sit.get('time', ''),
@@ -656,8 +878,8 @@ def sec_answer(b, npc, ctx):
     return ['ANSWER'] + [f'{k}: {ANSWER_HELP[k]}' for k in ANSWER_KEYS]
 
 
-BRIEF_SECTIONS = [sec_header, sec_who, sec_memory, sec_owed, sec_knows, sec_body, sec_desire, sec_now,
-                  sec_answer]
+BRIEF_SECTIONS = [sec_header, sec_who, sec_memory, sec_owed, sec_knows, sec_believes, sec_body, sec_desire,
+                  sec_others, sec_claims, sec_now, sec_answer]
 
 
 def read_scene(path):
@@ -753,9 +975,22 @@ def render_view(b, npc):
             if group == 'body' and field == 'marks':
                 rows += [f'- body.marks.{m}: {mark_text(b, value[m])}' for m in sorted(value)]
             else:
-                rows.append(f'- {group}.{field}: {value}')
+                rows += [f'- {path}: {v}' for path, v in flatten(value, f'{group}.{field}')]
     out += rows or ['- nothing set']
+    out += ['', '## Beliefs', '']
+    out += [f'- seq {s["seq"]} [{s["truth"]}, {s["confidence"]}' + (f', about {s["about"]}' if s['about'] else '')
+            + f'] {s["text"]}' for _, s in sorted(b.state['beliefs'].get(npc, {}).items())] or ['- none']
+    out += ['', '## Claims', '']
+    out += [f'- seq {c["seq"]} to {c["to"]} [{c["kind"]}, {c["truth"]}' + (f', about {c["about"]}' if c['about'] else '')
+            + f'] {c["text"]}' for c in b.state['claims'].get(npc, [])] or ['- none']
     return '\n'.join(out) + '\n'
+
+
+def flatten(value, prefix):
+    """(dotted path, leaf value) pairs of a state subtree, in recorded order."""
+    if not isinstance(value, dict):
+        return [(prefix, value)]
+    return [pair for key, sub in value.items() for pair in flatten(sub, f'{prefix}.{key}')]
 
 
 def write_views(b):
@@ -805,6 +1040,17 @@ def run_check(b):
     for fid, w in b.state['world'].items():
         if fid not in b.gm_state['facts']:
             warns.append(f'{fid} is classified but is no longer a game-master fact')
+    for npc in sorted(b.state['claims']):
+        claims = b.state['claims'][npc]
+        warns += [contradiction_warning(npc, a, c) for i, c in enumerate(claims) for a in claims[:i]
+                  if contradiction(a, c)]
+    for npc in sorted(b.state['states']):
+        held = allowed_facts(b.state, b.gm_state, npc)
+        for pid, edge in b.state['states'][npc].get('people', {}).items():
+            for fid in edge.get('thinks_knows', {}):
+                if fid not in held:
+                    warns.append(f'{npc} thinks about whether {pid} knows {fid}, which {npc} no longer holds; the '
+                                 f'brief leaves it out. Clear it: state {npc} --set people.{pid}.thinks_knows.{fid}=')
     return errs, warns
 
 
@@ -845,12 +1091,31 @@ def dependency(state, gm_state, ev):
             return 'witnesses ' + ', '.join(lost) + ' are no longer cast'
     if op == 'unlearn' and not holds(state, npc, fid):
         return f'{npc} no longer held {fid} to unlearn'
+    def cast(w):
+        return w in state['chars'] or w in gm_state['npcs']
+
     if op == 'state':
         for path, value in d.get('set', []):
             if path.endswith('.seen_by') and isinstance(value, list):
-                lost = [w for w in value if w not in state['chars'] and w not in gm_state['npcs']]
+                lost = [w for w in value if not cast(w)]
                 if lost:
                     return f'{path} names {", ".join(lost)}, no longer cast'
+            parts = path.split('.')
+            if value is None or parts[0] != 'people' or len(parts) < 2:
+                continue
+            if parts[1] != PLAYER and not cast(parts[1]):
+                return f'{path} is about {parts[1]}, no longer cast'
+            if len(parts) > 3 and parts[2] == 'thinks_knows':
+                if parts[3] not in gm_state['facts']:
+                    return f'{path}: {parts[3]} is no longer a game-master fact'
+                if not holds(state, npc, parts[3]):
+                    return f'{path}: {npc} no longer holds {parts[3]}'
+    if op in ('believe', 'claim') and d.get('about') is not None and d['about'] not in gm_state['facts']:
+        return f'it is about {d["about"]}, no longer a game-master fact'
+    if op == 'believe' and 'retire' in d and d['retire'] not in state['beliefs'].get(npc, {}):
+        return f'it retired the belief at seq {d["retire"]}, which is set aside'
+    if op == 'claim' and d.get('to') != PLAYER and not cast(d.get('to')):
+        return f'it was said to {d.get("to")}, no longer cast'
     if op == 'compress':
         live = state['episodes'].get(npc, {})
         lost = [str(q) for q in d.get('replaces', []) if q not in live]
@@ -1179,6 +1444,32 @@ def cmd_tick(args):
     return {'seq': ev['seq'], 'moved': {f: list(m) for f, m in moves.items()}}, warns
 
 
+def cmd_believe(args):
+    b = Brains(args.root)
+    data = {}
+    if args.retire is not None:
+        data['retire'] = args.retire
+    if args.text is not None:
+        data.update(text=args.text, truth=args.truth, confidence=args.confidence)
+        if args.about:
+            data['about'] = args.about
+    elif args.truth or args.confidence or args.about:
+        raise Fail('--truth, --confidence and --about go with a new belief\'s --text')
+    ev, warns = b.append(args.npc, 'believe', data, args.entry,
+                         args.why or (f'{args.npc} came to believe something' if 'text' in data
+                                      else f'{args.npc} no longer believes seq {args.retire}'))
+    return {'seq': ev['seq'], 'active': len(b.state['beliefs'].get(args.npc, {}))}, warns
+
+
+def cmd_claim(args):
+    b = Brains(args.root)
+    data = {'to': args.to, 'text': args.text, 'truth': args.truth, 'kind': args.kind}
+    if args.about:
+        data['about'] = args.about
+    ev, warns = b.append(args.npc, 'claim', data, args.entry, args.why or f'{args.npc} told {args.to} something')
+    return {'seq': ev['seq']}, warns
+
+
 def cmd_brief(args):
     b = Brains(args.root)
     text = build_brief(b, args.npc, args.scene, args.alias)
@@ -1260,7 +1551,7 @@ def cmd_reconcile(args):
 COMMANDS = {'init': cmd_init, 'add': cmd_add, 'world': cmd_world, 'know': cmd_know, 'unlearn': cmd_unlearn,
             'remember': cmd_remember, 'compress': cmd_compress, 'session': cmd_session, 'brief': cmd_brief,
             'view': cmd_view, 'check': cmd_check, 'migrate': cmd_migrate, 'reconcile': cmd_reconcile,
-            'state': cmd_state, 'tick': cmd_tick}
+            'state': cmd_state, 'tick': cmd_tick, 'believe': cmd_believe, 'claim': cmd_claim}
 
 
 def parser():
@@ -1311,7 +1602,21 @@ def parser():
     s = cmd('state')
     s.add_argument('--set', nargs='+', action='append', metavar='PATH=VALUE',
                    help='affect.<level>=N, affect.mood=..., body.<field>=..., body.marks.<id>=... and '
-                        'body.marks.<id>.seen_by=anyone|close|nobody|<cast ids>, desire.<field>=...')
+                        'body.marks.<id>.seen_by=anyone|close|nobody|<cast ids>, desire.<field>=..., '
+                        'people.<cast id|player>.trust|attraction|fear=N (0-5), .debt=N (-5 to 5), .last=..., '
+                        '.thinks_knows.<fact>=knows|doesnt|unsure')
+    s = cmd('believe')
+    s.add_argument('--text', help='the belief, as the character holds it')
+    s.add_argument('--truth', choices=TRUTH, help='whether it is so; for you, never printed in the brief')
+    s.add_argument('--confidence', choices=CONFIDENCE)
+    s.add_argument('--about', help='the game-master fact it concerns, if any')
+    s.add_argument('--retire', type=int, metavar='SEQ', help='a belief they no longer hold (with --text, replaces it)')
+    s = cmd('claim')
+    s.add_argument('--to', required=True, help=f'{PLAYER} or the cast id of who was told')
+    s.add_argument('--text', required=True, help='what they said, or for an omission what they kept back')
+    s.add_argument('--truth', required=True, choices=TRUTH)
+    s.add_argument('--kind', required=True, choices=CLAIM_KINDS)
+    s.add_argument('--about', help='the game-master fact it concerns; claims about the same fact are compared')
     s = cmd('tick')
     s.add_argument('--scene-end', action='store_true', help='a scene boundary: pain and intoxication ease too')
     s = cmd('brief', entry=False)

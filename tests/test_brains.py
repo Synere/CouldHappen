@@ -555,6 +555,164 @@ class BrainsTest(unittest.TestCase):
         self.assertEqual([(e['op'], 'oren' in e['why']) for e in out['set_aside']], [('state', True)])
         self.assertNotIn('scar', self.brief())
 
+    # ---- beliefs, claims and other minds (ISS-27) ----
+
+    def believe(self, text, truth='false', confidence='certain', *extra, npc='mara', expect=0):
+        return self.brains('believe', npc, '--text', text, '--truth', truth, '--confidence', confidence, *extra,
+                           '--entry', self.entry, expect=expect)
+
+    def claim(self, to, text, truth, kind, *extra, npc='mara', expect=0):
+        return self.brains('claim', npc, '--to', to, '--text', text, '--truth', truth, '--kind', kind, *extra,
+                           '--entry', self.entry, expect=expect)
+
+    def test_a_false_belief_appears_with_no_label(self):
+        self.cast()
+        self.gm([self.fact(1)])
+        self.brains('world', 'F1', '--visibility', 'secret', '--witnesses', 'juno')
+        self.believe('The clerk slipped on the wet steps.', 'false', 'certain', '--about', 'F1')
+        self.believe('Juno would never sell me out.', 'unknown', 'probable')
+        brief = self.brief()
+        self.assertEqual(self.block(brief, 'WHAT THEY BELIEVE'),
+                         ['- The clerk slipped on the wet steps.', '- Juno would never sell me out. (probably)'])
+        self.assertNotIn(text(1), brief)  # the fact it is about stays hidden
+        self.assertNotRegex(brief, r'\b(false|unknown|untrue)\b')
+        order = [brief.index(h) for h in ('WHAT THEY KNOW', 'WHAT THEY BELIEVE', '\n\nNOW\n')]
+        self.assertEqual(order, sorted(order))
+        view = (self.root / 'notes/brains/mara.md').read_text(encoding='utf-8')
+        self.assertRegex(view, r'- seq \d+ \[false, certain, about F1\] The clerk slipped')
+
+    def test_at_most_twelve_beliefs_and_retire_frees_a_place(self):
+        self.cast()
+        seqs = [self.believe(f'Belief number {n}.', 'unknown')['seq'] for n in range(12)]
+        log = (self.root / 'notes/brains/events.jsonl').read_bytes()
+        self.assertIn('12 beliefs already', self.believe('One too many.', expect=2)['error'])
+        self.assertEqual((self.root / 'notes/brains/events.jsonl').read_bytes(), log)
+        out = self.believe('A replacement.', 'true', 'doubts', '--retire', str(seqs[0]))
+        self.assertEqual(out['active'], 12)
+        self.assertEqual(self.brains('believe', 'mara', '--retire', str(seqs[1]), '--entry', self.entry)['active'], 11)
+        lines = self.block(self.brief(), 'WHAT THEY BELIEVE')
+        self.assertEqual(len(lines), 11)
+        self.assertNotIn('- Belief number 0.', lines)
+        self.assertEqual(lines[-1], '- A replacement. (you doubt this)')
+        self.assertIn('not an active belief', self.brains('believe', 'mara', '--retire', str(seqs[0]),
+                                                          '--entry', self.entry, expect=2)['error'])
+        self.assertIn('not a game-master fact', self.believe('x', 'true', 'certain', '--about', 'F99', expect=2)['error'])
+        self.assertIn('needs --entry', self.brains('believe', 'mara', '--text', 'x', '--truth', 'true',
+                                                   '--confidence', 'certain', expect=2)['error'])
+
+    def test_claims_print_six_people_present_first_never_the_truth(self):
+        self.cast()
+        self.gm([{'op': 'set', 'kind': 'npc', 'id': 'oren', 'fields': {'name': 'Oren Pike'}}])  # not present
+        self.claim('oren', 'Oren claim one.', 'true', 'truth')
+        self.claim('juno', 'Juno claim one.', 'false', 'lie')
+        for n in range(1, 5):
+            self.claim('oren', f'Oren claim {n + 1}.', 'unknown', 'boast')
+        self.claim('player', 'You will have the boat by Sunday.', 'false', 'promise')
+        self.claim('juno', 'that the boat leaks', 'true', 'omission')
+        lines = self.block(self.brief(), 'WHAT THEY HAVE TOLD PEOPLE')
+        self.assertEqual(lines, [
+            '- to Juno Ash, kept back: that the boat leaks',
+            '- to the player, a promise: You will have the boat by Sunday.',
+            '- to Juno Ash, a lie: Juno claim one.',
+            '- to Oren Pike, a boast: Oren claim 5.', '- to Oren Pike, a boast: Oren claim 4.',
+            '- to Oren Pike, a boast: Oren claim 3.'])
+        self.assertNotRegex('\n'.join(lines), r'\b(true|false|unknown)\b')
+        self.assertIn('is false by its kind', self.claim('juno', 'x', 'true', 'lie', expect=2)['error'])
+        self.assertIn('is true by its kind', self.claim('juno', 'x', 'false', 'truth', expect=2)['error'])
+        self.assertIn('not cast', self.claim('nobody', 'x', 'true', 'boast', expect=2)['error'])
+        self.assertIn('themself', self.claim('mara', 'x', 'true', 'boast', expect=2)['error'])
+
+    def test_check_warns_when_a_claim_contradicts_an_earlier_one_to_the_same_person(self):
+        self.cast()
+        self.gm([self.fact(1), self.fact(2)])
+        for n in (1, 2):
+            self.brains('world', f'F{n}', '--visibility', 'public')
+        first = self.claim('juno', 'I never touched the manifest.', 'false', 'lie', '--about', 'F1')
+        self.claim('player', 'I forged it.', 'true', 'truth', '--about', 'F1')  # another listener
+        self.claim('juno', 'The tide was early.', 'true', 'truth', '--about', 'F2')  # another fact
+        self.claim('juno', 'Maybe I signed it.', 'unknown', 'half-truth', '--about', 'F1')  # unknown never clashes
+        self.assertEqual(self.brains('check')['warnings'], [])
+        out = self.claim('juno', 'Fine, I forged it.', 'true', 'truth', '--about', 'F1', expect=1)
+        self.assertEqual(len(out['warnings']), 1)
+        self.assertIn(f'seq {first["seq"]} (lie, false) and seq {out["seq"]} (truth, true)', out['warnings'][0])
+        warns = self.brains('check', expect=1)['warnings']
+        self.assertEqual(warns, out['warnings'])
+        self.assertEqual(self.brief().encode(), self.brief().encode())  # same state, same bytes
+
+    def test_edges_print_in_words_for_three_people_two_propositions_each(self):
+        self.cast()
+        self.gm([{'op': 'set', 'kind': 'npc', 'id': 'oren', 'fields': {'name': 'Oren Pike'}},
+                 {'op': 'set', 'kind': 'npc', 'id': 'tess', 'fields': {'name': 'Tess'}}]
+                + [self.fact(n) for n in range(1, 6)])
+        for n in range(1, 6):
+            self.brains('world', f'F{n}', '--visibility', 'public')
+        self.state('people.oren.trust=1')
+        self.state('people.juno.trust=4', 'people.juno.attraction=2', 'people.juno.fear=0', 'people.juno.debt=-3',
+                   'people.juno.last=she covered for me at the weigh-house', 'people.juno.thinks_knows.F1=knows',
+                   'people.juno.thinks_knows.F2=unsure', 'people.juno.thinks_knows.F3=doesnt',
+                   'people.juno.thinks_knows.F4=knows')
+        self.state('people.tess.debt=2')
+        self.state('people.player.fear=1')
+        brief = self.brief()
+        self.assertEqual(self.block(brief, 'OTHER PEOPLE'), [
+            'the player', '  fear of them: a little',
+            'Juno Ash', '  trust: deeply; attraction: some; you owe them a lot',
+            '  last between you: she covered for me at the weigh-house',
+            f'  you think they do not know: {text(3)}', f'  you are not sure they know: {text(2)}',
+            'Tess', '  they owe you something'])  # present first, then the latest recorded; Oren is left out
+        self.assertNotRegex('\n'.join(self.block(brief, 'OTHER PEOPLE')), r'\d')
+        order = [brief.index(h) for h in ('WHAT THEY KNOW', 'OTHER PEOPLE', '\n\nNOW\n')]
+        self.assertEqual(order, sorted(order))
+        self.assertEqual(self.brief().encode(), brief.encode())  # same state, same bytes
+        self.assertIn('at most 4 facts', self.state('people.juno.thinks_knows.F5=knows', expect=2)['error'])
+        self.state('people.juno.thinks_knows.F1=', 'people.juno.thinks_knows.F5=knows')  # clear one, then a fifth fits
+        view = (self.root / 'notes/brains/mara.md').read_text(encoding='utf-8')
+        self.assertIn('- people.juno.debt: -3', view)
+        self.assertIn('- people.juno.thinks_knows.F3: doesnt', view)
+
+    def test_a_thinks_knows_about_a_fact_the_character_cannot_know_is_refused(self):
+        self.cast()
+        self.gm([self.fact(1), self.fact(2)])
+        self.brains('world', 'F1', '--visibility', 'secret', '--witnesses', 'juno')
+        self.brains('world', 'F2', '--visibility', 'witnessed', '--witnesses', 'mara')
+        log = (self.root / 'notes/brains/events.jsonl').read_bytes()
+        self.assertIn('does not know F1 exists', self.state('people.juno.thinks_knows.F1=knows', expect=2)['error'])
+        self.assertIn('not a game-master fact', self.state('people.juno.thinks_knows.F9=knows', expect=2)['error'])
+        bad = {'people.juno.thinks_knows.F2=maybe': 'one of knows, doesnt, unsure', 'people.juno.trust=6': 'from 0 to 5',
+               'people.juno.debt=-6': 'from -5 to 5', 'people.ghost.trust=1': 'is not cast',
+               'people.mara.trust=1': 'themself', 'people.juno=x': 'holds fields'}
+        for item, needle in bad.items():
+            self.assertIn(needle, self.state(item, expect=2)['error'], item)
+        self.assertEqual((self.root / 'notes/brains/events.jsonl').read_bytes(), log)
+        self.state('people.juno.thinks_knows.F2=doesnt')
+        self.assertIn(f'you think they do not know: {text(2)}', self.brief())
+        self.brains('unlearn', 'mara', 'F2', '--entry', self.entry, '--why', 'she was made to forget')
+        self.assertNotIn(text(2), self.brief())  # an unlearn takes the proposition out of the brief too
+        self.assertIn('no longer holds', self.brains('check', expect=1)['warnings'][0])
+
+    def test_reconcile_sets_aside_beliefs_claims_and_edges_with_their_entry(self):
+        self.cast()
+        undone = self.add_entry('Mara lies to Juno.')
+        self.entry, kept = undone, self.entry
+        held = self.believe('Juno trusts me.', 'false')
+        self.claim('juno', 'The ledger burned.', 'false', 'lie')
+        self.state('people.juno.trust=3')
+        self.entry = kept
+        self.brains('believe', 'mara', '--retire', str(held['seq']), '--entry', kept)  # rests on the undone belief
+        self.claim('player', 'I will get you out.', 'true', 'promise')
+        story = self.root / 'public/story.md'
+        story.write_text(story.read_text(encoding='utf-8').replace(files.entry('Mara lies to Juno.', id=undone), ''),
+                         encoding='utf-8', newline='\n')
+        out = self.brains('reconcile', '--apply')
+        self.assertEqual([e['op'] for e in out['set_aside']], ['believe', 'claim', 'state', 'believe'])
+        self.assertIn('which is set aside', out['set_aside'][-1]['why'])
+        brief = self.brief()
+        self.assertEqual(self.block(brief, 'WHAT THEY HAVE TOLD PEOPLE'),
+                         ['- to the player, a promise: I will get you out.'])
+        for gone in ('WHAT THEY BELIEVE', 'OTHER PEOPLE', 'ledger'):
+            self.assertNotIn(gone, brief)
+        self.assertEqual(self.brains('check')['ok'], True)
+
     def test_needs_game_master(self):
         (self.root / 'tools' / 'gm_state.py').unlink()
         self.assertIn('game-master is not installed', self.brains('init', expect=2)['error'])
@@ -573,7 +731,7 @@ class BrainsDocs(unittest.TestCase):
         self.assertIn('**`limits` is authoritative.**', protocol)
         self.assertIn('cut that output', protocol)
         for command in ('init', 'add', 'world', 'know', 'unlearn', 'remember', 'compress', 'session', 'brief',
-                        'view', 'check', 'migrate', 'reconcile', 'state', 'tick'):
+                        'view', 'check', 'migrate', 'reconcile', 'state', 'tick', 'believe', 'claim'):
             self.assertIn(f'brains.py {command}', protocol + (plus / 'APPLY.md').read_text(encoding='utf-8'), command)
 
 

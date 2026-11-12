@@ -24,6 +24,7 @@ The two cannot be installed together: both keep their files in `notes/brains/`. 
 - Characters who cannot know what they were never shown or told, because the brief is built from records, not memory.
 - Knowledge with a history: how each character learned a thing, how sure they are, and what they have forgotten.
 - Memories ranked by how much they matter, so the six a brain is given are the ones that count.
+- Beliefs that can be wrong, a record of every lie, promise and threat a character made and to whom (with a warning when they contradict themselves to the same person), and what each character makes of the others: trust, fear, debt, and who they think knows what.
 - A body and a mood that carry between scenes: pain, fear, fatigue and drink that ease with time, marks and clothes, and, where the story wants it, desire with limits the writer never crosses.
 
 ## How it fits game-master
