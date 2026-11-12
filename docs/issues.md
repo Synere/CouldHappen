@@ -41,7 +41,6 @@ Work order from 2026-11-11. The author's ranking: one `N. ISS-n — why` line pe
 | ISS-21 | Lossless `card.md` (envelope, lorebook names, falsy fields); `portrait` guidance for a JSON-card import | helpers | — | [public release](plans/public-release.md#iss-21--lossless-card-copy-and-portrait-guidance) |
 | ISS-22 | Vite denies `START_HERE.md`; portrait button names a lost connection; contract says how the reader settles uncertain saves | web | — | [public release](plans/public-release.md#iss-22--reader-boundary-and-save-wording) |
 | ISS-23 | Design names `voice.md` and `what-this-can-do.md` and keeps one creative-practice file; link-check wording | docs | — | [public release](plans/public-release.md#iss-23--design-text-catches-up) |
-| ISS-28 | character-brains-plus: the `BODY`, `UNSURE` and `REMEMBERS` answer keys, wants, intents, vetoes, the off-screen call | packages | ISS-24 | [character-brains-plus](plans/character-brains-plus.md#iss-28--agency-and-life-off-screen) |
 | ISS-29 | character-brains-plus: `review` for card drift, with a proposal for game-master | packages | ISS-24, ISS-28 | [character-brains-plus](plans/character-brains-plus.md#iss-29--drift-review) |
 | ISS-30 | Both brain packages: no desire for a character under 18 or with no age (for opencode) | packages | ISS-26 | [character-brains-plus](plans/character-brains-plus.md#iss-30--age-gate-on-desire) |
 
@@ -79,6 +78,7 @@ Work order from 2026-11-11. The author's ranking: one `N. ISS-n — why` line pe
 
 | ID | Item | Closed | Resolution |
 | --- | --- | --- | --- |
+| ISS-28 | character-brains-plus: the `BODY`, `UNSURE` and `REMEMBERS` answer keys, wants, intents, vetoes, the off-screen call | 2026-11-13 | the ten-key answer block, `brains.py want` (three, top two in the brief), `intent` (three, by horizon, `--done`/`--drop`), `veto`, a `routine` state group, and `brief --offscreen` with `offscreen` and `settings` (off by default, one call per boundary) shipped with tests; not yet observed in a story |
 | ISS-26 | character-brains-plus: body, mood and desire state, `tick` decay, words not numbers in the brief | 2026-11-13 | `brains.py state` (affect, body with marks, desire) and `tick [--scene-end]`, a baseline at `add`, the brief's HOW THEY ARE and DESIRE sections in words, and the protocol's authoritative `limits` shipped with tests; not yet observed in a story |
 | ISS-27 | character-brains-plus: beliefs, claims with a contradiction warning, what each thinks others know | 2026-11-13 | `brains.py believe` (truth label never in the brief, at most 12, `--retire`), `claim --to` with `check` warning on a true/false pair about the same fact to the same person, and `people.*` edges in `state` (`thinks_knows` only for facts the character holds) shipped with tests; not yet observed in a story |
 | ISS-25 | character-brains-plus: migrate method-only brain files into the log; `reconcile` after a Director Undo | 2026-11-13 | `brains.py migrate` and `reconcile [--apply]`, the protocol's two-step Undo and APPLY's offer to migrate shipped with tests; not yet observed in a story |

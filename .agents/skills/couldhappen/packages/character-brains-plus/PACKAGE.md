@@ -26,6 +26,7 @@ The two cannot be installed together: both keep their files in `notes/brains/`. 
 - Memories ranked by how much they matter, so the six a brain is given are the ones that count.
 - Beliefs that can be wrong, a record of every lie, promise and threat a character made and to whom (with a warning when they contradict themselves to the same person), and what each character makes of the others: trust, fear, debt, and who they think knows what.
 - A body and a mood that carry between scenes: pain, fear, fatigue and drink that ease with time, marks and clothes, and, where the story wants it, desire with limits the writer never crosses.
+- Characters with aims of their own: standing wants, intentions they carry from scene to scene, and decisions to leave or refuse that the writer honours or records why not. If the Director wants it, one character a scene boundary also lives a little off-screen, and the player finds only the traces.
 
 ## How it fits game-master
 
@@ -37,7 +38,7 @@ It needs [game-master](../game-master/PACKAGE.md) with layers 1 to 4 on and read
 
 ## Fidelity
 
-As with the method-only package, the Director chooses how many characters keep a persistent brain and how many brain calls a turn may make. The defaults are three and two.
+As with the method-only package, the Director chooses how many characters keep a persistent brain and how many brain calls a turn may make. The defaults are three and two. Off-screen calls, one per scene boundary outside that budget, are off unless the Director turns them on.
 
 ## What it changes
 

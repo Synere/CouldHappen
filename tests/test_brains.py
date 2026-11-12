@@ -162,7 +162,7 @@ class BrainsTest(unittest.TestCase):
         self.assertIn('look: tall, salt-grey hair, a burn on one wrist', first)
         self.assertIn('NOW\nday 2, dusk, the harbour\nJuno sets a wet lantern on the bollard.', first)
         self.assertTrue(first.rstrip().endswith('DECIDES: a lasting intention they form now (to leave, to refuse, '
-                                                'to do something later), or (none)'))
+                                                'to do something later), or (nothing)'))
         wrapped = self.brains('brief', 'mara', '--scene', str(self.scene))
         self.assertEqual(wrapped['brief'], first)
 
@@ -713,6 +713,203 @@ class BrainsTest(unittest.TestCase):
             self.assertNotIn(gone, brief)
         self.assertEqual(self.brains('check')['ok'], True)
 
+    # ---- agency and life off-screen (ISS-28) ----
+
+    def want(self, text, weight, *extra, npc='mara', expect=0):
+        return self.brains('want', npc, '--text', text, '--weight', str(weight), *extra, '--entry', self.entry,
+                           expect=expect)
+
+    def intent(self, text, horizon, *extra, npc='mara', expect=0):
+        return self.brains('intent', npc, '--text', text, '--horizon', horizon, *extra, '--entry', self.entry,
+                           expect=expect)
+
+    def next_scene(self, name):
+        self.gm([{'op': 'set', 'kind': 'situation', 'fields': {'scene': name}}])
+
+    def test_answer_block_has_body_unsure_remembers_and_decides_all_accepting_nothing(self):
+        self.cast()
+        answer = self.block(self.brief().rstrip(), 'ANSWER')
+        self.assertEqual([ln.split(':')[0] for ln in answer],
+                         ['NOTICES', 'WANTS', 'HIDES', 'SAYS', 'DOES', 'TELL', 'BODY', 'UNSURE', 'REMEMBERS', 'DECIDES'])
+        for line in answer[6:]:
+            self.assertTrue(line.endswith('or (nothing)'), line)
+
+    def test_at_most_three_wants_the_brief_prints_the_top_two_and_retire_frees_a_place(self):
+        self.cast()
+        light = self.want('A dry bed tonight.', 1)['seq']
+        self.want('To clear the debt before the tide office calls it.', 5, '--conflict', 'the debt is owed to Juno')
+        self.want('To keep Juno close.', 3)
+        log = (self.root / 'notes/brains/events.jsonl').read_bytes()
+        self.assertIn('3 standing wants already', self.want('One too many.', 2, expect=2)['error'])
+        self.assertEqual((self.root / 'notes/brains/events.jsonl').read_bytes(), log)
+        brief = self.brief()
+        self.assertEqual(self.block(brief, 'WHAT THEY WANT'), [
+            '- To clear the debt before the tide office calls it. (but: the debt is owed to Juno)',
+            '- To keep Juno close.'])  # heaviest first; the third is left out and no weight is printed
+        order = [brief.index(h) for h in ('WHAT THEY KNOW', 'WHAT THEY WANT', 'WHAT THEY MEAN TO DO', '\n\nNOW\n')
+                 if h in brief]
+        self.assertEqual(order, sorted(order))
+        self.assertEqual(self.brief().encode(), brief.encode())
+        self.assertEqual(self.brains('want', 'mara', '--retire', str(light), '--entry', self.entry)['active'], 2)
+        self.want('To see the boat finished.', 5)  # equal weight: the newest first
+        self.assertEqual(self.block(self.brief(), 'WHAT THEY WANT')[0], '- To see the boat finished.')
+        self.assertIn('not a standing want', self.brains('want', 'mara', '--retire', str(light), '--entry', self.entry,
+                                                         expect=2)['error'])
+        self.assertIn('--weight is 1', self.want('x', 9, expect=2)['error'])
+        view = (self.root / 'notes/brains/mara.md').read_text(encoding='utf-8')
+        self.assertRegex(view, r'- seq \d+ \[weight 5, scene 0\] To clear the debt .* \(conflict: the debt is owed')
+
+    def test_at_most_three_intents_by_horizon_and_done_or_drop_closes_one(self):
+        self.cast()
+        long_ = self.intent('Leave the harbour for good.', 'long')['seq']
+        now = self.intent('Get the lantern off the bollard.', 'now')['seq']
+        self.intent('Find out who Juno reports to.', 'day')
+        self.assertIn('3 active intents already', self.intent('One too many.', 'scene', expect=2)['error'])
+        self.assertEqual(self.block(self.brief(), 'WHAT THEY MEAN TO DO'), [
+            '- Get the lantern off the bollard. (right now)', '- Find out who Juno reports to. (within a day or so)',
+            '- Leave the harbour for good. (in the long run)'])
+        self.next_scene('the weigh-house')
+        out = self.brains('intent', 'mara', '--done', str(now), '--entry', self.entry)
+        self.assertEqual(out['active'], 2)
+        self.intent('Lie to the weigh-house clerk.', 'scene', '--drop', str(long_))  # close one and add one at once
+        lines = self.block(self.brief(), 'WHAT THEY MEAN TO DO')
+        self.assertEqual(lines, ['- Lie to the weigh-house clerk. (before this scene is over)',
+                                 '- Find out who Juno reports to. (within a day or so)'])
+        self.assertIn('not an active intent', self.brains('intent', 'mara', '--done', str(now), '--entry', self.entry,
+                                                          expect=2)['error'])
+        self.assertIn('not both', self.brains('intent', 'mara', '--done', '1', '--drop', '2', '--entry', self.entry,
+                                              expect=2)['error'])
+        view = (self.root / 'notes/brains/mara.md').read_text(encoding='utf-8')
+        self.assertIn(f'- seq {now} [done at seq {out["seq"]}, scene 1] Get the lantern off the bollard.', view)
+        self.assertRegex(view, rf'- seq {long_} \[dropped at seq \d+, scene 1\] Leave the harbour')
+        events = [json.loads(ln) for ln in (self.root / 'notes/brains/events.jsonl').read_text().splitlines()]
+        self.assertEqual({e['data']['scene'] for e in events if e['op'] == 'intent'}, {0, 1})  # for drift review
+
+    def test_veto_records_the_kind_reason_and_scene_and_can_close_an_intent(self):
+        self.cast()
+        held = self.intent('Walk out before Juno speaks.', 'now')['seq']
+        self.next_scene('the pier')
+        out = self.brains('veto', 'mara', '--kind', 'leave', '--reason', 'the tide office has the door barred',
+                          '--decides', 'I walk out', '--intent', str(held), '--entry', self.entry)
+        self.assertEqual(out['vetoes'], 1)
+        self.brains('veto', 'mara', '--kind', 'refuse', '--reason', 'the player already paid her', '--entry', self.entry)
+        self.assertNotIn('WHAT THEY MEAN TO DO', self.brief())
+        self.assertNotIn('barred', self.brief())  # a veto is the writer's record, not the character's
+        view = (self.root / 'notes/brains/mara.md').read_text(encoding='utf-8')
+        self.assertIn(f'- seq {out["seq"]} [leave, scene 1] the tide office has the door barred (decided: I walk out)',
+                      view)
+        self.assertIn(f'- seq {held} [vetoed at seq {out["seq"]}, scene 1] Walk out before Juno speaks.', view)
+        ev = json.loads((self.root / 'notes/brains/events.jsonl').read_text().splitlines()[-1])
+        self.assertEqual((ev['op'], ev['data']['kind'], ev['data']['scene']), ('veto', 'refuse', 1))
+        self.assertIn('needs --entry', self.brains('veto', 'mara', '--kind', 'leave', '--reason', 'x', expect=2)['error'])
+        self.assertIn('--reason is required', self.brains('veto', 'mara', '--kind', 'leave', '--reason', ' ',
+                                                          '--entry', self.entry, expect=2)['error'])
+        self.assertIn('not an active intent', self.brains('veto', 'mara', '--kind', 'later', '--reason', 'x',
+                                                          '--intent', str(held), '--entry', self.entry,
+                                                          expect=2)['error'])
+
+    def test_routine_is_a_state_field_only_the_offscreen_brief_prints(self):
+        self.cast()
+        self.state('routine.mornings=opens the chandlery', 'routine.nights=drinks alone at the Gull')
+        self.assertIn('at most 6 routine slots', self.state(*[f'routine.r{n}=x' for n in range(7)], expect=2)['error'])
+        self.assertNotIn('chandlery', self.brief())
+        self.brains('settings', '--offscreen', 'on')
+        brief = self.brains('brief', 'mara', '--offscreen', '--text')
+        self.assertEqual(self.block(brief, 'THEIR DAYS'),
+                         ['- mornings: opens the chandlery', '- nights: drinks alone at the Gull'])
+        self.state('routine.nights=')
+        self.assertEqual(self.block(self.brains('brief', 'mara', '--offscreen', '--text'), 'THEIR DAYS'),
+                         ['- mornings: opens the chandlery'])
+        view = (self.root / 'notes/brains/mara.md').read_text(encoding='utf-8')
+        self.assertIn('- routine.mornings: opens the chandlery', view)
+
+    def test_offscreen_call_is_off_by_default_and_one_per_boundary(self):
+        self.cast()
+        self.claim('player', 'You will have the boat by Sunday.', 'false', 'promise')
+        self.claim('juno', 'The ledger burned.', 'false', 'lie')
+        self.want('To clear the debt.', 4)
+        self.intent('Visit the tide office at dawn.', 'day')
+        self.assertIn('off-screen calls are off', self.brains('brief', 'mara', '--offscreen', '--text',
+                                                              expect=2)['error'])
+        self.assertIn('off-screen calls are off', self.brains('offscreen', 'mara', '--does', 'x', '--entry',
+                                                              self.entry, expect=2)['error'])
+        self.assertIn('give --scene', self.brains('brief', 'mara', '--text', expect=2)['error'])
+        self.assertEqual(self.brains('settings', '--offscreen', 'on')['settings'], {'offscreen': True})
+        brief = self.brains('brief', 'mara', '--offscreen', '--text')
+        self.assertEqual(brief.encode(), self.brains('brief', 'mara', '--offscreen', '--text').encode())
+        self.assertIn('You are the mind of Mara Venn, 34, between scenes, away from the player.', brief)
+        self.assertNotIn('the harbour', brief)  # the player's scene is not where Mara is
+        self.assertEqual(self.block(brief, 'NOW'), [
+            'day 2, dusk', 'The story is elsewhere. Nobody is watching you; what you do now happens off the page.'])
+        self.assertEqual(self.block(brief.rstrip(), 'ANSWER'), [
+            'DOES: what they do with the time, in one or two plain lines',
+            'LEAVES: the sign of it someone could find later (a note, a smell, a missing thing, a rumour), or (nothing)',
+            'DECIDES: a lasting intention they form (to leave, to refuse, to do something later), or (nothing)',
+            'CHANGES: how they are different after it (mood, body, what they want), or (nothing)'])
+        self.assertIn('- Visit the tide office at dawn.', '\n'.join(self.block(brief, 'WHAT THEY MEAN TO DO')))
+        self.assertEqual(self.block(brief, 'WHAT THEY HAVE TOLD PEOPLE')[0],
+                         '- to Juno Ash, a lie: The ledger burned.')  # nobody present off-screen: newest first
+        self.scene.write_text('Two days pass in the rain.\n', encoding='utf-8')
+        with_scene = self.brains('brief', 'mara', '--offscreen', '--scene', str(self.scene), '--text')
+        self.assertTrue(self.block(with_scene, 'NOW')[-1] == 'Two days pass in the rain.')
+        out = self.brains('offscreen', 'mara', '--does', 'I sold the spare sail to a stranger.', '--entry', self.entry)
+        self.assertEqual(out['scene'], 0)
+        self.assertIn('- I sold the spare sail to a stranger.', self.block(self.brief(), 'WHAT THEY REMEMBER'))
+        for args in (('brief', 'juno', '--offscreen', '--text'),
+                     ('offscreen', 'juno', '--does', 'x', '--entry', self.entry)):
+            self.assertIn('mara already had the off-screen call', self.brains(*args, expect=2)['error'])
+        self.next_scene('the pier')
+        self.brains('offscreen', 'juno', '--does', 'I followed Mara to the pier.', '--entry', self.entry)
+        self.assertIn('- scenes 0', (self.root / 'notes/brains/mara.md').read_text(encoding='utf-8'))
+        self.brains('settings', '--offscreen', 'off')
+        self.assertIn('off-screen calls are off', self.brains('brief', 'mara', '--offscreen', '--text',
+                                                              expect=2)['error'])
+        self.assertEqual(self.brains('check')['ok'], True)
+
+    def test_reconcile_follows_wants_intents_vetoes_and_offscreen_calls(self):
+        self.cast()
+        self.brains('settings', '--offscreen', 'on')
+        kept_want = self.want('To clear the debt.', 4)['seq']
+        undone = self.add_entry('Mara turns on Juno.')
+        self.entry, kept = undone, self.entry
+        gone_want = self.want('To ruin Juno.', 5)['seq']
+        gone_intent = self.intent('Burn the ledger tonight.', 'day')['seq']
+        self.brains('offscreen', 'mara', '--does', 'I bought lamp oil.', '--entry', undone)
+        self.entry = kept
+        self.brains('want', 'mara', '--retire', str(gone_want), '--entry', kept)    # rests on the undone want
+        self.brains('veto', 'mara', '--kind', 'later', '--reason', 'the ledger is needed', '--intent', str(gone_intent),
+                    '--entry', kept)                                                # closes the undone intent
+        self.intent('Ask the clerk about the manifest.', 'scene')
+        story = self.root / 'public/story.md'
+        story.write_text(story.read_text(encoding='utf-8').replace(files.entry('Mara turns on Juno.', id=undone), ''),
+                         encoding='utf-8', newline='\n')
+        self.assertIn('Undo?', self.brief(expect=2)['error'])
+        out = self.brains('reconcile', '--apply')
+        self.assertEqual([e['op'] for e in out['set_aside']], ['want', 'intent', 'offscreen', 'want', 'veto'])
+        brief = self.brief()
+        self.assertEqual(self.block(brief, 'WHAT THEY WANT'), ['- To clear the debt.'])
+        self.assertEqual(self.block(brief, 'WHAT THEY MEAN TO DO'),
+                         ['- Ask the clerk about the manifest. (before this scene is over)'])
+        self.assertNotIn('lamp oil', brief)
+        self.brains('brief', 'juno', '--offscreen', '--text')  # the set-aside call no longer holds the boundary
+        self.assertIn(f'seq {kept_want}', (self.root / 'notes/brains/mara.md').read_text(encoding='utf-8'))
+        self.assertEqual(self.brains('settings')['settings'], {'offscreen': True})  # setup, never set aside
+        self.assertEqual(self.brains('check')['ok'], True)
+
+    def test_reconcile_sets_aside_a_want_that_would_pass_the_cap(self):
+        self.cast()
+        first = [self.want(f'Want {n}.', 2)['seq'] for n in range(3)][0]
+        undone = self.add_entry('Mara gives up on the boat.')
+        self.brains('want', 'mara', '--retire', str(first), '--entry', undone)
+        self.want('A fourth want, once the first was gone.', 4)
+        story = self.root / 'public/story.md'
+        story.write_text(story.read_text(encoding='utf-8').replace(
+            files.entry('Mara gives up on the boat.', id=undone), ''), encoding='utf-8', newline='\n')
+        out = self.brains('reconcile', '--apply')
+        self.assertEqual([e['op'] for e in out['set_aside']], ['want', 'want'])
+        self.assertIn('more than 3 standing wants', out['set_aside'][1]['why'])
+        self.assertEqual(self.brains('check')['ok'], True)
+
     def test_needs_game_master(self):
         (self.root / 'tools' / 'gm_state.py').unlink()
         self.assertIn('game-master is not installed', self.brains('init', expect=2)['error'])
@@ -728,10 +925,15 @@ class BrainsDocs(unittest.TestCase):
         protocol = (plus / 'files/PROTOCOL.md').read_text(encoding='utf-8')
         self.assertIn('knows too much', protocol)
         self.assertIn('DECIDES', protocol)
+        for key in ('BODY', 'UNSURE', 'REMEMBERS', 'LEAVES', 'CHANGES'):
+            self.assertIn(f'{key}: ', protocol, key)
+        self.assertIn('Never narrate the off-screen scene.', protocol)
+        self.assertIn('Off-screen calls?', (plus / 'APPLY.md').read_text(encoding='utf-8'))
         self.assertIn('**`limits` is authoritative.**', protocol)
         self.assertIn('cut that output', protocol)
         for command in ('init', 'add', 'world', 'know', 'unlearn', 'remember', 'compress', 'session', 'brief',
-                        'view', 'check', 'migrate', 'reconcile', 'state', 'tick', 'believe', 'claim'):
+                        'view', 'check', 'migrate', 'reconcile', 'state', 'tick', 'believe', 'claim', 'want',
+                        'intent', 'veto', 'offscreen', 'settings'):
             self.assertIn(f'brains.py {command}', protocol + (plus / 'APPLY.md').read_text(encoding='utf-8'), command)
 
 

@@ -15,6 +15,7 @@ Then ask the **fidelity** questions, two at a time, with the defaults as suggest
 
 1. **How many characters keep a persistent brain** at once? Default 3.
 2. **How many brain calls may a turn make?** Default 2, at most 4. Characters past the budget are played by you, from their views.
+3. **Off-screen calls?** Default off. When on, at each scene boundary one character away from the player gets one extra brain call (outside the budget) to say what they did meanwhile; the player sees only the trace it leaves, never the scene. It costs one call per boundary.
 
 If the Director says "you decide", propose numbers for this story's cast and wait for a yes. Do not install anything until they answer.
 
@@ -30,7 +31,7 @@ If the Director says "you decide", propose numbers for this story's cast and wai
 
 1. Copy [files/brains.py](files/brains.py) to `tools/brains.py`, beside `tools/gm_state.py`, and run `python tools/brains.py init`, unless you are moving method-only brains (next step).
 2. **Only when moving method-only brains** (prerequisite 1), run `python tools/brains.py migrate` in place of `init`. It copies each file to `notes/brains/legacy/`, then records the character, their session and tier, and every memory line (each digest as one summary) against the last story entry (`--entry E` for another), and replaces the file with its generated view. It makes a `know` only from a `## Knows` line that names a fact id, and never guesses one: read its warnings, and for each fact a character holds that the old file did not name by id, record `know` in step 6. A `## Desire` line or a `## Sheet` stays in the legacy copy only; record a desire line yourself with `python tools/brains.py state <npc> --set desire.limits=... desire.wants=... --entry E`, limits first. The next two steps replace the old protocol and template.
-3. Copy [files/PROTOCOL.md](files/PROTOCOL.md) to `notes/brains/PROTOCOL.md`. Fill its "Fidelity" section with the Director's answers and the date, and note whether sessions can be resumed.
+3. Copy [files/PROTOCOL.md](files/PROTOCOL.md) to `notes/brains/PROTOCOL.md`. Fill its "Fidelity" section with the Director's answers and the date, and note whether sessions can be resumed. If the Director wants off-screen calls, run `python tools/brains.py settings --offscreen on`; they stay off otherwise.
 4. Copy [files/scene-template.md](files/scene-template.md) to `notes/brains/SCENE.md` and [files/brain-template.md](files/brain-template.md) to `notes/brains/TEMPLATE.md`. Neither is a character.
 5. **Classify the facts game-master already holds.** Run `python tools/brains.py world --audit`, and for each fact it lists run `python tools/brains.py world <fact> --visibility public|witnessed|private|secret [--witnesses <npc> ...]`. Ask of each: who in the fiction could know this? When in doubt, choose the narrower class; a brain can learn a fact later, but cannot unsee it.
 6. **Add the characters who already qualify** under the protocol's "Who gets a brain". Each needs a layer 3 cast card first. Then `python tools/brains.py add <npc> --look "..." [--age N] [--alias ...] [--threads T1 ...] [--baseline valence=N energy=N ...]`, a `know` for each hidden truth they have learned (with the entry where they learned it), and a first `remember` from the story so far.
@@ -50,7 +51,7 @@ Tell the Director in plain language what now happens each turn, who has a brain 
 
 ## Changing fidelity later
 
-When the Director asks, update the "Fidelity" section of `notes/brains/PROTOCOL.md` and the line in `notes/packages.md`. Lowering the number of persistent brains retires the sessions with the least at stake (`python tools/brains.py session <npc> --end --tier ephemeral`); their logs stay.
+When the Director asks, update the "Fidelity" section of `notes/brains/PROTOCOL.md` and the line in `notes/packages.md`. Off-screen calls go on or off with `python tools/brains.py settings --offscreen on|off`. Lowering the number of persistent brains retires the sessions with the least at stake (`python tools/brains.py session <npc> --end --tier ephemeral`); their logs stay.
 
 ## What this package does not do
 

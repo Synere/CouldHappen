@@ -19,6 +19,7 @@ Set by the Director when the package was applied. Change it only when they ask.
 - Persistent brains at once: 3 (default)
 - Brain calls per turn: 2 (default, at most 4)
 - Sessions can be resumed: yes | no (if no, every brain is ephemeral)
+- Off-screen calls at scene boundaries: off (default) | on (`python tools/brains.py settings --offscreen on`)
 - Set on: <date>, from Director entry <id>
 
 ## Who gets a brain
@@ -54,13 +55,14 @@ Skip the brain entirely when the beat is mechanical (a door opens, a bus arrives
 ## Each turn
 
 1. **Before the call.** Write the scene to `notes/brains/scene.txt` from `notes/brains/SCENE.md`: only what this character perceives. Then `python tools/brains.py brief <npc> --scene notes/brains/scene.txt --text` and give the output to the brain as it is. The script refuses a scene with a game-master fact line (`FACT ...`) or an entry id, and a brief that would carry an id or a file path; reword, never work around it.
-2. **The answer.** Use the block as described below. `DECIDES` and anything the character will not forget become a `remember` once the entry exists.
+2. **The answer.** Use the block as described below. Once the entry exists: `REMEMBERS` becomes a `remember`; a `DECIDES` you honour becomes an `intent` (or a `remember` if it is done in the same beat), and one you cannot honour becomes a `veto`; `BODY` becomes a `state` change if it lasts; `UNSURE` may become a `believe` with `--confidence doubts`, or nothing.
 3. **End of the turn, after game-master's `commit`.** For every fact the turn added, classify it: `python tools/brains.py world <fact> --visibility public|witnessed|private|secret --witnesses <npc> ... --entry <entry>`. A fact with no class is hidden from every brain, and `check` fails until it has one. `world --audit` lists the ones you missed.
 4. **What characters learned.** For each character who learned something not covered by its visibility (told, overheard, read, guessed), `python tools/brains.py know <npc> <fact> --how "I ..." --confidence certain|probable|suspects|doubts --entry <entry>`. Write `--how` in their words, first person. If they forget, are fooled out of it, or the fact was never theirs, `unlearn` it.
 5. **What they keep.** `python tools/brains.py remember <npc> --text "..." --salience 1-5 --entry <entry>` for what changed for them. 5 is unforgettable; 1 is passing.
 6. **How they are.** If the turn hurt, frightened, tired, dressed, marked or moved a character, record it with `python tools/brains.py state <npc> --set ... --entry <entry>` (see "Body, mood and desire"). When time has passed, `python tools/brains.py tick <npc> --entry <entry>`; at the end of a scene, `tick <npc> --scene-end`.
 7. **What they believe and what they said.** If a character came to believe something, true or not, record it with `believe`; if they told someone something that matters later (a lie, a promise, a threat, what they kept back), record it with `claim`; if the turn changed how they stand with someone, record it in `state` under `people` (see "Beliefs, claims and other people").
-8. Run `python tools/brains.py check`. Fix every error before the next turn, and read every warning: a contradiction warning means a character told someone two opposite things.
+8. **What they want and mean to do.** Keep `want` and `intent` current (see "Wants, intents and vetoes"): close an intent the turn carried out or let go.
+9. Run `python tools/brains.py check`. Fix every error before the next turn, and read every warning: a contradiction warning means a character told someone two opposite things.
 
 ## Body, mood and desire
 
@@ -82,6 +84,35 @@ What a character *knows* is a game-master fact, true by construction. What they 
 - **Claims.** `python tools/brains.py claim <npc> --to player|<npc> --text "..." --truth true|false|unknown --kind lie|truth|half-truth|promise|threat|boast|omission [--about <fact>] --entry <entry>`. Record a claim when a character says something they will have to live with: a lie, a promise or threat they may be held to, a boast, or (`omission`) what they kept back, written as what was left out. A `lie` is `false` and a `truth` is `true` by their kind. The brief gives the last six claims, those to people present first, with their kind, so a brain remembers what it told whom. The player always counts as present.
 - **Contradictions.** Give `--about` whenever a claim concerns a game-master fact. Two claims to the same person about the same fact, one `true` and one `false`, are a contradiction: `claim` and `check` both warn. It is a story beat, not an error: that person may notice. Claims with no `--about`, or labelled `unknown`, are never compared; the script does not read their texts.
 - **Other people.** `state <npc> --set people.<cast id or player>.<field>=...` records how a character stands with each person: `trust`, `attraction`, `fear` from 0 to 5; `debt` from -5 (they owe that person everything) to 5 (that person owes them everything); `last`, the last thing that passed between them; and `thinks_knows.<fact>=knows|doesnt|unsure`, what they think that person knows, at most four facts each. A `thinks_knows` is refused for a fact the character does not hold: they cannot wonder who knows what they do not know exists. The brief gives at most three people (those present first, then the most recently recorded), levels in words, and two of the facts (what they think the other does not know first, then what they are unsure of). `--set people.juno=` clears a person.
+
+## Wants, intents and vetoes
+
+A character with no aims only reacts. These records give a brain something to pursue, and keep the writer honest when the story overrides it.
+
+- **Wants** are standing: what the character's life is pulling toward, beyond this scene. `python tools/brains.py want <npc> --text "..." --weight 1-5 [--conflict "..."] --entry <entry>`. The weight (1 passing, 5 what their life turns on) ranks them and is never printed; `--conflict` is what pulls against it, and the brief gives it beside the want. A character holds at most three wants and the brief gives the top two, heaviest first. When a want is met, given up or turned, `want <npc> --retire <seq> --entry <entry>`; with `--text`, the new want replaces it in one event. A want that contradicts the card is a story beat; when it lasts, update the card through game-master.
+- **Intents** are what they mean to do, each with a horizon: `now` (this beat), `scene` (before it ends), `day`, or `long`. `python tools/brains.py intent <npc> --text "..." --horizon now|scene|day|long --entry <entry>`. At most three are active; the brief gives them all, nearest horizon first. Close one with `intent <npc> --done <seq>` when it is carried out, or `--drop <seq>` when they let it go (with `--entry`); give `--text` too to close one and add another in one event.
+- **Vetoes.** `DECIDES` may name leaving, refusing, or a later act. Honour it: let them leave, refuse, or carry it as an intent. When the story truly cannot (the door is barred, the act would break canon or a limit, the player already made it moot), record why: `python tools/brains.py veto <npc> --kind leave|refuse|later|other --reason "..." [--decides "..."] [--intent <seq>] --entry <entry>`. `--intent` closes the intent it overrides. A veto is your record, not the character's: the brief never shows it, so if the character felt the refusal, `remember` that too. A character whose decisions are often vetoed is a puppet; drift review counts them.
+
+Every `want`, `intent`, `veto` and `offscreen` event records game-master's scene count, so a later review can tell how long an intent has stood and how many vetoes fell in ten scenes.
+
+## Off-screen calls
+
+Off by default. The Director is asked at apply, and only then are they on (`settings --offscreen on`; `settings --offscreen off` turns them off again).
+
+At a scene boundary, after the scene's bookkeeping, you may make **one** off-screen call, for the one character whose life away from the player matters most now (an open intent, a pressure they belong to, a long absence). It is outside the turn's call budget, and the script refuses a second call at the same boundary (game-master's scene count).
+
+1. Record where their time goes when the story is elsewhere: `state <npc> --set routine.<slot>="..."` (`routine.mornings="opens the chandlery"`), at most six slots. Only the off-screen brief carries it.
+2. `python tools/brains.py brief <npc> --offscreen --text`, optionally with `--scene notes/brains/scene.txt` saying how much time passes and anything they would plainly know of it. The brief places them away from the player, counts nobody as present, adds their routine, and asks for four keys:
+
+```
+DOES: what they do with the time, in one or two plain lines
+LEAVES: the sign of it someone could find later, or (nothing)
+DECIDES: a lasting intention they form, or (nothing)
+CHANGES: how they are different after it, or (nothing)
+```
+
+3. **Never narrate the off-screen scene.** The player sees only what it leaves. `LEAVES` goes to game-master as evidence in your next delta: a fact (with `"known": false` until it is found; classify it with `world`), or the `evidence` of a pressure's `offscreen` advance. Check it against canon first, as with any brain output.
+4. Record the rest against the boundary's entry: `python tools/brains.py offscreen <npc> --does "..." --entry <entry>` keeps `DOES` as one of their memories (salience 2 unless `--salience`) and marks the boundary as used; `DECIDES` becomes an `intent` (or a `veto`); `CHANGES` becomes `state` or `want` changes.
 
 ## Visibility
 
@@ -105,8 +136,11 @@ Only perception. Never the story log, never another character's view or card, ne
 - desire: the desire fields that are set, limits among them, marked as never crossed;
 - other people: at most three, with trust, attraction, fear and debt in words, the last thing between them, and two facts they think that person does or does not know;
 - what they have told people: the last six claims, to people present first, with their kind;
-- now: day, time, place, and your scene file;
-- the answer block.
+- what they want: the top two standing wants, each with what pulls against it;
+- what they mean to do: the active intents, nearest horizon first;
+- their days: the routine, in the off-screen brief only;
+- now: day, time, place, and your scene file (off-screen: no place, and a line saying nobody is watching);
+- the answer block (off-screen: `DOES`, `LEAVES`, `DECIDES`, `CHANGES`).
 
 ## Voice in the scene file
 
@@ -118,7 +152,7 @@ A brain sees the beat, not the room, so left alone it writes finished, quotable 
 
 ## The block (what comes back)
 
-Strict seven-key format, plain text, no prose around it. Anything outside the keys is discarded.
+Strict ten-key format, plain text, no prose around it. Anything outside the keys is discarded. The off-screen call has its own four keys (see "Off-screen calls").
 
 ```
 NOTICES: the one thing they notice first
@@ -127,10 +161,14 @@ HIDES: what they will not show
 SAYS: one to three short lines, in their voice, or (nothing)
 DOES: one physical action
 TELL: one involuntary detail a careful observer would catch
-DECIDES: a lasting intention they form now (to leave, to refuse, to do something later), or (none)
+BODY: what their body feels or does that they notice, or (nothing)
+UNSURE: what they do not know here and would want to, or (nothing)
+REMEMBERS: one thing from this moment they will keep, in their own words, or (nothing)
+DECIDES: a lasting intention they form now (to leave, to refuse, to do something later), or (nothing)
 ```
 
-- `DECIDES` is the one key that can change the scene rather than colour it. Honour it: let them leave, refuse, or carry the intention into later scenes, and `remember` it. If you cannot honour it, `remember` why not. A character who cannot leave is a puppet.
+- `DECIDES` is the one key that can change the scene rather than colour it. Honour it: let them leave, refuse, or carry the intention into later scenes as an `intent`. If you cannot honour it, record a `veto` with the reason. A character who cannot leave is a puppet.
+- `BODY`, `UNSURE` and `REMEMBERS` feed the log (step 2 of "Each turn"); `(nothing)` is a full answer, never an error.
 - `SAYS` is used as dialogue, cut, or replaced with silence. You do not embroider it. `TELL` may be dropped. The others shape how you write the character.
 - Swap test: if another character could say the line unchanged, cut it.
 
@@ -172,11 +210,16 @@ Build a fresh brief, start a new subagent, record it with `session <npc> --id <n
 | `python tools/brains.py remember <npc>` | an episode they keep, with salience |
 | `python tools/brains.py compress <npc>` | folds episodes into one summary |
 | `python tools/brains.py session <npc>` | records or ends the kept session, and the tier |
-| `python tools/brains.py state <npc> --set PATH=VALUE` | body, mood, desire and `people` (how they stand with others); without `--set`, prints them |
+| `python tools/brains.py state <npc> --set PATH=VALUE` | body, mood, desire, `people` (how they stand with others) and `routine`; without `--set`, prints them |
 | `python tools/brains.py believe <npc>` | a belief, true or not: `--text`, `--truth`, `--confidence`, `--about`; `--retire SEQ` drops one |
 | `python tools/brains.py claim <npc> --to W` | what they told someone: `--text`, `--truth`, `--kind`, `--about` |
+| `python tools/brains.py want <npc>` | a standing want (at most three): `--text`, `--weight`, `--conflict`; `--retire SEQ` drops one |
+| `python tools/brains.py intent <npc>` | what they mean to do (at most three): `--text`, `--horizon`; `--done SEQ` or `--drop SEQ` closes one |
+| `python tools/brains.py veto <npc>` | a `DECIDES` you could not honour: `--kind`, `--reason`, `--decides`, `--intent SEQ` |
+| `python tools/brains.py offscreen <npc>` | what the off-screen call said they did (`--does`), kept as a memory; one per boundary |
+| `python tools/brains.py settings` | story settings: `--offscreen on` or `off` (off by default) |
 | `python tools/brains.py tick <npc>` | time passes: affect eases one step toward baseline; `--scene-end` eases pain and intoxication too |
-| `python tools/brains.py brief <npc> --scene F` | the brief; `--as` an alias they go by here; `--text` prints it bare |
+| `python tools/brains.py brief <npc> --scene F` | the brief; `--as` an alias they go by here; `--text` prints it bare; `--offscreen` for the off-screen call |
 | `python tools/brains.py view [<npc>]` | rewrites the views and prints one |
 | `python tools/brains.py check` | validates the log against game-master |
 | `python tools/brains.py reconcile [--apply]` | after an Undo: sets aside events whose entry is gone, and what depends on them |

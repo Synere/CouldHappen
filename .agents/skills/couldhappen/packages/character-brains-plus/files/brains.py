@@ -14,8 +14,8 @@ Usage (from the workspace root):  python tools/brains.py <command> [--root .]
   remember <npc> --text T [--salience 1-5] --entry E   an episode the character keeps
   compress <npc> --replace SEQ ... --text T [--salience 1-5]   fold episodes into one summary
   session <npc> (--id ID | --end) [--tier persistent|ephemeral]   the kept subagent session
-  state <npc> [--set PATH=VALUE ...] --entry E   body, mood and desire (affect.fear=3, body.clothes=...,
-                                       desire.limits=...; an empty value clears); without --set, print it.
+  state <npc> [--set PATH=VALUE ...] --entry E   body, mood, desire, routine (affect.fear=3, body.clothes=...,
+                                       desire.limits=..., routine.<slot>=...; an empty value clears); without --set, print it.
                                        Edges to others: people.<cast id|player>.trust|attraction|fear (0-5),
                                        .debt (-5 to 5), .last, .thinks_knows.<fact>=knows|doesnt|unsure
   believe <npc> --text T --truth true|false|unknown --confidence C [--about FACT] [--retire SEQ] --entry E
@@ -24,7 +24,16 @@ Usage (from the workspace root):  python tools/brains.py <command> [--root .]
                                        what they told someone: lie, truth, half-truth, promise, threat, boast, omission
   tick <npc> [--scene-end] --entry E   time passes: each affect level one step toward baseline
                                        (pain and intoxication only with --scene-end)
+  want <npc> --text T [--weight 1-5] [--conflict T] [--retire SEQ] --entry E
+                                       a standing want (at most 3); --retire SEQ alone drops one
+  intent <npc> --text T --horizon now|scene|day|long [--done SEQ | --drop SEQ] --entry E
+                                       what they mean to do (at most 3 active); --done/--drop SEQ alone closes one
+  veto <npc> --kind leave|refuse|later|other --reason T [--decides T] [--intent SEQ] --entry E
+                                       a DECIDES the writer could not honour, and why
+  offscreen <npc> --does T [--salience 1-5] --entry E   what the off-screen call said they did (one per boundary)
+  settings [--offscreen on|off]        story settings; off-screen calls are off by default
   brief <npc> --scene FILE [--as ALIAS] [--text]   the only way to build a brain's brief
+  brief <npc> --offscreen [--scene FILE] [--text]  the off-screen brief at a scene boundary, with their routine
   view [<npc>]                         rewrite the generated views and print one
   check                                validate the log against game-master
   migrate [--entry E]                  move method-only brain files into the log (originals kept in notes/brains/legacy/)
@@ -56,7 +65,7 @@ CONFIDENCE = ('certain', 'probable', 'suspects', 'doubts')
 TIERS = ('persistent', 'ephemeral')
 CARD_FIELDS = ('want', 'fear', 'secret', 'attitude', 'voice')
 TERMINAL_FACT = ('outdated', 'discarded')
-SETUP_OPS = ('char', 'world', 'session', 'compress')  # the only ops whose entry may be null
+SETUP_OPS = ('char', 'world', 'session', 'compress', 'settings')  # the only ops whose entry may be null
 MAX_TEXT, MAX_LIST, MAX_EPISODES = 300, 20, 6
 SALIENCE = range(1, 6)
 GENERATED = '<!-- generated from events.jsonl; do not edit -->'
@@ -68,7 +77,7 @@ FIRST_PERSON = re.compile(r"\b(I|I'm|I've|I'd|I'll|me|my|mine|myself|we|us|our)\
 PATH_RE = re.compile(r'(?:\b(?:notes|public|tools|imports)/)|(?:\.(?:jsonl|json|py|md)\b)')
 AUTO_ID = re.compile(r'\b[A-Z]\d+\b')  # the shape of game-master auto ids: F12, T3, P2, V1
 FACT_ID = re.compile(r'\bF\d+\b')
-ANSWER_KEYS = ('NOTICES', 'WANTS', 'HIDES', 'SAYS', 'DOES', 'TELL', 'DECIDES')
+ANSWER_KEYS = ('NOTICES', 'WANTS', 'HIDES', 'SAYS', 'DOES', 'TELL', 'BODY', 'UNSURE', 'REMEMBERS', 'DECIDES')
 ANSWER_HELP = {
     'NOTICES': 'the one thing they notice first',
     'WANTS': 'what they want in this moment',
@@ -76,7 +85,10 @@ ANSWER_HELP = {
     'SAYS': 'one to three short lines, in their voice, as they would actually say them, or (nothing)',
     'DOES': 'one physical action',
     'TELL': 'one involuntary detail a careful observer would catch',
-    'DECIDES': 'a lasting intention they form now (to leave, to refuse, to do something later), or (none)'}
+    'BODY': 'what their body feels or does that they notice (pain, tiredness, heat, hunger), or (nothing)',
+    'UNSURE': 'what they do not know here and would want to, or (nothing)',
+    'REMEMBERS': 'one thing from this moment they will keep, in their own words, or (nothing)',
+    'DECIDES': 'a lasting intention they form now (to leave, to refuse, to do something later), or (nothing)'}
 CONFIDENCE_WORDS = {'certain': '', 'probable': 'probably', 'suspects': 'you suspect this',
                     'doubts': 'you doubt this'}
 
@@ -98,7 +110,10 @@ STATE_SCHEMA = {
     # ISS-27: what the character makes of each other person. debt above 0 is owed to the character, below 0
     # is what they owe. thinks_knows is what they think that person knows, by fact id.
     'people': ('keyed', {'trust': LEVEL, 'attraction': LEVEL, 'fear': LEVEL, 'debt': ('level', -5, 5),
-                         'last': TEXT, 'thinks_knows': ('keyed', ('choice', THINKS), 'fact')}, 'person')}
+                         'last': TEXT, 'thinks_knows': ('keyed', ('choice', THINKS), 'fact')}, 'person'),
+    # ISS-28: where they are and what they do when the story is elsewhere, by a short slot id
+    # (routine.mornings="opens the chandlery"). Only the off-screen brief prints it.
+    'routine': ('keyed', TEXT)}
 AFFECT_LEVELS = tuple(k for k, spec in STATE_SCHEMA['affect'].items() if spec[0] == 'level')
 DEFAULT_BASELINE = {'energy': 3}  # every other affect level settles to 0
 BOUNDARY_ONLY = ('pain', 'intoxication')  # these ease only at a scene boundary (tick --scene-end)
@@ -128,6 +143,24 @@ THINKS_ORDER = {'doesnt': 0, 'unsure': 1, 'knows': 2}  # what the brief shows fi
 EDGE_LABELS = {'trust': 'trust', 'attraction': 'attraction', 'fear': 'fear of them'}
 EDGE_WORDS = ('none', 'a little', 'some', 'a lot', 'deeply', 'utterly')  # 0 to 5, as LEVEL_WORDS for affect
 DEBT_WORDS = ('nothing', 'a little', 'something', 'a lot', 'a great deal', 'everything')
+
+# ---- agency and life off-screen (ISS-28) ----
+# want, intent, veto and offscreen events carry data.scene, game-master's scene_count when they were recorded,
+# so drift review (ISS-29) can count vetoes per ten scenes and find intents gone stale.
+HORIZONS = ('now', 'scene', 'day', 'long')
+HORIZON_WORDS = {'now': 'right now', 'scene': 'before this scene is over', 'day': 'within a day or so',
+                 'long': 'in the long run'}
+WEIGHTS = range(1, 6)  # how much a standing want matters; ranks wants, never printed
+MAX_WANTS, MAX_INTENTS, BRIEF_WANTS, MAX_ROUTINE = 3, 3, 2, 6
+INTENT_OUTCOMES = ('done', 'dropped')  # a veto closes an intent as 'vetoed'
+VETO_KINDS = ('leave', 'refuse', 'later', 'other')  # what the DECIDES the writer could not honour named
+OFFSCREEN_ANSWER_KEYS = ('DOES', 'LEAVES', 'DECIDES', 'CHANGES')
+OFFSCREEN_ANSWER_HELP = {
+    'DOES': 'what they do with the time, in one or two plain lines',
+    'LEAVES': 'the sign of it someone could find later (a note, a smell, a missing thing, a rumour), or (nothing)',
+    'DECIDES': 'a lasting intention they form (to leave, to refuse, to do something later), or (nothing)',
+    'CHANGES': 'how they are different after it (mood, body, what they want), or (nothing)'}
+SETTINGS = {'offscreen': False}  # off-screen calls are off until the Director turns them on at apply
 
 
 class Fail(Exception):
@@ -195,8 +228,10 @@ def method_only_files(root):
 
 def new_state():
     # touched: npc -> person -> the seq of the last state event about them, to rank people in the brief
+    # wants and intents: npc -> seq -> the active one; closed: npc -> intents completed, dropped or vetoed
     return {'chars': {}, 'world': {}, 'knows': {}, 'unlearned': {}, 'episodes': {}, 'states': {},
-            'beliefs': {}, 'claims': {}, 'touched': {}}
+            'beliefs': {}, 'claims': {}, 'touched': {}, 'wants': {}, 'intents': {}, 'closed': {}, 'vetoes': {},
+            'offscreen': {}, 'settings': dict(SETTINGS)}
 
 
 def text_ok(value):
@@ -427,6 +462,8 @@ def v_state(state, gm_state, ev):
     bare = [m for m, mark in marks.items() if 'text' not in mark]
     if bare:
         raise Fail(f'a mark needs its text first: --set body.marks.{bare[0]}="..."')
+    if len(tree.get('routine', {})) > MAX_ROUTINE:
+        raise Fail(f'at most {MAX_ROUTINE} routine slots; clear one with --set routine.<slot>=')
     people = tree.get('people', {})
     if len(people) > MAX_LIST:
         raise Fail(f'at most {MAX_LIST} people; clear one with --set people.<id>=')
@@ -506,9 +543,101 @@ def v_tick(state, gm_state, ev):
     return []
 
 
+def need_scene(ev):
+    if not (isinstance(ev['data'].get('scene'), int) and not isinstance(ev['data']['scene'], bool)):
+        raise Fail(f'{ev["op"]} data needs scene: game-master\'s scene count when it was recorded')
+
+
+def v_want(state, gm_state, ev):
+    need_char(state, ev['npc'])
+    need_scene(ev)
+    d, active = ev['data'], state['wants'].get(ev['npc'], {})
+    if 'retire' not in d and 'text' not in d:
+        raise Fail('give the want (--text, --weight), or --retire SEQ, or both to replace one')
+    if 'retire' in d and d['retire'] not in active:
+        raise Fail(f'seq {d["retire"]} is not a standing want of {ev["npc"]} (see python tools/brains.py view)')
+    if 'text' in d:
+        if not text_ok(d['text']):
+            raise Fail(f'--text must be a non-empty text of at most {MAX_TEXT} characters')
+        if d.get('weight') not in WEIGHTS:
+            raise Fail('--weight is 1 (a passing want) to 5 (what their life turns on)')
+        if 'conflict' in d and not text_ok(d['conflict']):
+            raise Fail(f'--conflict must be a text of at most {MAX_TEXT} characters')
+        if len(active) - ('retire' in d) >= MAX_WANTS:
+            raise Fail(f'{ev["npc"]} has {MAX_WANTS} standing wants already, the most a brain keeps. '
+                       'Retire one first, or replace it: want ... --retire SEQ')
+    return []
+
+
+def v_intent(state, gm_state, ev):
+    need_char(state, ev['npc'])
+    need_scene(ev)
+    d, active = ev['data'], state['intents'].get(ev['npc'], {})
+    if 'close' not in d and 'text' not in d:
+        raise Fail('give the intent (--text, --horizon), or --done SEQ or --drop SEQ, or both')
+    if 'close' in d:
+        if d['close'] not in active:
+            raise Fail(f'seq {d["close"]} is not an active intent of {ev["npc"]} (see python tools/brains.py view)')
+        if d.get('outcome') not in INTENT_OUTCOMES:
+            raise Fail('an intent closes as ' + ' or '.join(INTENT_OUTCOMES))
+    if 'text' in d:
+        if not text_ok(d['text']):
+            raise Fail(f'--text must be a non-empty text of at most {MAX_TEXT} characters')
+        if d.get('horizon') not in HORIZONS:
+            raise Fail('--horizon is one of ' + ', '.join(HORIZONS))
+        if len(active) - ('close' in d) >= MAX_INTENTS:
+            raise Fail(f'{ev["npc"]} has {MAX_INTENTS} active intents already. Close one first '
+                       '(intent ... --done SEQ or --drop SEQ), or give it with the new --text')
+    return []
+
+
+def v_veto(state, gm_state, ev):
+    need_char(state, ev['npc'])
+    need_scene(ev)
+    d = ev['data']
+    if d.get('kind') not in VETO_KINDS:
+        raise Fail('--kind is one of ' + ', '.join(VETO_KINDS) + ': what the decision you could not honour named')
+    if not text_ok(d.get('reason', '')):
+        raise Fail(f'--reason is required: why the story could not honour it (at most {MAX_TEXT} characters)')
+    if 'decides' in d and not text_ok(d['decides']):
+        raise Fail(f'--decides must be a text of at most {MAX_TEXT} characters')
+    if 'intent' in d and d['intent'] not in state['intents'].get(ev['npc'], {}):
+        raise Fail(f'seq {d["intent"]} is not an active intent of {ev["npc"]}')
+    return []
+
+
+def offscreen_at(state, scene):
+    """The character who already had the off-screen call at this scene boundary, or None."""
+    for npc in sorted(state['offscreen']):
+        if any(o['scene'] == scene for o in state['offscreen'][npc]):
+            return npc
+    return None
+
+
+def v_offscreen(state, gm_state, ev):
+    need_char(state, ev['npc'])
+    need_scene(ev)
+    if not state['settings']['offscreen']:
+        raise Fail('off-screen calls are off for this story. The Director turns them on: '
+                   'python tools/brains.py settings --offscreen on')
+    had = offscreen_at(state, ev['data']['scene'])
+    if had:
+        raise Fail(f'{had} already had the off-screen call at this scene boundary; one per boundary')
+    v_remember(state, gm_state, ev)
+    return []
+
+
+def v_settings(state, gm_state, ev):
+    d = ev['data']
+    if not d or any(k not in SETTINGS or not isinstance(v, bool) for k, v in d.items()):
+        raise Fail('settings: ' + ', '.join(f'{k} on|off' for k in SETTINGS))
+    return []
+
+
 VALIDATE = {'char': v_char, 'world': v_world, 'know': v_know, 'unlearn': v_unlearn,
             'remember': v_remember, 'compress': v_compress, 'session': v_session, 'state': v_state,
-            'tick': v_tick, 'believe': v_believe, 'claim': v_claim}
+            'tick': v_tick, 'believe': v_believe, 'claim': v_claim, 'want': v_want, 'intent': v_intent,
+            'veto': v_veto, 'offscreen': v_offscreen, 'settings': v_settings}
 
 
 # Folders: (state, event) -> None. They apply an already-validated event on replay and never consult game-master.
@@ -627,9 +756,54 @@ def f_claim(state, ev):
         'about': d.get('about'), 'entry': ev['entry']})
 
 
+def f_want(state, ev):
+    d, wants = ev['data'], state['wants'].setdefault(ev['npc'], {})
+    if 'retire' in d:
+        wants.pop(d['retire'], None)
+    if 'text' in d:
+        wants[ev['seq']] = {'seq': ev['seq'], 'text': d['text'], 'weight': d['weight'],
+                            'conflict': d.get('conflict'), 'scene': d['scene'], 'entry': ev['entry']}
+
+
+def close_intent(state, npc, seq, outcome, ev):
+    intent = state['intents'].get(npc, {}).pop(seq, None)
+    if intent:
+        state['closed'].setdefault(npc, []).append(
+            dict(intent, outcome=outcome, closed_seq=ev['seq'], closed_scene=ev['data']['scene']))
+
+
+def f_intent(state, ev):
+    d = ev['data']
+    if 'close' in d:
+        close_intent(state, ev['npc'], d['close'], d['outcome'], ev)
+    if 'text' in d:
+        state['intents'].setdefault(ev['npc'], {})[ev['seq']] = {
+            'seq': ev['seq'], 'text': d['text'], 'horizon': d['horizon'], 'scene': d['scene'], 'entry': ev['entry']}
+
+
+def f_veto(state, ev):
+    d = ev['data']
+    if 'intent' in d:
+        close_intent(state, ev['npc'], d['intent'], 'vetoed', ev)
+    state['vetoes'].setdefault(ev['npc'], []).append({
+        'seq': ev['seq'], 'kind': d['kind'], 'reason': d['reason'], 'decides': d.get('decides'),
+        'intent': d.get('intent'), 'scene': d['scene'], 'entry': ev['entry']})
+
+
+def f_offscreen(state, ev):
+    """What a character did off-screen: kept as one of their episodes, and as the call made at that boundary."""
+    state['offscreen'].setdefault(ev['npc'], []).append({'seq': ev['seq'], 'scene': ev['data']['scene']})
+    f_remember(state, ev)
+
+
+def f_settings(state, ev):
+    state['settings'].update(ev['data'])
+
+
 FOLD = {'char': f_char, 'world': f_world, 'know': f_know, 'unlearn': f_unlearn,
         'remember': f_remember, 'compress': f_compress, 'session': f_session, 'state': f_state,
-        'tick': f_tick, 'believe': f_believe, 'claim': f_claim}
+        'tick': f_tick, 'believe': f_believe, 'claim': f_claim, 'want': f_want, 'intent': f_intent,
+        'veto': f_veto, 'offscreen': f_offscreen, 'settings': f_settings}
 
 
 def replay(events):
@@ -702,7 +876,9 @@ def sec_header(b, npc, ctx):
     parts = [who + (f', who is {char["name"]}' if ctx['as'] else '')]
     if char.get('age') is not None:
         parts.append(str(char['age']))
-    if sit.get('location'):
+    if ctx.get('offscreen'):  # the situation's place is the player's scene, not where this character is now
+        parts.append('between scenes, away from the player')
+    elif sit.get('location'):
         parts.append('in ' + sit['location'])
     return [f'You are the mind of {", ".join(parts)}. Return only the block below.',
             'You know nothing beyond what this brief says. You may lie, withhold, misread, or refuse.']
@@ -808,9 +984,11 @@ def sec_believes(b, npc, ctx):
     return ['WHAT THEY BELIEVE'] + lines if lines else []
 
 
-def present_ids(b):
+def present_ids(b, ctx=None):
     """Cast ids on stage now: game-master's situation.present, matched by id, name or alias, case-insensitively.
-    The player counts as present: every brain call is part of a scene played with them."""
+    The player counts as present: every brain call is part of a scene played with them. Off-screen, nobody is."""
+    if ctx and ctx.get('offscreen'):
+        return set()
     here = {p.strip().lower() for p in b.gm_state['situation'].get('present', []) if isinstance(p, str)}
     out = {PLAYER}
     for cid in sorted(set(b.state['chars']) | set(b.gm_state['npcs'])):
@@ -846,7 +1024,7 @@ def edge_lines(b, npc, pid, edge, held):
 def sec_others(b, npc, ctx):
     """At most three people: those present first, then the most recently recorded, then by id."""
     people = b.state['states'].get(npc, {}).get('people', {})
-    here, touched = present_ids(b), b.state['touched'].get(npc, {})
+    here, touched = present_ids(b, ctx), b.state['touched'].get(npc, {})
     held = allowed_facts(b.state, b.gm_state, npc)
     lines, shown = [], 0
     for pid in sorted(people, key=lambda p: (p not in here, -touched.get(p, 0), p)):
@@ -860,26 +1038,60 @@ def sec_others(b, npc, ctx):
 def sec_claims(b, npc, ctx):
     """Six claims at most: to people present first, newest first within each. The kind is said (the character
     knows when they lied); the truth label is not."""
-    here = present_ids(b)
+    here = present_ids(b, ctx)
     claims = sorted(b.state['claims'].get(npc, []), key=lambda c: (c['to'] not in here, -c['seq']))[:MAX_CLAIMS]
     lines = [f'- to {person_name(b, c["to"])}, {KIND_WORDS[c["kind"]]}: {c["text"]}' for c in claims]
     return ['WHAT THEY HAVE TOLD PEOPLE'] + lines if lines else []
 
 
+def top_wants(b, npc):
+    """The standing wants the brief carries: heaviest first, then newest."""
+    wants = b.state['wants'].get(npc, {}).values()
+    return sorted(wants, key=lambda w: (-w['weight'], -w['seq']))[:BRIEF_WANTS]
+
+
+def sec_wants(b, npc, ctx):
+    """The top two standing wants, each with what pulls against it. The weight ranks them and is never printed."""
+    lines = ['- ' + w['text'] + (f' (but: {w["conflict"]})' if w.get('conflict') else '') for w in top_wants(b, npc)]
+    return ['WHAT THEY WANT'] + lines if lines else []
+
+
+def active_intents(b, npc):
+    """Active intents, nearest horizon first, then oldest."""
+    return sorted(b.state['intents'].get(npc, {}).values(), key=lambda i: (HORIZONS.index(i['horizon']), i['seq']))
+
+
+def sec_intents(b, npc, ctx):
+    lines = [f'- {i["text"]} ({HORIZON_WORDS[i["horizon"]]})' for i in active_intents(b, npc)]
+    return ['WHAT THEY MEAN TO DO'] + lines if lines else []
+
+
+def sec_routine(b, npc, ctx):
+    """Only off-screen: where the character's time goes when the story is elsewhere, in recorded order."""
+    routine = b.state['states'].get(npc, {}).get('routine', {})
+    if not ctx.get('offscreen') or not routine:
+        return []
+    return ['THEIR DAYS'] + [f'- {slot}: {routine[slot]}' for slot in routine]
+
+
 def sec_now(b, npc, ctx):
     sit = b.gm_state['situation']
-    when = ', '.join(x for x in (f'day {sit["day"]}' if sit.get('day') else '', sit.get('time', ''),
-                                 sit.get('location', '')) if x)
+    place = '' if ctx.get('offscreen') else sit.get('location', '')
+    when = ', '.join(x for x in (f'day {sit["day"]}' if sit.get('day') else '', sit.get('time', ''), place) if x)
     lines = ['NOW'] + ([when] if when else [])
+    if ctx.get('offscreen'):
+        lines.append('The story is elsewhere. Nobody is watching you; what you do now happens off the page.')
     return lines + ctx['scene']
 
 
 def sec_answer(b, npc, ctx):
-    return ['ANSWER'] + [f'{k}: {ANSWER_HELP[k]}' for k in ANSWER_KEYS]
+    keys, help_ = ((OFFSCREEN_ANSWER_KEYS, OFFSCREEN_ANSWER_HELP) if ctx.get('offscreen')
+                   else (ANSWER_KEYS, ANSWER_HELP))
+    return ['ANSWER'] + [f'{k}: {help_[k]}' for k in keys]
 
 
 BRIEF_SECTIONS = [sec_header, sec_who, sec_memory, sec_owed, sec_knows, sec_believes, sec_body, sec_desire,
-                  sec_others, sec_claims, sec_now, sec_answer]
+                  sec_others, sec_claims, sec_wants, sec_intents, sec_routine, sec_now, sec_answer]
 
 
 def read_scene(path):
@@ -920,8 +1132,17 @@ def leaks(b, text):
     return found
 
 
-def build_brief(b, npc, scene_file, alias=None):
+def build_brief(b, npc, scene_file, alias=None, offscreen=False):
     need_char(b.state, npc)
+    if offscreen:
+        if not b.state['settings']['offscreen']:
+            raise Fail('off-screen calls are off for this story; they are asked about at apply. The Director turns '
+                       'them on: python tools/brains.py settings --offscreen on')
+        had = offscreen_at(b.state, b.gm_state['scene_count'])
+        if had:
+            raise Fail(f'{had} already had the off-screen call at this scene boundary; one per boundary')
+    elif scene_file is None:
+        raise Fail('give --scene: the perception-only scene file (only an off-screen brief may go without one)')
     gone = withdrawn_entries(b)
     if gone:
         raise Fail(f'{len(gone)} brain event(s) cite entries no longer in the logs (Undo?), so the brief could carry '
@@ -932,7 +1153,7 @@ def build_brief(b, npc, scene_file, alias=None):
     char = b.state['chars'][npc]
     if alias is not None and alias not in char.get('aliases', []):
         raise Fail(f'{alias!r} is not one of {npc}\'s aliases; add it with: python tools/brains.py add {npc} --alias ...')
-    ctx = {'as': alias, 'scene': read_scene(scene_file)}
+    ctx = {'as': alias, 'scene': read_scene(scene_file) if scene_file else [], 'offscreen': offscreen}
     blocks = [lines for lines in (sec(b, npc, ctx) for sec in BRIEF_SECTIONS) if lines]
     text = '\n\n'.join('\n'.join(lines) for lines in blocks) + '\n'
     found = leaks(b, text)
@@ -983,6 +1204,22 @@ def render_view(b, npc):
     out += ['', '## Claims', '']
     out += [f'- seq {c["seq"]} to {c["to"]} [{c["kind"]}, {c["truth"]}' + (f', about {c["about"]}' if c['about'] else '')
             + f'] {c["text"]}' for c in b.state['claims'].get(npc, [])] or ['- none']
+    out += ['', '## Wants', '']
+    out += [f'- seq {w["seq"]} [weight {w["weight"]}, scene {w["scene"]}] {w["text"]}'
+            + (f' (conflict: {w["conflict"]})' if w.get('conflict') else '')
+            for _, w in sorted(b.state['wants'].get(npc, {}).items())] or ['- none']
+    out += ['', '## Intents', '']
+    out += [f'- seq {i["seq"]} [{i["horizon"]}, scene {i["scene"]}] {i["text"]}' for i in active_intents(b, npc)]
+    out += [f'- seq {i["seq"]} [{i["outcome"]} at seq {i["closed_seq"]}, scene {i["closed_scene"]}] {i["text"]}'
+            for i in b.state['closed'].get(npc, [])]
+    if out[-1] == '':
+        out.append('- none')
+    out += ['', '## Vetoes', '']
+    out += [f'- seq {v["seq"]} [{v["kind"]}, scene {v["scene"]}] {v["reason"]}'
+            + (f' (decided: {v["decides"]})' if v.get('decides') else '') for v in b.state['vetoes'].get(npc, [])
+            ] or ['- none']
+    calls = b.state['offscreen'].get(npc, [])
+    out += ['', '## Off-screen calls', '', '- scenes ' + ', '.join(str(o['scene']) for o in calls) if calls else '- none']
     return '\n'.join(out) + '\n'
 
 
@@ -1080,6 +1317,8 @@ def dependency(state, gm_state, ev):
             return f'{npc} no longer has a game-master cast card'
         lost = [t for t in d.get('knows_threads', []) if t not in gm_state['threads']]
         return 'threads ' + ', '.join(lost) + ' are no longer in game-master' if lost else None
+    if op == 'settings':
+        return None
     if op != 'world' and npc not in state['chars']:
         return f'{npc} has no brain once the events it rests on are set aside'
     fid = d.get('fact')
@@ -1116,6 +1355,21 @@ def dependency(state, gm_state, ev):
         return f'it retired the belief at seq {d["retire"]}, which is set aside'
     if op == 'claim' and d.get('to') != PLAYER and not cast(d.get('to')):
         return f'it was said to {d.get("to")}, no longer cast'
+    # ISS-28: closing what is set aside, or a fourth want or intent once a retire or close it relied on is gone
+    if op == 'want':
+        wants = state['wants'].get(npc, {})
+        if 'retire' in d and d['retire'] not in wants:
+            return f'it retired the want at seq {d["retire"]}, which is set aside'
+        if 'text' in d and len(wants) - ('retire' in d) >= MAX_WANTS:
+            return f'{npc} would hold more than {MAX_WANTS} standing wants'
+    if op in ('intent', 'veto'):
+        intents, seq = state['intents'].get(npc, {}), d.get('close', d.get('intent'))
+        if seq is not None and seq not in intents:
+            return f'it closed the intent at seq {seq}, which is set aside'
+        if op == 'intent' and 'text' in d and len(intents) - ('close' in d) >= MAX_INTENTS:
+            return f'{npc} would hold more than {MAX_INTENTS} active intents'
+    if op == 'believe' and 'text' in d and len(state['beliefs'].get(npc, {})) - ('retire' in d) >= MAX_BELIEFS:
+        return f'{npc} would hold more than {MAX_BELIEFS} beliefs'
     if op == 'compress':
         live = state['episodes'].get(npc, {})
         lost = [str(q) for q in d.get('replaces', []) if q not in live]
@@ -1470,9 +1724,71 @@ def cmd_claim(args):
     return {'seq': ev['seq']}, warns
 
 
+def cmd_want(args):
+    b = Brains(args.root)
+    data = {'scene': b.gm_state['scene_count']}
+    if args.retire is not None:
+        data['retire'] = args.retire
+    if args.text is not None:
+        data.update(text=args.text, weight=args.weight)
+        if args.conflict:
+            data['conflict'] = args.conflict
+    elif args.conflict:
+        raise Fail('--weight and --conflict go with a new want\'s --text')
+    ev, warns = b.append(args.npc, 'want', data, args.entry,
+                         args.why or (f'{args.npc} wants something' if 'text' in data
+                                      else f'{args.npc} no longer wants seq {args.retire}'))
+    return {'seq': ev['seq'], 'active': len(b.state['wants'].get(args.npc, {}))}, warns
+
+
+def cmd_intent(args):
+    b = Brains(args.root)
+    if args.done is not None and args.drop is not None:
+        raise Fail('give --done or --drop, not both')
+    data = {'scene': b.gm_state['scene_count']}
+    closing = args.done if args.done is not None else args.drop
+    if closing is not None:
+        data.update(close=closing, outcome='done' if args.done is not None else 'dropped')
+    if args.text is not None:
+        data.update(text=args.text, horizon=args.horizon)
+    elif args.horizon:
+        raise Fail('--horizon goes with a new intent\'s --text')
+    ev, warns = b.append(args.npc, 'intent', data, args.entry,
+                         args.why or (f'{args.npc} means to do something' if 'text' in data
+                                      else f'{args.npc} intent seq {closing} {data["outcome"]}'))
+    return {'seq': ev['seq'], 'active': len(b.state['intents'].get(args.npc, {}))}, warns
+
+
+def cmd_veto(args):
+    b = Brains(args.root)
+    data = {'kind': args.kind, 'reason': args.reason, 'scene': b.gm_state['scene_count']}
+    if args.decides:
+        data['decides'] = args.decides
+    if args.intent is not None:
+        data['intent'] = args.intent
+    ev, warns = b.append(args.npc, 'veto', data, args.entry, args.why or f'a decision of {args.npc} was not honoured')
+    return {'seq': ev['seq'], 'vetoes': len(b.state['vetoes'][args.npc])}, warns
+
+
+def cmd_offscreen(args):
+    b = Brains(args.root)
+    data = {'text': args.does, 'salience': args.salience, 'scene': b.gm_state['scene_count']}
+    ev, warns = b.append(args.npc, 'offscreen', data, args.entry, args.why or f'{args.npc} off-screen')
+    return {'seq': ev['seq'], 'scene': data['scene']}, warns
+
+
+def cmd_settings(args):
+    b = Brains(args.root)
+    if args.offscreen is None:
+        return {'settings': b.state['settings']}, []
+    ev, warns = b.append(None, 'settings', {'offscreen': args.offscreen == 'on'}, args.entry,
+                         args.why or f'off-screen calls {args.offscreen}')
+    return {'seq': ev['seq'], 'settings': b.state['settings']}, warns
+
+
 def cmd_brief(args):
     b = Brains(args.root)
-    text = build_brief(b, args.npc, args.scene, args.alias)
+    text = build_brief(b, args.npc, args.scene, args.alias, args.offscreen)
     if args.text:
         sys.stdout.write(text)
         return None, []
@@ -1551,7 +1867,8 @@ def cmd_reconcile(args):
 COMMANDS = {'init': cmd_init, 'add': cmd_add, 'world': cmd_world, 'know': cmd_know, 'unlearn': cmd_unlearn,
             'remember': cmd_remember, 'compress': cmd_compress, 'session': cmd_session, 'brief': cmd_brief,
             'view': cmd_view, 'check': cmd_check, 'migrate': cmd_migrate, 'reconcile': cmd_reconcile,
-            'state': cmd_state, 'tick': cmd_tick, 'believe': cmd_believe, 'claim': cmd_claim}
+            'state': cmd_state, 'tick': cmd_tick, 'believe': cmd_believe, 'claim': cmd_claim, 'want': cmd_want,
+            'intent': cmd_intent, 'veto': cmd_veto, 'offscreen': cmd_offscreen, 'settings': cmd_settings}
 
 
 def parser():
@@ -1619,9 +1936,31 @@ def parser():
     s.add_argument('--about', help='the game-master fact it concerns; claims about the same fact are compared')
     s = cmd('tick')
     s.add_argument('--scene-end', action='store_true', help='a scene boundary: pain and intoxication ease too')
+    s = cmd('want')
+    s.add_argument('--text', help='a standing want, as the character holds it')
+    s.add_argument('--weight', type=int, default=3, help='1 (passing) to 5 (what their life turns on); ranks wants')
+    s.add_argument('--conflict', help='what pulls against it, if anything')
+    s.add_argument('--retire', type=int, metavar='SEQ', help='a want they no longer hold (with --text, replaces it)')
+    s = cmd('intent')
+    s.add_argument('--text', help='what they mean to do')
+    s.add_argument('--horizon', choices=HORIZONS, help='now, scene (before it ends), day, or long')
+    s.add_argument('--done', type=int, metavar='SEQ', help='an intent they carried out')
+    s.add_argument('--drop', type=int, metavar='SEQ', help='an intent they let go')
+    s = cmd('veto')
+    s.add_argument('--kind', required=True, choices=VETO_KINDS, help='what the DECIDES you could not honour named')
+    s.add_argument('--reason', required=True, help='why the story could not honour it')
+    s.add_argument('--decides', help='the decision itself, as the brain gave it')
+    s.add_argument('--intent', type=int, metavar='SEQ', help='an active intent this veto closes')
+    s = cmd('offscreen')
+    s.add_argument('--does', required=True, help='what they did off-screen (the DOES line); kept as an episode')
+    s.add_argument('--salience', type=int, default=2)
+    s = cmd('settings', npc=False)
+    s.add_argument('--offscreen', choices=('on', 'off'), help='off-screen calls at scene boundaries (off by default)')
     s = cmd('brief', entry=False)
-    s.add_argument('--scene', required=True)
+    s.add_argument('--scene', help='the perception-only scene file (optional with --offscreen)')
     s.add_argument('--as', dest='alias')
+    s.add_argument('--offscreen', action='store_true',
+                   help='the off-screen call at a scene boundary: adds their routine, answers DOES/LEAVES/DECIDES/CHANGES')
     s.add_argument('--text', action='store_true', help='print the brief alone, not wrapped in JSON')
     s = sub.add_parser('view')
     s.add_argument('npc', nargs='?')
