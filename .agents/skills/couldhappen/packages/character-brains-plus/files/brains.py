@@ -16,6 +16,9 @@ Usage (from the workspace root):  python tools/brains.py <command> [--root .]
   brief <npc> --scene FILE [--as ALIAS] [--text]   the only way to build a brain's brief
   view [<npc>]                         rewrite the generated views and print one
   check                                validate the log against game-master
+  migrate [--entry E]                  move method-only brain files into the log (originals kept in notes/brains/legacy/)
+  reconcile [--apply]                  after a Director Undo: set aside events whose entry is gone, and what
+                                       depends on them, into notes/brains/withdrawn.jsonl (dry run without --apply)
 
 Every command prints one JSON object. Exit 0 ok, 1 warning, 2 error.
 
@@ -46,6 +49,7 @@ MAX_TEXT, MAX_LIST, MAX_EPISODES = 300, 20, 6
 SALIENCE = range(1, 6)
 GENERATED = '<!-- generated from events.jsonl; do not edit -->'
 NOT_BRAINS = ('PROTOCOL.md', 'TEMPLATE.md', 'SCENE.md')  # files in notes/brains/ that are not views
+MIGRATED = 'migrated'  # the how of a know event moved from a method-only "## Knows" line (ISS-25)
 ID_RE = re.compile(r'^[A-Za-z][A-Za-z0-9_-]{0,31}$')
 UUID_RE = re.compile(r'[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}')
 FIRST_PERSON = re.compile(r"\b(I|I'm|I've|I'd|I'll|me|my|mine|myself|we|us|our)\b")
@@ -110,6 +114,10 @@ def brains_dir(root):
 
 def events_path(root):
     return brains_dir(root) / 'events.jsonl'
+
+
+def withdrawn_path(root):
+    return brains_dir(root) / 'withdrawn.jsonl'
 
 
 def method_only_files(root):
@@ -211,7 +219,9 @@ def v_know(state, gm_state, ev):
     need_fact(gm_state, d['fact'])
     if not text_ok(d.get('how', '')):
         raise Fail('--how is required: how the character learned it, in their own words')
-    if not FIRST_PERSON.search(d['how']):
+    if d.get('migrated') and d['how'] == MIGRATED:
+        pass  # moved from a method-only file, which never said how
+    elif not FIRST_PERSON.search(d['how']):
         raise Fail('--how is written in the first person, as the character would say it ("I overheard ...")')
     if d['confidence'] not in CONFIDENCE:
         raise Fail('confidence must be one of ' + ', '.join(CONFIDENCE))
@@ -324,28 +334,44 @@ def replay(events):
 class Brains:
     """One command's view of the workspace: the brain log, its replayed state, and game-master's state."""
 
-    def __init__(self, root, need_log=True):
+    def __init__(self, root, need_log=True, migrating=False):
         self.root = root
         self.gm = gm_module(root)
         self.gm_state = gm_load(self.gm, root)
         stale = method_only_files(root)
-        if stale:
+        if stale and not migrating:
             raise Fail('notes/brains/ holds method-only brain files (' + ', '.join(stale) + '). The two brain '
                        'packages cannot run together; move those files into the log first, or keep the method-only package.')
         if need_log and not events_path(root).exists():
             raise Fail('notes/brains/events.jsonl is missing. Run: python tools/brains.py init')
         self.events = self.gm.read_lines(events_path(root)) if events_path(root).exists() else []
         self.state = replay(self.events)
-        write_views(self)  # views also follow game-master, so every command rewrites them
+        if not migrating:  # a view could overwrite a method-only file before migrate has copied it
+            write_views(self)  # views also follow game-master, so every command rewrites them
+
+    def next_seq(self):
+        """One past every seq used, set-aside events included, so a seq is never reused."""
+        used = self.events + self.gm.read_lines(withdrawn_path(self.root))
+        return max((e.get('seq') or 0 for e in used), default=0) + 1
 
     def append(self, npc, op, data, entry=None, why=None):
+        ev, warns = self.stage(npc, op, data, entry, why)
+        self.save()
+        return ev, warns
+
+    def save(self):
+        self.gm.write_text(events_path(self.root), self.gm.dump_lines(self.events))
+        write_views(self)
+
+    def stage(self, npc, op, data, entry=None, why=None):
+        """Validate an event and apply it in memory; save() writes it."""
         if entry is None and op not in SETUP_OPS:
             raise Fail(f'{op} needs --entry: the story or Director entry that shows it')
         if entry is not None and entry not in self.gm.read_entries(self.root):
             raise Fail(f'entry {entry} is not in public/story.md or public/director.md')
         if npc is not None and not ID_RE.match(npc):
             raise Fail('a character id is letters, digits, - and _ (their game-master cast id)')
-        ev = {'seq': max((e.get('seq') or 0 for e in self.events), default=0) + 1,
+        ev = {'seq': self.next_seq(),
               'at': datetime.now(timezone.utc).isoformat(timespec='seconds'),
               'npc': npc, 'op': op, 'entry': entry, 'why': why or f'{op} {npc or data.get("fact")}', 'data': data}
         if not text_ok(ev['why']):
@@ -353,8 +379,6 @@ class Brains:
         warns = VALIDATE[op](self.state, self.gm_state, ev)
         self.events.append(ev)
         FOLD[op](self.state, ev)
-        self.gm.write_text(events_path(self.root), self.gm.dump_lines(self.events))
-        write_views(self)
         return ev, warns
 
 
@@ -407,7 +431,7 @@ def sec_knows(b, npc, ctx):
         notes = [w for w in (CONFIDENCE_WORDS[held['confidence']],
                              'a rumour' if fact['status'] == 'rumour' else '',
                              'you keep this secret' if held['secret'] else '') if w]
-        if held.get('how'):
+        if held.get('how') and held['how'] != MIGRATED:
             notes.append('how: ' + held['how'])
         lines.append('- ' + fact['text'] + (f' ({"; ".join(notes)})' if notes else ''))
     return ['WHAT THEY KNOW'] + lines + ['They know nothing else about the world.']
@@ -468,6 +492,11 @@ def leaks(b, text):
 
 def build_brief(b, npc, scene_file, alias=None):
     need_char(b.state, npc)
+    gone = withdrawn_entries(b)
+    if gone:
+        raise Fail(f'{len(gone)} brain event(s) cite entries no longer in the logs (Undo?), so the brief could carry '
+                   'what never happened. Run: python tools/gm_state.py reconcile --apply, then '
+                   'python tools/brains.py reconcile --apply')
     if npc not in b.gm_state['npcs']:
         raise Fail(f'{npc} has no game-master cast card')
     char = b.state['chars'][npc]
@@ -508,6 +537,9 @@ def render_view(b, npc):
 def write_views(b):
     for npc in sorted(b.state['chars']):
         b.gm.write_text(brains_dir(b.root) / f'{npc}.md', render_view(b, npc))
+    for path in brains_dir(b.root).glob('*.md'):  # a brain set aside by reconcile leaves no stale view
+        if path.stem not in b.state['chars'] and path.read_text(encoding='utf-8').startswith(GENERATED):
+            path.unlink()
 
 
 # ---- check -----------------------------------------------------------------------------------
@@ -538,7 +570,7 @@ def run_check(b):
     for ev in b.events:
         if ev.get('entry') and ev['entry'] not in entries:
             warns.append(f'seq {ev["seq"]} ({ev["op"]} {ev.get("npc")}) cites entry {ev["entry"]}, no longer in the logs '
-                         '(Undo?). Record unlearn for what the character learned from it.')
+                         '(Undo?). Run: python tools/brains.py reconcile')
     for npc in sorted(b.state['chars']):
         held = allowed_facts(b.state, b.gm_state, npc)
         for fid in b.state['knows'].get(npc, {}):
@@ -550,6 +582,229 @@ def run_check(b):
         if fid not in b.gm_state['facts']:
             warns.append(f'{fid} is classified but is no longer a game-master fact')
     return errs, warns
+
+
+# ---- reconcile (ISS-25) ----------------------------------------------------------------------
+
+def withdrawn_entries(b):
+    """Events that cite an entry no longer in the public logs: a Director Undo took it back."""
+    entries = b.gm.read_entries(b.root)
+    return [ev for ev in b.events if ev.get('entry') and ev['entry'] not in entries]
+
+
+def holds(state, npc, fid):
+    """Whether the character held a fact before an unlearn; outdated or discarded facts count, as they did then."""
+    world = state['world'].get(fid)
+    seen = world and (world['visibility'] == 'public' or npc in world['witnesses'])
+    return fid in state['knows'].get(npc, {}) or bool(seen and fid not in state['unlearned'].get(npc, set()))
+
+
+def dependency(state, gm_state, ev):
+    """Why an event cannot stand on what is left (the kept events before it, and game-master now), or None.
+
+    Like game-master's reconcile, only what a withdrawal can break is rechecked: a fact that has since
+    become outdated does not set aside the know event recorded while it was live."""
+    op, npc, d = ev.get('op'), ev.get('npc'), ev.get('data') or {}
+    if op == 'char':
+        if npc not in gm_state['npcs']:
+            return f'{npc} no longer has a game-master cast card'
+        lost = [t for t in d.get('knows_threads', []) if t not in gm_state['threads']]
+        return 'threads ' + ', '.join(lost) + ' are no longer in game-master' if lost else None
+    if op != 'world' and npc not in state['chars']:
+        return f'{npc} has no brain once the events it rests on are set aside'
+    fid = d.get('fact')
+    if op in ('world', 'know', 'unlearn') and fid not in gm_state['facts']:
+        return f'{fid} is no longer a game-master fact'
+    if op == 'world':
+        lost = [w for w in d.get('witnesses', []) if w not in state['chars'] and w not in gm_state['npcs']]
+        if lost:
+            return 'witnesses ' + ', '.join(lost) + ' are no longer cast'
+    if op == 'unlearn' and not holds(state, npc, fid):
+        return f'{npc} no longer held {fid} to unlearn'
+    if op == 'compress':
+        live = state['episodes'].get(npc, {})
+        lost = [str(q) for q in d.get('replaces', []) if q not in live]
+        if lost:
+            return 'it folded episodes that are set aside (seq ' + ', '.join(lost) + ')'
+    return None
+
+
+def plan_reconcile(b):
+    """(kept events, [(event, why it is set aside)]), in log order."""
+    entries = b.gm.read_entries(b.root)
+    state, kept, aside = new_state(), [], []
+    for ev in b.events:
+        if ev.get('entry') and ev['entry'] not in entries:
+            aside.append((ev, f'entry {ev["entry"]} is no longer in the logs'))
+            continue
+        why = dependency(state, b.gm_state, ev)
+        if why:
+            aside.append((ev, 'depends on what was set aside: ' + why))
+            continue
+        FOLD[ev['op']](state, ev)
+        kept.append(ev)
+    return kept, aside
+
+
+# ---- migrate (ISS-25) ------------------------------------------------------------------------
+
+# Guidance lines of the method-only brain template; a file copied from it may still hold them.
+TEMPLATE_LINES = {
+    'Frame, colouring and one recurring physical detail, in one line. A brain will reach for the body; '
+    'give it the right one.',
+    'Optional, one line, written plainly: what they want sexually or physically, what they refuse, what they would '
+    'never admit. Leave it out when it does not belong in the story. Their limits are authoritative: cut anything a '
+    'brain writes that crosses them.',
+    'Fact ids this character has learned, with the entry where they learned it. Only these hidden truths '
+    '(facts with `"known": false`) may enter their brief.',
+    'What they did, what they learned, what they will not forget. Newest last.',
+    'Written every third turn the brain is called, or at a scene\'s end. See the protocol\'s "Memory".'}
+KNOWN_SECTIONS = ('Look', 'Desire', 'Knows', 'Memory', 'Digest', 'Sheet')
+BULLET = re.compile(r'^(?:[-*+]|\d+[.)])\s+')
+
+
+def parse_method_only(text):
+    """A method-only brain file: its name, header fields (npc, session, tier) and sections (title -> lines)."""
+    out = {'name': None, 'fields': {}, 'sections': {}}
+    current = None
+    for line in text.replace('\r\n', '\n').split('\n'):
+        m = re.match(r'^##\s+(.+?)\s*$', line)
+        if m:
+            current = out['sections'].setdefault(m.group(1), [])
+        elif current is not None:
+            current.append(line)
+        elif re.match(r'^#\s+Brain file:', line):
+            out['name'] = line.split(':', 1)[1].strip()
+        else:
+            m = re.match(r'^(npc|session|tier):\s*(.*?)\s*$', line)
+            if m:
+                out['fields'][m.group(1)] = m.group(2)
+    return out
+
+
+def items(lines):
+    """Bullets and paragraphs, one text each; a wrapped line joins the item above it. Template guidance is dropped."""
+    out, joinable = [], False
+    for line in lines:
+        s = line.strip()
+        if not s or s in TEMPLATE_LINES or s.startswith('<!--'):
+            joinable = False
+            continue
+        if BULLET.match(s):
+            out.append(BULLET.sub('', s))
+        elif joinable and not s.startswith('DIGEST:'):  # a digest pasted under Memory is its own item
+            out[-1] += ' ' + s
+        else:
+            out.append(s)
+        joinable = True
+    return out
+
+
+def chunks(text, size=MAX_TEXT):
+    """Split a text into pieces of at most size characters, at sentence ends, then at spaces."""
+    text = ' '.join(text.split())
+    if len(text) <= size:
+        return [text]
+    pieces = []
+    for sentence in re.split(r'(?<=[.!?])\s+', text):
+        pieces += [sentence] if len(sentence) <= size else [w[i:i + size] for w in sentence.split()
+                                                            for i in range(0, len(w), size)]
+    out = ['']
+    for piece in pieces:
+        if out[-1] and len(out[-1]) + 1 + len(piece) > size:
+            out.append('')
+        out[-1] = (out[-1] + ' ' + piece).strip()
+    return out
+
+
+def default_entry(b):
+    story = [eid for eid, e in b.gm.read_entries(b.root).items() if e.get('channel') == 'story.md']
+    if not story:
+        raise Fail('public/story.md has no entry for the migrated memories to cite; give --entry')
+    return story[-1]
+
+
+def migrate_file(b, path, entry, entries):
+    """Stage one method-only file's events; return (summary, warnings)."""
+    src = parse_method_only(path.read_text(encoding='utf-8'))
+    npc, name, secs, warns = src['fields'].get('npc', ''), path.name, src['sections'], []
+    if npc in b.state['chars']:
+        raise Fail(f'{name}: {npc} already has a brain in events.jsonl; move the file aside by hand')
+    card = b.gm_state['npcs'].get(npc, {})
+    title = src['name'] if src['name'] and '<' not in src['name'] else None
+    data = {'name': title or card.get('name') or npc,
+            'card': {k: card[k] for k in CARD_FIELDS if card.get(k)}, 'card_at': gm_seq(b.gm, b.root)}
+    look = ' '.join(items(secs.get('Look', [])))
+    if look:
+        if len(look) > MAX_TEXT:
+            warns.append(f'{name}: the look was cut to {MAX_TEXT} characters; the whole of it is in the legacy copy')
+            look = look[:MAX_TEXT]
+        data['look'] = look
+    why = f'migrated from {name}'
+    b.stage(npc, 'char', data, None, why)
+    tier = (src['fields'].get('tier', '').split() or ['ephemeral'])[0].lower()
+    if tier not in TIERS:
+        warns.append(f'{name}: tier {src["fields"]["tier"]!r} is not persistent or ephemeral; recorded as ephemeral')
+        tier = 'ephemeral'
+    session = src['fields'].get('session', '').split()
+    session = None if not session or session[0].lower() in ('none', 'new') else session[0]
+    b.stage(npc, 'session', {'session': session, 'tier': tier}, None, why)
+
+    memories = []
+    for text in items(secs.get('Memory', [])):
+        digest = re.match(r'^DIGEST:\s*', text)
+        memories.append((text[digest.end():] if digest else text, 4 if digest else 3))
+    digest = ' '.join(items(secs.get('Digest', [])))
+    if digest:
+        memories.append((digest, 4))  # the digest becomes one summary, ranked above a plain memory
+    count = {3: 0, 4: 0}
+    for text, salience in memories:
+        parts = chunks(text)
+        if len(parts) > 1:
+            warns.append(f'{name}: a memory longer than {MAX_TEXT} characters was split into {len(parts)} episodes')
+        found = leaks(b, text)
+        if found:
+            warns.append(f'{name}: the memory "{text[:60]}" holds ' + ' and '.join(found) + '; a brief is refused '
+                         'until it is folded into reworded text with compress')
+        for part in parts:
+            b.stage(npc, 'remember', {'text': part, 'salience': salience}, entry, why)
+            count[salience] += 1
+
+    knows = []
+    for line in items(secs.get('Knows', [])):
+        if re.search(r'<[^>]+>', line):
+            continue  # the template's placeholder bullet
+        cited = UUID_RE.search(line)
+        words = re.findall(r'[A-Za-z][A-Za-z0-9_-]*', UUID_RE.sub(' ', line))
+        fids = [w for w in dict.fromkeys(words) if w in b.gm_state['facts']]
+        if not fids:
+            odd = FACT_ID.findall(line)
+            warns.append(f'{name}: Knows line "{line}" ' + (f'names {", ".join(odd)}, not a game-master fact' if odd
+                         else 'names no fact id') + f'; if {npc} knows it, record it with know')
+            continue
+        at = cited.group(0) if cited else entry
+        if at not in entries:
+            warns.append(f'{name}: Knows line "{line}" cites entry {at}, no longer in the logs; not moved')
+            continue
+        for fid in fids:
+            status = b.gm_state['facts'][fid]['status']
+            if status in TERMINAL_FACT:
+                warns.append(f'{name}: {fid} is {status}; not moved')
+            elif fid not in b.state['knows'].get(npc, {}):
+                b.stage(npc, 'know', {'fact': fid, 'how': MIGRATED, 'confidence': 'certain', 'migrated': True},
+                        at, why)
+                knows.append(fid)
+    for title in secs:
+        if not items(secs[title]):
+            continue
+        if title == 'Desire':
+            warns.append(f'{name}: the Desire line is kept only in the legacy copy; this version has no place for it yet')
+        elif title == 'Sheet':
+            warns.append(f'{name}: the Sheet is kept only in the legacy copy; remember what of it the character keeps')
+        elif title not in KNOWN_SECTIONS:
+            warns.append(f'{name}: section "{title}" is kept only in the legacy copy')
+    return {'npc': npc, 'file': f'notes/brains/{name}', 'legacy': f'notes/brains/legacy/{name}',
+            'memories': count[3], 'summaries': count[4], 'knows': knows}, warns
 
 
 # ---- commands --------------------------------------------------------------------------------
@@ -661,9 +916,61 @@ def cmd_check(args):
     return {'events': len(b.events), 'brains': sorted(b.state['chars'])}, warns
 
 
+def cmd_migrate(args):
+    names = method_only_files(args.root)
+    if not names:
+        return {'migrated': []}, ['notes/brains/ holds no method-only brain files; nothing to migrate']
+    b = Brains(args.root, need_log=False, migrating=True)
+    entries = b.gm.read_entries(args.root)
+    entry = args.entry or default_entry(b)
+    if entry not in entries:
+        raise Fail(f'entry {entry} is not in public/story.md or public/director.md')
+    paths = [brains_dir(args.root) / n for n in names]
+    npcs = [parse_method_only(p.read_text(encoding='utf-8'))['fields'].get('npc', '') for p in paths]
+    twice = sorted({n for n in npcs if npcs.count(n) > 1})
+    if twice:
+        raise Fail('more than one method-only file is for ' + ', '.join(twice) + '; merge them by hand first')
+    legacy = brains_dir(args.root) / 'legacy'
+    for path in paths:  # the copies come first, so nothing is lost whatever happens next
+        dest = legacy / path.name
+        if dest.exists() and dest.read_bytes() != path.read_bytes():
+            raise Fail(f'notes/brains/legacy/{path.name} already exists and differs; move one of them aside by hand')
+        legacy.mkdir(parents=True, exist_ok=True)
+        dest.write_bytes(path.read_bytes())
+    done, warns = [], []
+    for path in paths:
+        summary, more = migrate_file(b, path, entry, entries)
+        done.append(summary)
+        warns += more
+    b.save()  # one write, once every file staged cleanly; a view replaces the file named after its npc
+    for path in paths:
+        if path.exists() and not path.read_text(encoding='utf-8').startswith(GENERATED):
+            path.unlink()  # its copy is in legacy/; left here it would block every command
+    for s in done:
+        warns.append(f'{s["npc"]}: no know event was invented. Record with know each fact they hold that the old '
+                     'file did not list by id, and classify facts with world --audit')
+    return {'migrated': done, 'entry': entry}, warns
+
+
+def cmd_reconcile(args):
+    b = Brains(args.root)
+    kept, aside = plan_reconcile(b)
+    listed = [{'seq': ev['seq'], 'op': ev['op'], 'npc': ev.get('npc'), 'why': why} for ev, why in aside]
+    if not aside:
+        return {'set_aside': [], 'applied': False, 'remaining': len(kept)}, []
+    if not args.apply:
+        return {'set_aside': listed, 'applied': False, 'remaining': len(kept)}, [
+            f'{len(aside)} event(s) to set aside. Run again with --apply (they are kept in notes/brains/withdrawn.jsonl).']
+    old = b.gm.read_lines(withdrawn_path(args.root))
+    b.gm.write_text(withdrawn_path(args.root), b.gm.dump_lines(old + [ev for ev, _ in aside]))
+    b.events, b.state = kept, replay(kept)
+    b.save()
+    return {'set_aside': listed, 'applied': True, 'remaining': len(kept)}, []
+
+
 COMMANDS = {'init': cmd_init, 'add': cmd_add, 'world': cmd_world, 'know': cmd_know, 'unlearn': cmd_unlearn,
             'remember': cmd_remember, 'compress': cmd_compress, 'session': cmd_session, 'brief': cmd_brief,
-            'view': cmd_view, 'check': cmd_check}
+            'view': cmd_view, 'check': cmd_check, 'migrate': cmd_migrate, 'reconcile': cmd_reconcile}
 
 
 def parser():
@@ -716,6 +1023,10 @@ def parser():
     s = sub.add_parser('view')
     s.add_argument('npc', nargs='?')
     cmd('check', npc=False, entry=False)
+    s = cmd('migrate', npc=False, entry=False)
+    s.add_argument('--entry', help='the entry the migrated memories cite (default: the last story entry)')
+    s = cmd('reconcile', npc=False, entry=False)
+    s.add_argument('--apply', action='store_true', help='set the events aside; without it, only list them')
     return p
 
 

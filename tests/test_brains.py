@@ -277,6 +277,135 @@ class BrainsTest(unittest.TestCase):
         (brains / 'PROTOCOL.md').write_text('npc: x\n', encoding='utf-8')
         self.assertIn('method-only brain files (mara.md)', self.brains('init', expect=2)['error'])
 
+    # ---- migration and Undo (ISS-25) ----
+
+    def method_only(self, name='mara.md', npc='mara', **sections):
+        body = {'Look': 'Tall, salt-grey hair, a burn on one wrist.',
+                'Desire': 'She wants to be wanted, and will never say so.',
+                'Knows': f'- F2, from {self.entry}\n- that Juno lies about the ledger\n- F99, from {self.entry}',
+                'Memory': ('- She took the player\'s coin and\n  did not count it.\n- The tide office turned her away.\n'
+                           '- ' + 'She waited on the quay all night. ' * 12 + '\n'
+                           'DIGEST: she trusts the player a little more; she wants the boat back.'),
+                'Digest': 'Owes the player now.\nWill not go back to the tide office.', **sections}
+        text = (f'# Brain file: Mara\n\nnpc: {npc}\nsession: sess-41\ntier: persistent (since day 2, because ...)\n\n'
+                + ''.join(f'## {k}\n\n{v}\n\n' for k, v in body.items() if v is not None))
+        brains = self.root / 'notes' / 'brains'
+        brains.mkdir(parents=True, exist_ok=True)
+        (brains / name).write_text(text, encoding='utf-8', newline='\n')
+        return text
+
+    def events(self, name='events.jsonl'):
+        path = self.root / 'notes/brains' / name
+        return [json.loads(ln) for ln in path.read_text(encoding='utf-8').splitlines()] if path.exists() else []
+
+    def test_migrate_keeps_every_memory_bullet_and_invents_no_know(self):
+        self.cast()  # mara and juno are already in the log; migrate a third character
+        self.gm([self.fact(1), self.fact(2, known=False),
+                 {'op': 'set', 'kind': 'npc', 'id': 'oren', 'fields': {'name': 'Oren Pike', 'want': 'quiet'}}])
+        self.brains('world', 'F1', '--visibility', 'public')
+        self.brains('world', 'F2', '--visibility', 'secret', '--witnesses', 'juno')
+        original = self.method_only('oren.md', 'oren')
+        before = len(self.events())
+        out = self.brains('migrate', expect=1)
+        self.assertEqual((self.root / 'notes/brains/legacy/oren.md').read_text(encoding='utf-8'), original)
+        self.assertTrue((self.root / 'notes/brains/oren.md').read_text(encoding='utf-8').startswith('<!-- generated'))
+        new = self.events()[before:]
+        self.assertEqual([e['op'] for e in new[:2]], ['char', 'session'])
+        self.assertEqual(new[0]['data']['look'], 'Tall, salt-grey hair, a burn on one wrist.')
+        self.assertEqual(new[1]['data'], {'session': 'sess-41', 'tier': 'persistent'})
+        memories = [e['data'] for e in new if e['op'] == 'remember']
+        texts = [m['text'] for m in memories]
+        self.assertEqual(texts[:2], ["She took the player's coin and did not count it.", 'The tide office turned her away.'])
+        long = ' '.join(t for t in texts if t.startswith('She waited'))
+        self.assertEqual(long, ('She waited on the quay all night. ' * 12).strip())  # split, nothing lost
+        self.assertEqual(texts[-2:], ['she trusts the player a little more; she wants the boat back.',
+                                      'Owes the player now. Will not go back to the tide office.'])
+        self.assertEqual([m['salience'] for m in memories][-2:], [4, 4])
+        self.assertTrue(all(e['entry'] == self.entry for e in new if e['op'] == 'remember'))
+        knows = [e for e in new if e['op'] == 'know']
+        self.assertEqual([(k['data']['fact'], k['data']['how'], k['entry']) for k in knows], [('F2', 'migrated', self.entry)])
+        joined = ' '.join(out['warnings'])
+        for needle in ('names no fact id', 'names F99, not a game-master fact', 'Desire line is kept only',
+                       'split into 2 episodes', 'no know event was invented'):
+            self.assertIn(needle, joined)
+        brief = self.brief('oren')
+        self.assertIn(text(2), brief)
+        self.assertNotIn('migrated', brief)
+        self.assertEqual(self.brains('check')['ok'], True)
+        self.assertEqual(self.brains('migrate', expect=1)['migrated'], [])  # nothing left to move
+
+    def test_migrate_writes_nothing_to_the_log_when_a_file_cannot_move(self):
+        self.cast()
+        self.method_only('mara.md', 'mara')  # mara already has a brain in the log
+        before = (self.root / 'notes/brains/events.jsonl').read_bytes()
+        self.assertIn('already has a brain', self.brains('migrate', expect=2)['error'])
+        self.assertEqual((self.root / 'notes/brains/events.jsonl').read_bytes(), before)
+        self.assertTrue((self.root / 'notes/brains/mara.md').read_text(encoding='utf-8').startswith('# Brain file'))
+        self.brains('check', expect=2)  # still refused over the method-only file
+        (self.root / 'notes/brains/mara.md').unlink()
+        self.method_only('stray.md', 'nobody')
+        self.assertIn('no game-master cast card', self.brains('migrate', expect=2)['error'])
+        self.assertTrue((self.root / 'notes/brains/legacy/stray.md').exists())  # the copy came first
+
+    def test_migrate_from_a_fresh_story_needs_no_init(self):
+        self.gm([{'op': 'set', 'kind': 'npc', 'id': 'mara', 'fields': {'name': 'Mara Venn'}}])
+        self.method_only(Knows=None, Desire=None, Digest=None)
+        out = self.brains('migrate', expect=1)
+        self.assertEqual(out['migrated'][0]['memories'], 4)
+        self.assertEqual(out['migrated'][0]['summaries'], 1)
+        self.assertEqual(self.brains('view', 'mara')['view'].count('[salience'), 5)
+
+    def test_an_event_citing_a_withdrawn_entry_leaves_the_brief(self):
+        self.fixture()
+        undone = self.add_entry('The clerk confessed.')
+        self.brains('know', 'mara', 'F9', '--how', 'I heard the clerk confess', '--confidence', 'certain',
+                    '--entry', undone)
+        first = self.brains('remember', 'mara', '--text', 'The clerk wept.', '--entry', undone)['seq']
+        second = self.brains('remember', 'mara', '--text', 'Rain all day.', '--entry', self.entry)['seq']
+        self.brains('remember', 'mara', '--text', 'Rain again.', '--entry', self.entry)
+        self.brains('compress', 'mara', '--replace', str(first), str(second), '--text', 'A wet, sad day.')
+        self.brains('unlearn', 'mara', 'F9', '--entry', self.entry, '--why', 'she decided he lied')
+        self.brains('know', 'mara', 'F10', '--how', 'I heard it too', '--confidence', 'probable', '--entry', self.entry)
+        self.assertNotIn(text(9), self.brief())
+        story = self.root / 'public/story.md'
+        story.write_text(story.read_text(encoding='utf-8').replace(files.entry('The clerk confessed.', id=undone), ''),
+                         encoding='utf-8', newline='\n')
+        self.assertIn('reconcile', self.brief(expect=2)['error'])  # no brief while the log cites what never happened
+        log = (self.root / 'notes/brains/events.jsonl').read_bytes()
+        dry = self.brains('reconcile', expect=1)
+        self.assertEqual([e['op'] for e in dry['set_aside']], ['know', 'remember', 'compress', 'unlearn'])
+        self.assertEqual((self.root / 'notes/brains/events.jsonl').read_bytes(), log)  # a dry run changes nothing
+        done = self.brains('reconcile', '--apply')
+        self.assertTrue(done['applied'])
+        self.assertEqual(len(self.events('withdrawn.jsonl')), 4)
+        brief = self.brief()
+        self.assertNotIn(text(9), brief)
+        self.assertNotIn('clerk wept', brief)
+        self.assertNotIn('wet, sad day', brief)
+        self.assertIn('- Rain all day.\n- Rain again.', brief)  # the episodes compress had folded come back
+        self.assertIn(text(10), brief)
+        self.assertEqual(self.brains('check')['ok'], True)
+        self.assertEqual(self.brains('reconcile')['set_aside'], [])
+        used = {e['seq'] for e in self.events() + self.events('withdrawn.jsonl')}
+        self.assertNotIn(self.brains('remember', 'mara', '--text', 'Later.', '--entry', self.entry)['seq'], used)
+
+    def test_reconcile_follows_a_fact_game_master_withdrew(self):
+        self.cast()
+        undone = self.add_entry('A body in the dock.')
+        (self.root / 'notes/gm/pending.json').write_text(json.dumps(
+            {'entry': undone, 'why': 'the story showed it', 'ops': [self.fact(1)]}), encoding='utf-8')
+        self.assertEqual(run(self.root, 'gm_state.py', 'commit').returncode, 0)
+        self.brains('world', 'F1', '--visibility', 'public')  # setup event: cites no entry, rests on F1
+        self.assertIn(text(1), self.brief())
+        story = self.root / 'public/story.md'
+        story.write_text(story.read_text(encoding='utf-8').replace(files.entry('A body in the dock.', id=undone), ''),
+                         encoding='utf-8', newline='\n')
+        self.assertEqual(run(self.root, 'gm_state.py', 'reconcile', '--apply').returncode, 0)  # game-master first
+        out = self.brains('reconcile', '--apply')
+        self.assertEqual([(e['op'], 'F1 is no longer a game-master fact' in e['why']) for e in out['set_aside']],
+                         [('world', True)])
+        self.assertEqual(self.brains('check')['ok'], True)
+
     def test_needs_game_master(self):
         (self.root / 'tools' / 'gm_state.py').unlink()
         self.assertIn('game-master is not installed', self.brains('init', expect=2)['error'])
@@ -293,7 +422,7 @@ class BrainsDocs(unittest.TestCase):
         self.assertIn('knows too much', protocol)
         self.assertIn('DECIDES', protocol)
         for command in ('init', 'add', 'world', 'know', 'unlearn', 'remember', 'compress', 'session', 'brief',
-                        'view', 'check'):
+                        'view', 'check', 'migrate', 'reconcile'):
             self.assertIn(f'brains.py {command}', protocol + (plus / 'APPLY.md').read_text(encoding='utf-8'), command)
 
 

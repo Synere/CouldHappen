@@ -20,7 +20,7 @@ If the Director says "you decide", propose numbers for this story's cast and wai
 
 ## 1. Check the prerequisites
 
-1. **No method-only brains.** If `notes/brains/` holds brain files from the method-only character-brains package (a hand-written file with an `npc:` line), stop. This version cannot move them into the log. Tell the Director, and offer to keep the method-only package.
+1. **Method-only brains.** If `notes/brains/` holds brain files from the method-only character-brains package (a hand-written file with an `npc:` line), the two packages cannot run side by side, and every `brains.py` command except `migrate` refuses while those files are there. Offer the Director two choices: keep the method-only package, or move its brains into the log (install step 2). Moving keeps every memory, and copies each file to `notes/brains/legacy/` first.
 2. **game-master.** `tools/gm_state.py` and `notes/gm/` exist. If not, the Director must agree to game-master first; apply it with its own `APPLY.md`.
 3. **Layers.** Run `python tools/gm_state.py layers`. Turn on any of 2, 3 and 4 that is off with `python tools/gm_state.py layers --on 2 3 4`, then follow step 3 of game-master's APPLY.md ("Switching on a further layer") for each one you turned on.
 4. **Python.** `python tools/gm_state.py hot` runs. `brains.py` uses the same Python and the standard library only.
@@ -28,12 +28,13 @@ If the Director says "you decide", propose numbers for this story's cast and wai
 
 ## 2. Install
 
-1. Copy [files/brains.py](files/brains.py) to `tools/brains.py`, beside `tools/gm_state.py`, and run `python tools/brains.py init`.
-2. Copy [files/PROTOCOL.md](files/PROTOCOL.md) to `notes/brains/PROTOCOL.md`. Fill its "Fidelity" section with the Director's answers and the date, and note whether sessions can be resumed.
-3. Copy [files/scene-template.md](files/scene-template.md) to `notes/brains/SCENE.md` and [files/brain-template.md](files/brain-template.md) to `notes/brains/TEMPLATE.md`. Neither is a character.
-4. **Classify the facts game-master already holds.** Run `python tools/brains.py world --audit`, and for each fact it lists run `python tools/brains.py world <fact> --visibility public|witnessed|private|secret [--witnesses <npc> ...]`. Ask of each: who in the fiction could know this? When in doubt, choose the narrower class; a brain can learn a fact later, but cannot unsee it.
-5. **Add the characters who already qualify** under the protocol's "Who gets a brain". Each needs a layer 3 cast card first. Then `python tools/brains.py add <npc> --look "..." [--age N] [--alias ...] [--threads T1 ...]`, a `know` for each hidden truth they have learned (with the entry where they learned it), and a first `remember` from the story so far.
-6. Run `python tools/brains.py check`. It must pass.
+1. Copy [files/brains.py](files/brains.py) to `tools/brains.py`, beside `tools/gm_state.py`, and run `python tools/brains.py init`, unless you are moving method-only brains (next step).
+2. **Only when moving method-only brains** (prerequisite 1), run `python tools/brains.py migrate` in place of `init`. It copies each file to `notes/brains/legacy/`, then records the character, their session and tier, and every memory line (each digest as one summary) against the last story entry (`--entry E` for another), and replaces the file with its generated view. It makes a `know` only from a `## Knows` line that names a fact id, and never guesses one: read its warnings, and for each fact a character holds that the old file did not name by id, record `know` in step 6. A `## Desire` line or a `## Sheet` stays in the legacy copy only. The next two steps replace the old protocol and template.
+3. Copy [files/PROTOCOL.md](files/PROTOCOL.md) to `notes/brains/PROTOCOL.md`. Fill its "Fidelity" section with the Director's answers and the date, and note whether sessions can be resumed.
+4. Copy [files/scene-template.md](files/scene-template.md) to `notes/brains/SCENE.md` and [files/brain-template.md](files/brain-template.md) to `notes/brains/TEMPLATE.md`. Neither is a character.
+5. **Classify the facts game-master already holds.** Run `python tools/brains.py world --audit`, and for each fact it lists run `python tools/brains.py world <fact> --visibility public|witnessed|private|secret [--witnesses <npc> ...]`. Ask of each: who in the fiction could know this? When in doubt, choose the narrower class; a brain can learn a fact later, but cannot unsee it.
+6. **Add the characters who already qualify** under the protocol's "Who gets a brain". Each needs a layer 3 cast card first. Then `python tools/brains.py add <npc> --look "..." [--age N] [--alias ...] [--threads T1 ...]`, a `know` for each hidden truth they have learned (with the entry where they learned it), and a first `remember` from the story so far.
+7. Run `python tools/brains.py check`. It must pass.
 
 Private notes under `notes/` need no pause. Nothing here touches public files.
 

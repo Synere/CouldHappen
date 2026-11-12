@@ -17,7 +17,7 @@ The same idea as [character-brains](../character-brains/PACKAGE.md): a recurring
 - **character-brains** (method only): light stories, small casts, or a Director who wants no extra bookkeeping. What a character knows is your judgment on each call.
 - **character-brains-plus**: stories built on secrets, lies and who-knows-what, where a leak would quietly flatten them. It costs one line of bookkeeping per new fact each turn.
 
-The two cannot be installed together: both keep their files in `notes/brains/`.
+The two cannot be installed together: both keep their files in `notes/brains/`. A story on the method-only package can move to this one: `migrate` moves its brain files into the log and keeps the originals in `notes/brains/legacy/`.
 
 ## What a player gets
 

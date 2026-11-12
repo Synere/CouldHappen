@@ -122,7 +122,11 @@ At a scene's end, `remember` what changed for each character who was called. Whe
 
 ## Undo
 
-After a Director Undo, run game-master's `reconcile` first. Then `python tools/brains.py check` warns about every brain event whose entry is gone. For each, `unlearn` what the character learned from it, and leave its episode out of what you write.
+After a Director Undo, `brief` refuses until both logs are reconciled, so no brain is told what never happened. In this order:
+
+1. `python tools/gm_state.py reconcile`, then, if it lists deltas to set aside, `python tools/gm_state.py reconcile --apply`. Game-master goes first: a brain event can rest on a fact that game-master sets aside.
+2. `python tools/brains.py reconcile` lists every brain event whose entry is gone, and every event that depends on one (an `unlearn` of what was learned there, a `compress` that folded its episode, anything about a fact game-master no longer has). `python tools/brains.py reconcile --apply` moves them into `notes/brains/withdrawn.jsonl`, so they leave every brief and view.
+3. `python tools/brains.py check`. If something the character still knows was only recorded in a set-aside event, record it again against an entry that stands.
 
 ## When a session ends
 
@@ -143,6 +147,8 @@ Build a fresh brief, start a new subagent, record it with `session <npc> --id <n
 | `python tools/brains.py brief <npc> --scene F` | the brief; `--as` an alias they go by here; `--text` prints it bare |
 | `python tools/brains.py view [<npc>]` | rewrites the views and prints one |
 | `python tools/brains.py check` | validates the log against game-master |
+| `python tools/brains.py reconcile [--apply]` | after an Undo: sets aside events whose entry is gone, and what depends on them |
+| `python tools/brains.py migrate` | moves method-only brain files into the log, once, at apply |
 
 Every command prints one JSON object and exits 0 when all is well, 1 with warnings, 2 on an error.
 
