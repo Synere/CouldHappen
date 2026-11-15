@@ -221,6 +221,7 @@ Raised on 2026-11-16 when ISS-33 closed. The offline tests cover payload buildin
 - **One character:** a one-person prompt file through `tools/scene_image_nai.py` lands one PNG in `public/assets/` and records its seed.
 - **Two characters:** a prompt file with `[Character 1]` and `[Character 2]` fields returns a picture with two people whose looks follow their own fields.
 - **Tag helper:** `tools/nai_tags.py` prints only matches that start with the query.
+- **Same character twice:** one cast block used in two scenes, one of them with two characters, gives a consistent look.
 - **From prose:** a one-character scene written from a story passage with `nai/core.md` and `nai/danbooru.md`, its unsure tags checked with the helper, passes the picture check.
 
 ## ISS-34 — Decide on bundling adapted nai5-prompting text
@@ -249,6 +250,8 @@ Blocked by ISS-35. Delivers:
 - **The picture check's extra question:** does each character still match their tag block?
 
 Done when the same character looks consistent across two scenes, including one with two characters.
+
+**Closed 2026-11-16, not yet observed in a story.** `nai/characters.md` and `nai/reverse.md`, the APPLY paragraph on characters, and a `[Character N = <cast id>]` header in `scene_image_nai.py` that fills the field from `notes/prompts/cast/<cast id>.txt` (lines under the header replace the block's clothing for that picture), with tests. The script reads the block, so the tags cannot drift between pictures. The consistency check across two scenes is part of ISS-38.
 
 ## ISS-37 — Scenes page
 

@@ -41,7 +41,6 @@ Work order from 2026-11-11. The author's ranking: one `N. ISS-n — why` line pe
 | ISS-21 | Lossless `card.md` (envelope, lorebook names, falsy fields); `portrait` guidance for a JSON-card import | helpers | — | [public release](plans/public-release.md#iss-21--lossless-card-copy-and-portrait-guidance) |
 | ISS-22 | Vite denies `START_HERE.md`; portrait button names a lost connection; contract says how the reader settles uncertain saves | web | — | [public release](plans/public-release.md#iss-22--reader-boundary-and-save-wording) |
 | ISS-23 | Design names `voice.md` and `what-this-can-do.md` and keeps one creative-practice file; link-check wording | docs | — | [public release](plans/public-release.md#iss-23--design-text-catches-up) |
-| ISS-36 | NovelAI cast tag blocks, characters and reverse pages: the same character across scenes | packages | ISS-35 | [plan](plans/novelai-images.md#iss-36--cast-tag-blocks-characters-and-reverse-pages) |
 | ISS-37 | NovelAI scenes page: positions, complexity, visual-novel switches | packages | ISS-35 | [plan](plans/novelai-images.md#iss-37--scenes-page) |
 
 ## Decisions pending
@@ -82,6 +81,7 @@ Work order from 2026-11-11. The author's ranking: one `N. ISS-n — why` line pe
 
 | ID | Item | Closed | Resolution |
 | --- | --- | --- | --- |
+| ISS-36 | NovelAI cast tag blocks, characters and reverse pages: the same character across scenes | 2026-11-16 | `scene-images/nai/characters.md` and `reverse.md` (GPL-3.0-only, ADR-10), cast blocks in `notes/prompts/cast/<id>.txt` read by the script through `[Character N = <id>]`, the picture check asks whether each character matches their block; live check in ISS-38; not yet observed in a story |
 | ISS-35 | NovelAI core and danbooru pages and `nai_tags.py`: a one-character scene from prose to checked tags | 2026-11-16 | `scene-images/nai/core.md` and `danbooru.md` (GPL-3.0-only with their notices, ADR-10), `files/nai_tags.py` (only matches that start with the query, counts shown as 10000+ at the cap, confidence rounded), APPLY, the index, the capability page and the README updated, with tests; live check in ISS-38; not yet observed in a story |
 | ISS-33 | NovelAI provider script (`scene_image_nai.py`) and APPLY section: one PNG through the contract | 2026-11-16 | `files/scene_image_nai.py` (JSON to `/ai/generate-image`, the ZIP read with `zipfile`, an honest user agent, V5 Full at 23 steps and Normal sizes, `--spend-anlas` for anything else, the Standard quality tags and Heavy UC, `nsfw: no`, the seed recorded in the prompt file, `--ref` refused), the APPLY section "NovelAI provider" and offline tests shipped; live checks in ISS-38; not yet observed in a story |
 | ISS-34 | ADR: bundling pages adapted from nai5-prompting (GPL-3.0-only) in the AGPL release | 2026-11-16 | [ADR-10](decisions/ADR-10-bundle-adapted-nai5-prompting-pages.md): the adapted pages ship as a GPL-3.0-only folder, `scene-images/nai/`, combined under §13 of both licences, each page with its copyright line, SPDX identifier, source link and modification notice, the source NOTICE and GPL-3.0 text beside them |

@@ -12,7 +12,9 @@ The prompt file holds the base prompt first, written as it should be sent: the p
 framing, place and light as Danbooru tags, a short sentence only where tags cannot say it, and, with two or more
 people, one "Character N: ..." action line per person. Then one character field per person in frame, each under
 a header line "[Character N]", numbered from 1 and from the viewer's left, holding that person's gender,
-appearance and clothing. Lines starting with # are notes and are not sent. A line "nsfw: no" here or in
+appearance and clothing. "[Character N = <cast id>]" fills the field from notes/prompts/cast/<cast id>.txt, the
+character's fixed cast block; lines under such a header replace the block's clothing (every line after its
+first). Lines starting with # are notes and are not sent. A line "nsfw: no" here or in
 notes/style.txt means the Director does not want NSFW pictures, and nsfw goes into the undesired content. After a
 picture is made, the seed used is recorded in the prompt file as a "seed: N" line, so the picture can be remade
 or varied deliberately with --seed.
@@ -53,7 +55,7 @@ HEAVY_UC = ('lowres, artistic error, film grain, scan artifacts, worst quality, 
             'very displeasing, chromatic aberration, dithering, halftone, screentone, multiple views, logo, '
             'too many watermarks, negative space, blank page')
 USER_AGENT = 'couldhappen-scene-image/0.1'  # an honest agent: Cloudflare refuses Python's default one
-HEADER = re.compile(r'^\[\s*character\s*(\d+)\s*\]$', re.IGNORECASE)
+HEADER = re.compile(r'^\[\s*character\s*(\d+)\s*(?:=\s*([A-Za-z0-9_-]+)\s*)?\]$', re.IGNORECASE)
 NO_NSFW = re.compile(r'^nsfw\s*:\s*no\s*$', re.IGNORECASE)
 SEED = re.compile(r'^seed\s*:\s*\d+\s*$', re.IGNORECASE)
 
@@ -64,9 +66,22 @@ def tidy(lines):
     return text.strip()
 
 
-def parse(text):
+def cast_block(cast_dir, cast_id):
+    """A cast block's tag lines: the appearance line first, then the clothing lines."""
+    path = Path(cast_dir) / f'{cast_id}.txt'
+    try:
+        lines = [line for line in path.read_text(encoding='utf-8').splitlines()
+                 if line.strip() and not line.strip().startswith('#')]
+    except OSError:
+        raise ValueError(f'there is no cast block {path}') from None
+    if not lines:
+        raise ValueError(f'the cast block {path} has no tags')
+    return lines
+
+
+def parse(text, cast_dir='notes/prompts/cast'):
     """Split a prompt file into (base prompt, [character fields], nsfw excluded)."""
-    base, characters, no_nsfw = [], [], False
+    base, characters, casts, no_nsfw = [], [], [], False
     current = base
     for raw in text.splitlines():
         line = raw.strip()
@@ -81,14 +96,21 @@ def parse(text):
                 raise ValueError('[Character N] headers must be numbered 1, 2, 3 ... in order')
             current = []
             characters.append(current)
+            casts.append(header.group(2))
             continue
         current.append(raw)
-    base, characters = tidy(base), [tidy(lines) for lines in characters]
-    if any(not field for field in characters):
+    fields = []
+    for lines, cast_id in zip(characters, casts):
+        if cast_id:
+            block = cast_block(cast_dir, cast_id)
+            lines = block[:1] + (lines if tidy(lines) else block[1:])
+        fields.append(tidy(lines))
+    base = tidy(base)
+    if any(not field for field in fields):
         raise ValueError('a [Character N] header has nothing under it')
-    if not base and not characters:
+    if not base and not fields:
         raise ValueError('the prompt file is empty')
-    return base, characters, no_nsfw
+    return base, fields, no_nsfw
 
 
 def payload(base, characters, *, width, height, steps, seed, no_nsfw=False, text=False):
@@ -177,7 +199,8 @@ def main(argv):
     if args.seed is not None and not 0 <= args.seed < 2 ** 32:
         sys.exit('--seed must be between 0 and 4294967295')
     try:
-        base, characters, no_nsfw = parse(args.prompt_file.read_text(encoding='utf-8'))
+        base, characters, no_nsfw = parse(args.prompt_file.read_text(encoding='utf-8'),
+                                          Path(__file__).resolve().parents[1] / 'notes/prompts/cast')
     except (OSError, ValueError) as error:
         sys.exit(f'Cannot use the prompt file: {error}')
     root = Path(__file__).resolve().parents[1]

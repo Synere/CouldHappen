@@ -68,6 +68,18 @@ class Payload(unittest.TestCase):
             with self.assertRaises(ValueError, msg=text):
                 self.nai.parse(text)
 
+    def test_a_cast_header_fills_the_field_from_the_cast_block(self):
+        with tempfile.TemporaryDirectory() as cast:
+            Path(cast, 'whisper.txt').write_text(
+                '# Whisper. Chosen: grey eyes.\ngirl, long hair, grey hair, braid, grey eyes,\ndark green cloak, boots,\n',
+                encoding='utf-8')
+            text = '2girls, indoors,\n[Character 1 = whisper]\n[Character 2 = whisper]\nwhite dress,\n'
+            base, characters, _ = self.nai.parse(text, cast)
+            self.assertEqual(characters[0], 'girl, long hair, grey hair, braid, grey eyes,\ndark green cloak, boots,')
+            self.assertEqual(characters[1], 'girl, long hair, grey hair, braid, grey eyes,\nwhite dress,')
+            with self.assertRaises(ValueError):
+                self.nai.parse('1girl\n[Character 1 = nobody]\n', cast)
+
     def test_defaults_are_the_free_tier_at_effort_high(self):
         sent = self.nai.payload('1girl, indoors,', ['girl, red hair'], width=832, height=1216, steps=23, seed=7)
         p = sent['parameters']
@@ -101,7 +113,7 @@ class Payload(unittest.TestCase):
 
 
 class Script(unittest.TestCase):
-    def run_script(self, *args, prompt='1girl, solo, window,\n[Character 1]\ngirl, black hair,\n', style=None, token=TOKEN):
+    def run_script(self, *args, prompt='1girl, solo, window,\n[Character 1]\ngirl, black hair,\n', style=None, token=TOKEN, cast=None):
         server = HTTPServer(('127.0.0.1', 0), NovelAI)
         threading.Thread(target=server.serve_forever, daemon=True).start()
         self.addCleanup(server.server_close)
@@ -113,6 +125,9 @@ class Script(unittest.TestCase):
         (root / 'notes/prompts').mkdir(parents=True)
         (root / 'tools/scene_image_nai.py').write_text(SCRIPT.read_text(encoding='utf-8'), encoding='utf-8')
         (root / 'notes/prompts/1.txt').write_text(prompt, encoding='utf-8')
+        if cast is not None:
+            (root / 'notes/prompts/cast').mkdir()
+            (root / 'notes/prompts/cast/whisper.txt').write_text(cast, encoding='utf-8')
         if style is not None:
             (root / 'notes/style.txt').write_text(style, encoding='utf-8')
         env = {k: v for k, v in os.environ.items() if k != 'NOVELAI_TOKEN'}
@@ -141,6 +156,11 @@ class Script(unittest.TestCase):
         self.assertEqual((root / 'public/assets' / name).read_bytes(), png([]))
         prompt = (root / 'notes/prompts/1.txt').read_text(encoding='utf-8')
         self.assertTrue(prompt.endswith(f"seed: {sent['parameters']['seed']}\n"), prompt)
+
+    def test_the_script_reads_cast_blocks_from_the_workspace(self):
+        root, done = self.run_script(prompt='1girl, solo,\n[Character 1 = whisper]\n', cast='girl, grey hair, braid,\ngreen cloak,\n')
+        self.assertEqual(done.returncode, 0, done.stderr)
+        self.assertEqual(seen[0][2]['parameters']['characterPrompts'][0]['prompt'], 'girl, grey hair, braid,\ngreen cloak,')
 
     def test_a_recorded_seed_is_replaced_and_reused_on_request(self):
         root, done = self.run_script('--seed', '42', prompt='1girl\nseed: 5\n')

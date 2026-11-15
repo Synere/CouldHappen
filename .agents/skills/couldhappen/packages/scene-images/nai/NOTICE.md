@@ -17,6 +17,8 @@ The CouldHappen project modified these pages on 2026-11-16. They rewrite chosen 
 | --- | --- |
 | [core.md](core.md) | `nai5-writing/references/conventions.md`: field responsibilities, assembling the final draft, quality tags and UC, weights, text rendering, multiple characters, V5 switches. `nai5-writing/references/illustration.md`: character types and appearance fields, the complete template and its checks, style blocks, order within the base prompt, functional blocks, tags or sentences, multi-person interaction and prefixes, troubleshooting, final checks. |
 | [danbooru.md](danbooru.md) | `illustration.md`: objects and attributes suited to tag phrases (people, species, framing, posture, clothing state, body-part focus, character names, background, semantic conflicts). `nai5-costume-writing/references/costume.md`: checking names on Danbooru, levels of word choice, tags and natural language, commonly misused terms. `nai5-writing/references/sources.md`: the Danbooru API links. |
+| [characters.md](characters.md) | `illustration.md`: character-field detail for original and franchise characters. `nai5-costume-writing/references/costume.md`: expressing garment components, writing from supplied clothing strings, including the outfit in a complete image. `oc-character-design/references/character.md`: establishing visual identity and overall silhouette. |
+| [reverse.md](reverse.md) | `nai5-reverse-prompt/references/reverse.md`: the three sources, scope, reading the grammar first, looking at the picture, what not to infer, delivery. |
 
 Nothing here is adapted from nai5-prompting's `background.md` files, so the separate MIT notice that nai5-prompting carries for Fanfic-background-assistant does not apply to these pages.
 
