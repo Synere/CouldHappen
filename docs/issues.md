@@ -4,7 +4,7 @@ The single register of open work for CouldHappen: to-dos, pending decisions, ope
 unverified facts, each with a stable `ISS-n` ID. A row is one short line. Its Source links to the item's home
 section: a heading that starts with its ID (`## ISS-n — title`) in another file, which holds the reasoning.
 
-- **Next ID: ISS-38.** IDs are never reused. Code comments and commits may cite them.
+- **Next ID: ISS-39.** IDs are never reused. Code comments and commits may cite them.
 - **New item:** write its home section first, then add a row here whose Source links to it, and bump Next ID.
 - **Resolved item:** move the row to Closed with the date and a one-line resolution, and update its home section.
 
@@ -41,7 +41,6 @@ Work order from 2026-11-11. The author's ranking: one `N. ISS-n — why` line pe
 | ISS-21 | Lossless `card.md` (envelope, lorebook names, falsy fields); `portrait` guidance for a JSON-card import | helpers | — | [public release](plans/public-release.md#iss-21--lossless-card-copy-and-portrait-guidance) |
 | ISS-22 | Vite denies `START_HERE.md`; portrait button names a lost connection; contract says how the reader settles uncertain saves | web | — | [public release](plans/public-release.md#iss-22--reader-boundary-and-save-wording) |
 | ISS-23 | Design names `voice.md` and `what-this-can-do.md` and keeps one creative-practice file; link-check wording | docs | — | [public release](plans/public-release.md#iss-23--design-text-catches-up) |
-| ISS-33 | NovelAI provider script (`scene_image_nai.py`) and APPLY section: one PNG through the contract | packages | — | [plan](plans/novelai-images.md#iss-33--novelai-provider-script-and-apply-section) |
 | ISS-35 | NovelAI core and danbooru pages and `nai_tags.py`: a one-character scene from prose to checked tags | packages | ISS-33, ISS-34 | [plan](plans/novelai-images.md#iss-35--core-and-danbooru-pages-and-the-tag-helper) |
 | ISS-36 | NovelAI cast tag blocks, characters and reverse pages: the same character across scenes | packages | ISS-35 | [plan](plans/novelai-images.md#iss-36--cast-tag-blocks-characters-and-reverse-pages) |
 | ISS-37 | NovelAI scenes page: positions, complexity, visual-novel switches | packages | ISS-35 | [plan](plans/novelai-images.md#iss-37--scenes-page) |
@@ -78,11 +77,13 @@ Work order from 2026-11-11. The author's ranking: one `N. ISS-n — why` line pe
 | ISS-14 | The writer closes the game when the player asks | hosts | observe in a release workspace session | [host validation](plans/host-validation.md#iss-14--closing-the-game-on-request) |
 | ISS-15 | The skill's wait check works after a host restart | hosts | restart the host mid-session and observe | [host validation](plans/host-validation.md#iss-15--wait-check-after-a-host-restart) |
 | ISS-16 | The voice reference works on a host | skill | observe in a release workspace session | [host validation](plans/host-validation.md#iss-16--voice-reference-on-a-host) |
+| ISS-38 | The NovelAI script makes a PNG in a release workspace, with one and with two character fields | packages | the author runs the prepared commands with their own token | [plan](plans/novelai-images.md#iss-38--live-checks-of-the-novelai-script) |
 
 ## Closed
 
 | ID | Item | Closed | Resolution |
 | --- | --- | --- | --- |
+| ISS-33 | NovelAI provider script (`scene_image_nai.py`) and APPLY section: one PNG through the contract | 2026-11-16 | `files/scene_image_nai.py` (JSON to `/ai/generate-image`, the ZIP read with `zipfile`, an honest user agent, V5 Full at 23 steps and Normal sizes, `--spend-anlas` for anything else, the Standard quality tags and Heavy UC, `nsfw: no`, the seed recorded in the prompt file, `--ref` refused), the APPLY section "NovelAI provider" and offline tests shipped; live checks in ISS-38; not yet observed in a story |
 | ISS-34 | ADR: bundling pages adapted from nai5-prompting (GPL-3.0-only) in the AGPL release | 2026-11-16 | [ADR-10](decisions/ADR-10-bundle-adapted-nai5-prompting-pages.md): the adapted pages ship as a GPL-3.0-only folder, `scene-images/nai/`, combined under §13 of both licences, each page with its copyright line, SPDX identifier, source link and modification notice, the source NOTICE and GPL-3.0 text beside them |
 | ISS-29 | character-brains-plus: `review` for card drift, with a proposal for game-master | 2026-11-13 | `brains.py review [--npc] [--propose]` (card changed since the snapshot, wants, intents and memories set beside the card for the writer to judge, more than two vetoes in ten scenes, stale intents by horizon, persistent with no session) and `notes/brains/card-proposal.json`, never `notes/gm/`, shipped with tests and the protocol's chapter and ten-scene review; not yet observed in a story |
 | ISS-28 | character-brains-plus: the `BODY`, `UNSURE` and `REMEMBERS` answer keys, wants, intents, vetoes, the off-screen call | 2026-11-13 | the ten-key answer block, `brains.py want` (three, top two in the brief), `intent` (three, by horizon, `--done`/`--drop`), `veto`, a `routine` state group, and `brief --offscreen` with `offscreen` and `settings` (off by default, one call per boundary) shipped with tests; not yet observed in a story |

@@ -209,6 +209,19 @@ Blocked by nothing. Delivers `scene-images/files/scene_image_nai.py`, built from
 
 Also delivers the "NovelAI provider" section in APPLY, with tests for the parts that run offline (payload building, limits, ZIP reading). Done when one PNG lands in `public/assets/` through the existing contract in a release workspace.
 
+**Closed 2026-11-16, not yet observed in a story.** `files/scene_image_nai.py`, the APPLY section "NovelAI provider" and `tests/test_scene_image_nai.py` shipped. Two changes from the list above, both from reading nai5-prompting's field rules while building it:
+- **Prompt file layout.** nai5-prompting keeps each person's appearance and clothes in their own character field and their action in a `Character N:` line inside the base prompt. So the prompt file sends its base text as written, and each character field sits under a `[Character N]` header line. The script maps those fields to `characterPrompts` and `char_captions`.
+- **`--text`** drops `no text` from the quality tags and `logo` from the UC, as nai5-prompting's UC conflict table does for a picture with readable text.
+
+The live checks moved to ISS-38.
+
+## ISS-38 — Live checks of the NovelAI script
+
+Raised on 2026-11-16 when ISS-33 closed. The offline tests cover payload building, the free-tier limits, the seed record and ZIP reading. The payload differs from the 2026-11-16 working request only in guidance (5, the author's default, against the capture's 7) and in using character fields, which no live request has sent yet. To check, in a release workspace, with the author's own token:
+- **One character:** a one-person prompt file through `tools/scene_image_nai.py` lands one PNG in `public/assets/` and records its seed.
+- **Two characters:** a prompt file with `[Character 1]` and `[Character 2]` fields returns a picture with two people whose looks follow their own fields.
+- **Tag helper:** `tools/nai_tags.py` prints only matches that start with the query.
+
 ## ISS-34 — Decide on bundling adapted nai5-prompting text
 
 Blocked by nothing. Records an ADR on shipping pages adapted from nai5-prompting (GPL-3.0-only) in the AGPL-3.0-or-later release: GPLv3 §13 and AGPLv3 §13, the notices each adapted page keeps (copyright line, source link, NOTICE), and how the release ZIP carries them. Done when the ADR is accepted.

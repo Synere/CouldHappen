@@ -10,6 +10,8 @@ Do not search the machine for a key. If `OPENAI_API_KEY` (or the key of whicheve
 
 Copy [files/scene_image.py](files/scene_image.py) to `tools/scene_image.py`. With the Director's approval, run `python tools/scene_image.py --models` (a free listing), choose a cheap tier, and set `OPENAI_IMAGE_MODEL` for the writer session. Size and quality default to `1024x1024` and `low`; `OPENAI_IMAGE_SIZE` and `OPENAI_IMAGE_QUALITY` change them. If the Director prefers another provider, adapt the script and keep its contract: prompt file in (and optional reference pictures), PNG in `public/assets/` out, file name printed.
 
+If the Director has a NovelAI subscription and wants NovelAI pictures, follow "NovelAI provider" at the end of this page instead of the OpenAI steps above, then continue here.
+
 Create `notes/style.txt` with the art style in a few lines (medium, palette, camera, "realistic human scale, no text") and a short list of things to avoid. Put its text at the start of every prompt so you never retype it.
 
 ## 2. Sheet file and validator
@@ -79,3 +81,42 @@ Change the theme with the mood of the scene and check text contrast in a real br
 ## 8. Record and verify
 
 Record in `START_HERE.md`: where the script, `notes/style.txt` and the prompts are, which provider and model, that the key lives only in the environment, the permission and cost notes, the picture line convention, `portrait_button`, the check-and-retry rule, the reference rule, and the restart rule. Record the package in `notes/packages.md`. Run `python -m unittest discover -s tests -p "test_*.py"` and, in `web/`, `npm run check`. Verify the live snapshot (workspace and generation match), and try in a real browser the button, a picture in the latest story turn with its enlarge view, and a portrait request in the Cast panel. Commit and start a fresh standing wait. Report to the Director what works, the cost of the first image, the differences the check found and what you could not verify. Show the first image and ask if cost and quality are right.
+
+## NovelAI provider
+
+NovelAI Diffusion V5 suits illustrated, anime-style stories, and an Opus subscription makes pictures at its Normal sizes without spending Anlas. This section replaces the OpenAI steps of part 1 and changes parts 3, 4 and 6 as below. Everything else in this page still applies.
+
+**The token.** The key is a persistent API token from the Director's own NovelAI account (it starts with `pst-`), in `NOVELAI_TOKEN` in your session's environment. Never take a NovelAI username or password, never offer or use a shared account, and never write the token into any file, log, entry or command line. If it is not set, tell the Director how to set it for the process that runs you and stop.
+
+**The script.** Copy [files/scene_image_nai.py](files/scene_image_nai.py) to `tools/scene_image_nai.py` and use it wherever this page says `tools/scene_image.py`. Its defaults are the most the Opus free tier allows: V5 Full at Effort High (23 steps), one picture, a Normal size, `--size portrait` (832×1216, the default, for one person), `--size landscape` (1216×832, for a place or a group) or `--size square` (1024×1024). Pick the orientation that fits the moment. A larger size or more than 28 steps costs Anlas: the script refuses it unless you add `--spend-anlas`, which you do only when the Director has asked for that picture at that setting, after telling them it costs Anlas.
+
+**NovelAI's terms.** Make a picture only when the Director presses a button or asks for one, never on your own each turn. Keep the three-try limit of the check in part 3. The script calls only NovelAI's `/ai/` generation endpoint; do not call account or subscription endpoints.
+
+**The prompt file.** NovelAI reads Danbooru tags, not a paragraph. Write the prompt file in this order:
+
+1. The base prompt: the number of people first (`1girl`, `2boys`, `1girl, 1boy`, `no humans`), then what is held or leaned on, the pose and expression of a single person, the framing, the place and the light, as Danbooru tags. Use a short sentence only for what tags cannot say, such as who holds what or who is in front of whom. With two or more people, leave their actions out of these lines: after a blank line, write one `Character N: girl, <their action, expression and gaze>,` line per person.
+2. After a blank line, the style block from `notes/style.txt`, word for word, so every picture keeps one art style.
+3. One character field per person in frame, under a header line `[Character N]`, numbered from 1 and from the viewer's left: `girl`, `boy` or `other`, then that person's appearance on one line and their clothes on the next. Give a character the same appearance tags in every picture. Appearance goes only here, never in the base prompt.
+4. Lines that start with `#` are notes and are not sent.
+
+```text
+1girl, solo, holding cup, sitting, smile, looking at viewer, upper body, indoors, window, morning, sunlight,
+
+watercolor (medium), soft colors,
+
+[Character 1]
+girl, long hair, black hair, green eyes,
+white shirt, collared shirt,
+```
+
+Do not write quality tags or undesired content: the script appends `very aesthetic, masterpiece, no text` and sends NovelAI's Heavy undesired content itself. Add `--text` only for a picture that needs readable text. To keep one thing out of a single picture, write it with negative emphasis, `-1.5::umbrella::`, on the last content line of the base prompt (before any `Character N:` lines), not as undesired content. Write only what the story supports: no props, people, clothes or mood the prose did not give.
+
+**The style block.** For NovelAI, write `notes/style.txt` as tags, not sentences: the medium and technique (`watercolor (medium)`, `anime coloring`, `flat color`) and, if the Director gives them, NovelAI artist tags kept exactly as given, with their order, weights and spaces. Every prompt reuses the block unchanged.
+
+**NSFW.** Do not ask about it. If the Director says they do not want NSFW pictures, add the line `nsfw: no` to `notes/style.txt`; the script then puts `nsfw` in the undesired content of every picture. Do not copy that line into prompts.
+
+**The seed.** After each picture the script records the seed it used as a `seed: N` line at the end of the prompt file. `--seed N` remakes the same picture or a deliberate variation; a retry after a failed check uses a fresh seed, so leave `--seed` out then.
+
+**Characters (parts 4 and 6).** V5 does not take reference pictures, so part 6 changes: the script refuses `--ref` with a message. Keep portraits as files (`public/assets/portrait-<id>.png`, part 4) all the same, since `--ref` will work when NovelAI supports it on V5. Until then a character stays consistent through their appearance tags, which go unchanged in their `[Character N]` field in every picture. Make portraits with `--size portrait`. In the check of part 3, ask whether each character still matches their appearance tags, and whether the framing tags held (`upper body` sometimes gives a full-length picture).
+
+**Record it.** In `START_HERE.md`, record that the provider is NovelAI through `tools/scene_image_nai.py`, the token lives only in `NOVELAI_TOKEN`, the free-tier defaults and the `--spend-anlas` rule, and where the seeds are.
