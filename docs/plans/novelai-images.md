@@ -221,6 +221,7 @@ Raised on 2026-11-16 when ISS-33 closed. The offline tests cover payload buildin
 - **One character:** a one-person prompt file through `tools/scene_image_nai.py` lands one PNG in `public/assets/` and records its seed.
 - **Two characters:** a prompt file with `[Character 1]` and `[Character 2]` fields returns a picture with two people whose looks follow their own fields.
 - **Tag helper:** `tools/nai_tags.py` prints only matches that start with the query.
+- **From prose:** a one-character scene written from a story passage with `nai/core.md` and `nai/danbooru.md`, its unsure tags checked with the helper, passes the picture check.
 
 ## ISS-34 — Decide on bundling adapted nai5-prompting text
 
@@ -237,6 +238,8 @@ Blocked by ISS-33 and ISS-34. Delivers:
 - **The capability pages:** `packages/INDEX.md`, the skill's `SKILL.md` reference list and `references/what-this-can-do.md`.
 
 Done when a one-character scene turns from prose into tags with checked tags and passes the picture check.
+
+**Closed 2026-11-16, not yet observed in a story.** `nai/core.md`, `nai/danbooru.md`, `nai/NOTICE.md` and `nai/LICENSE-GPL-3.0.txt` under `scene-images/` ([ADR-10](../decisions/ADR-10-bundle-adapted-nai5-prompting-pages.md)), `files/nai_tags.py`, APPLY's pointer to them, the index and capability pages, the README licence note, and tests for the helper and the pages' notices. The skill's own `SKILL.md` reference list is unchanged: it lists the skill's references, and these pages belong to the package, which `packages/INDEX.md` already lists. The core and danbooru pages come to about 22 KB together. The live check (a one-character scene from prose to checked tags that passes the picture check) is part of ISS-38. The helper treats an exact match with a count of a few hundred or more as safe, which settles the first open question below as a working rule until a story shows otherwise.
 
 ## ISS-36 — Cast tag blocks, characters and reverse pages
 

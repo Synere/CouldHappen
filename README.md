@@ -152,7 +152,7 @@ Do not add the development repository as a remote or merge its history into a st
 
 ## License
 
-CouldHappen is free software under the GNU Affero General Public License, version 3 or (at your option) any later version (`AGPL-3.0-or-later`). See [LICENSE](LICENSE). If you share a modified copy, including changes your writer agent made to the helper or reader, share it under the same license with its source; if you let other people use a modified copy over a network, offer them its source. The license covers the package source, not your story or imported third-party card material. Bundled fonts retain their OFL notices in `web/fonts/`; npm dependencies retain their own licenses in the installed package tree.
+CouldHappen is free software under the GNU Affero General Public License, version 3 or (at your option) any later version (`AGPL-3.0-or-later`). See [LICENSE](LICENSE). If you share a modified copy, including changes your writer agent made to the helper or reader, share it under the same license with its source; if you let other people use a modified copy over a network, offer them its source. The license covers the package source, not your story or imported third-party card material. The NovelAI guide pages in `.agents/skills/couldhappen/packages/scene-images/nai/` are adapted from Miint-Sunny's nai5-prompting and stay under GPL-3.0-only, combined with the rest under section 13 of both licences; that folder carries their notice and the GPL text. Bundled fonts retain their OFL notices in `web/fonts/`; npm dependencies retain their own licenses in the installed package tree.
 
 ## Documentation
 

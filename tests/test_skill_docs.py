@@ -38,6 +38,20 @@ class SkillDocs(unittest.TestCase):
         missing = [c for c in commands if f'helpers {c}' not in text]
         self.assertEqual(missing, [], 'helper commands not described in the skill, contract or setup')
 
+    def test_adapted_nai_pages_keep_their_gpl_notice(self):
+        """ADR-10: every page adapted from nai5-prompting keeps its notice, with NOTICE and the GPL text beside it."""
+        folder = SKILL / 'packages/scene-images/nai'
+        self.assertTrue((folder / 'NOTICE.md').is_file())
+        self.assertTrue((folder / 'LICENSE-GPL-3.0.txt').read_text(encoding='utf-8').lstrip().startswith('GNU GENERAL PUBLIC LICENSE'))
+        pages = [p for p in sorted(folder.glob('*.md')) if p.name != 'NOTICE.md']
+        self.assertTrue(pages)
+        for page in pages:
+            head = page.read_text(encoding='utf-8').split('\n\n', 1)[0]
+            for needed in ('https://github.com/Miint-Sunny/nai5-prompting', 'Copyright (C) 2026 Miint-Sunny',
+                           'SPDX-License-Identifier: GPL-3.0-only', 'Modified for CouldHappen on '):
+                self.assertIn(needed, head, page.name)
+            self.assertIn(f'[{page.name}]({page.name})', (folder / 'NOTICE.md').read_text(encoding='utf-8'), page.name)
+
     def test_front_matter_values_are_valid_unquoted_yaml(self):
         """A ': ' or ' #' inside an unquoted value breaks YAML parsers that read these headers."""
         pages = [SKILL / 'SKILL.md', *sorted((SKILL / 'packages').glob('*/PACKAGE.md'))]
