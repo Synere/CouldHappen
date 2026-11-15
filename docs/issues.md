@@ -4,7 +4,7 @@ The single register of open work for CouldHappen: to-dos, pending decisions, ope
 unverified facts, each with a stable `ISS-n` ID. A row is one short line. Its Source links to the item's home
 section: a heading that starts with its ID (`## ISS-n — title`) in another file, which holds the reasoning.
 
-- **Next ID: ISS-33.** IDs are never reused. Code comments and commits may cite them.
+- **Next ID: ISS-38.** IDs are never reused. Code comments and commits may cite them.
 - **New item:** write its home section first, then add a row here whose Source links to it, and bump Next ID.
 - **Resolved item:** move the row to Closed with the date and a one-line resolution, and update its home section.
 
@@ -41,6 +41,11 @@ Work order from 2026-11-11. The author's ranking: one `N. ISS-n — why` line pe
 | ISS-21 | Lossless `card.md` (envelope, lorebook names, falsy fields); `portrait` guidance for a JSON-card import | helpers | — | [public release](plans/public-release.md#iss-21--lossless-card-copy-and-portrait-guidance) |
 | ISS-22 | Vite denies `START_HERE.md`; portrait button names a lost connection; contract says how the reader settles uncertain saves | web | — | [public release](plans/public-release.md#iss-22--reader-boundary-and-save-wording) |
 | ISS-23 | Design names `voice.md` and `what-this-can-do.md` and keeps one creative-practice file; link-check wording | docs | — | [public release](plans/public-release.md#iss-23--design-text-catches-up) |
+| ISS-33 | NovelAI provider script (`scene_image_nai.py`) and APPLY section: one PNG through the contract | packages | — | [plan](plans/novelai-images.md#iss-33--novelai-provider-script-and-apply-section) |
+| ISS-34 | ADR: bundling pages adapted from nai5-prompting (GPL-3.0-only) in the AGPL release | packages | — | [plan](plans/novelai-images.md#iss-34--decide-on-bundling-adapted-nai5-prompting-text) |
+| ISS-35 | NovelAI core and danbooru pages and `nai_tags.py`: a one-character scene from prose to checked tags | packages | ISS-33, ISS-34 | [plan](plans/novelai-images.md#iss-35--core-and-danbooru-pages-and-the-tag-helper) |
+| ISS-36 | NovelAI cast tag blocks, characters and reverse pages: the same character across scenes | packages | ISS-35 | [plan](plans/novelai-images.md#iss-36--cast-tag-blocks-characters-and-reverse-pages) |
+| ISS-37 | NovelAI scenes page: positions, complexity, visual-novel switches | packages | ISS-35 | [plan](plans/novelai-images.md#iss-37--scenes-page) |
 
 ## Decisions pending
 
@@ -56,7 +61,7 @@ Work order from 2026-11-11. The author's ranking: one `N. ISS-n — why` line pe
 
 | ID | Item | Area | Revisit when | Source |
 | --- | --- | --- | --- | --- |
-| ISS-32 | NovelAI provider for scene-images, with a guide that translates the prose into Danbooru tags (core, Danbooru, characters, scenes, reverse prompt) | packages | idea, open questions in the plan | [plan](plans/novelai-images.md#iss-32--novelai-provider-for-scene-images) |
+| ISS-32 | NovelAI provider for scene-images, with a guide that translates the prose into Danbooru tags (core, Danbooru, characters, scenes, reverse prompt) | packages | cut into ISS-33 to ISS-37; closes when they do | [plan](plans/novelai-images.md#iss-32--novelai-provider-for-scene-images) |
 | ISS-31 | Crew package: a roster of agents with one adapter each; the main writer hands tasks to the others, including what it will not do | packages | idea, open questions in the plan | [plan](plans/crew-package.md#iss-31--crew-package) |
 | ISS-8 | Writing-style director package: a distilled style guide, a per-turn re-read, a style lint, and preset import as data | packages | idea, not started | [plan](plans/writing-style-package.md#iss-8--writing-style-package) |
 | ISS-9 | Literal comp pixel gates: `.impeccable/build/state.json` stays at `spec`; no pixel pass claimed | reader | the author explicitly downgrades comp authority | [known limitations](plans/known-limitations.md#iss-9--literal-comp-pixel-gates) |

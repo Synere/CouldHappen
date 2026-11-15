@@ -113,6 +113,18 @@ Two lessons for the package:
 - **Fix what the prose doesn't say.** When the picture needs a detail the prose leaves open, such as hair colour, choose it once and record it in the cast tag block so it never changes. Don't let it vary from picture to picture.
 - **Follow the story when they differ.** The prose wins over a tag block or a supplied portrait, and the writer tells the Director about the difference.
 
+**How the writer finds the right tag.** Agreed with the author on 2026-11-16. Four sources, in order:
+1. **Memory.** The model's own knowledge covers the common tags. It goes wrong in three ways: invented tags (`black long hair` instead of `long hair, black hair`), similar-looking tags that mean something else (`loose socks` are baggy socks, not slipped ones), and rare tags that barely move the image.
+2. **The danbooru page.** The tags story pictures usually need, by category, plus the confusable-tag table.
+3. **A tag-suggestion helper.** `tools/nai_tags.py <partial tag>` calls NovelAI's `GET /ai/generate-image/suggest-tags` (`model`, `prompt`, `lang`), the endpoint behind the web UI's autocomplete. It returns `{"tags": [{"tag", "count", "confidence"}]}`, where `count` is how often the tag occurs in NovelAI's training data. So it shows what the model learned, not raw Danbooru. It's an `/ai/` endpoint and makes no image, so it fits the terms. The writer runs it on any tag it isn't sure of. No match, or a low count, means describing that detail in a sentence instead.
+   **Tried on 2026-11-16** (author's run, own token): suggest-tags answers for `nai-diffusion-5-full`, 10 suggestions per query. What the results show:
+   - **Counts top out at 10000.** They show whether a tag is common, not an exact frequency. Examples: `thighhighs`, `upper body`, `loose socks` and `socks` all read 10000; `thighhighs pull` 8348; `torn socks` 4292; `socks rolled down` 28.
+   - **Confidence 0.0 seems to mean a direct text match.** The real tags that start with the query all came back at 0.0. Fuzzy matches score 0.6–0.85, and many are noise: `upper bo` returned `boingo`, `bo staff`, `elder bors`.
+   - **The rule for the helper:** only a match that starts with the query counts; a fuzzy match isn't a confirmation.
+   - **It catches invented tags.** For socks that slipped down, the obvious tag, `socks rolled down`, has a count of only 28, so the writer would use a sentence instead. That's the mistake this check is for.
+   - **Display:** the script printed long confidence decimals; round them in the real helper.
+4. **The Danbooru wiki, for meaning.** The suggester says a tag exists and is common, not what it means. When meaning matters, as with clothing state or `X focus` tags, the writer reads the tag's wiki page.
+
 A `references/` set inside the package, split so the writer reads the core and danbooru pages for every picture and the others on demand:
 
 | Page | Keeps from nai5-prompting | When the writer reads it |
@@ -154,16 +166,78 @@ A Director who wants these can install the full skill, and the package says how.
 
 When it ships, update `packages/INDEX.md`, the skill's `SKILL.md` reference list and `references/what-this-can-do.md` (see [AGENTS.md](../../AGENTS.md)).
 
-## Possible slices
+## Further features worth using
 
-To be agreed before they become rows:
+A second pass on 2026-11-16 over nai5-prompting, NovelAI-Image-MCP's skills and NovelAI's docs found these.
 
-1. `scene_image_nai.py` from the working non-stream test script (JSON in, ZIP out): one generated PNG through the contract over plain HTTPS (transport and payload proven on 2026-11-16).
-2. The core and danbooru pages, and the APPLY section for one-character scenes.
-3. Cast tag blocks with the reverse page: portraits on V5 and multi-character scenes, plus the extra question for the picture check.
-4. The characters and scenes pages, the license ADR, and the writer's capability pages.
+From nai5-prompting:
+- **A fixed style block per story.** `illustration.md` "Style blocks" says to keep the artist and technique strings verbatim (order, weights, spaces) and put them in a fixed place. That's how one story keeps one art style: `notes/style.txt` holds the block, and every prompt reuses it unchanged. This goes in the core page. Agreed with the author on 2026-11-16.
+- **V5 switches suited to a story reader** (`illustration.md` "V5-Specific Switches", tag-only):
+  - `visual novel sprite` for cast portraits, and `visual novel cg` or `visual novel bg` for scenes and places.
+  - `transparent background`, which with V5's true alpha (`straight_alpha`) could give cutout portraits.
+  - `low/medium/high/ultra complexity` as a deliberate choice, never added by default. nai5-prompting calls it a "generation computation budget" for how much visual detail goes in, separate from steps and size. High suits a busy place, and the skill pairs `vn bg` with high complexity and `depthness`. Too much can make results stiff or repetitive, and low and ultra noticeably restyle the picture. So the writer adds it only when the prose describes a detailed or a stark scene. The core page explains all four levels to the writer (the author's request, 2026-11-16).
+  - These go in the core page. The author agreed to the visual-novel and transparency switches on 2026-11-16. Whether they help in the reader is untested.
+
+From the NovelAI API (models and costs as the MCP and NovelAI's docs state them, not tested by us):
+- **Inpainting** (`nai-diffusion-5-full-inpainting`, image plus mask): redraw one wrong region instead of the whole picture, such as wrong clothes or an extra hand. This could make the picture check's retry cheaper and keep the parts that were right. Whether it's free on Opus at Normal size isn't documented. Deferred by the author on 2026-11-16: inpainting means making a mask and more tool calls for each fix, so it waits until the simple check-and-regenerate loop shows it isn't enough.
+- **Seed:** record each picture's seed beside its prompt in `notes/prompts/<n>.txt`, so a picture can be remade or varied deliberately. The MCP's skill recommends this too. Cheap, so slice 1.
+- **Character positions:** `characterPrompts[].center` and `use_coords` place each character on the canvas; V5 is a free canvas. The writer can follow where the prose puts people ("she stands at the door, he sits by the fire"). This goes in the scenes page.
+- **Precise Reference** (a reference image for a character or style): V4.5 only, and 5 extra Anlas per image ([docs](https://docs.novelai.net/en/image/precisereference/)). It's a paid alternative for portrait consistency that the Director could opt into. The V5 default stays tag blocks.
+
+The author expects V5 to gain Precise Reference. Design for it now: keep each portrait as a file (`public/assets/portrait-<id>.png`, as today), keep `--ref` in the script's interface, and have the script refuse it with a clear message on models that don't support it. When V5 supports references, the writer passes the portraits as part 6 of APPLY already describes, and the tag blocks stay as the text side.
+- **Director tools** (emotion change, background removal, line art, colourize) and **upscale:** the MCP says each spends Anlas. Emotion change could give one portrait several expressions with the same face. Leave all of these out unless a Director asks (the author agreed, 2026-11-16).
+
+From NovelAI-Image-MCP's skills:
+- **Offline cost estimate:** the MCP mirrors the web client's Anlas formula in `estimate_anlas_cost`: resolution × steps × samples, minus one free sample on Opus at 28 steps or fewer and 1024×1024 or smaller. The script can refuse non-free settings unless the Director asked for them, with no API call. Unverified against the current web client; Effort Medium changes the step term.
+
+The author wants this only if it's accurate. Until then the script enforces the free-tier rules directly, which needs no formula: Normal sizes only, 28 steps or fewer, one sample. Anything else needs the Director's explicit request. To adopt the formula, compare its estimate with the cost the web UI shows on its Generate button for a handful of settings (sizes, steps, High and Medium). Use it only if every case matches.
+- **Not useful to us:** the MCP's prompt templates. They are a generic idea-to-tags recipe, and the nai5-prompting pages already cover it better.
+
+## Tickets
+
+Agreed with the author on 2026-11-16. ISS-32 stays open as the umbrella until these close.
+
+## ISS-33 — NovelAI provider script and APPLY section
+
+Blocked by nothing. Delivers `scene-images/files/scene_image_nai.py`, built from the working non-stream test script. Start by copying it out of the 2026-11-16 session's scratchpad, `nai_generate_zip.py`, before anything clears it; the plan's request details are enough to rebuild it if it's gone. What it has to do:
+- **Request:** JSON to `/ai/generate-image`, the ZIP read with `zipfile`, and an honest user agent.
+- **Token:** `NOVELAI_TOKEN` from the environment, never printed.
+- **Defaults:** V5 Full, Effort High at 23 steps, Normal sizes by orientation, the Standard quality tags appended with `qualityPresetId` `none`, the Heavy V5 UC, and `nsfw` only on the Director's word.
+- **Seed:** recorded beside the prompt.
+- **Free-tier limits:** Normal size, 28 steps or fewer and one sample, enforced unless the Director asks.
+- **`--ref`:** kept in the interface, refused on V5 with a clear message.
+
+Also delivers the "NovelAI provider" section in APPLY, with tests for the parts that run offline (payload building, limits, ZIP reading). Done when one PNG lands in `public/assets/` through the existing contract in a release workspace.
+
+## ISS-34 — Decide on bundling adapted nai5-prompting text
+
+Blocked by nothing. Records an ADR on shipping pages adapted from nai5-prompting (GPL-3.0-only) in the AGPL-3.0-or-later release: GPLv3 §13 and AGPLv3 §13, the notices each adapted page keeps (copyright line, source link, NOTICE), and how the release ZIP carries them. Done when the ADR is accepted.
+
+## ISS-35 — Core and danbooru pages and the tag helper
+
+Blocked by ISS-33 and ISS-34. Delivers:
+- **The core page:** fields, quality and UC, weights, the translation rules, the style block in `notes/style.txt`, the V5 switches with all four complexity levels explained, and final checks.
+- **The danbooru page.**
+- **`tools/nai_tags.py`:** only matches that start with the query count, counts top out at 10000, and confidence is rounded.
+- **The capability pages:** `packages/INDEX.md`, the skill's `SKILL.md` reference list and `references/what-this-can-do.md`.
+
+Done when a one-character scene turns from prose into tags with checked tags and passes the picture check.
+
+## ISS-36 — Cast tag blocks, characters and reverse pages
+
+Blocked by ISS-35. Delivers:
+- **Cast tag blocks:** `notes/prompts/cast/<id>.txt`, with details the prose leaves open chosen once and recorded.
+- **The characters page and the reverse page:** turning a card portrait or the first approved portrait into a tag block, with the three source marks.
+- **The picture check's extra question:** does each character still match their tag block?
+
+Done when the same character looks consistent across two scenes, including one with two characters.
+
+## ISS-37 — Scenes page
+
+Blocked by ISS-35. Delivers the scenes page: turning the prose's place and moment into framing, camera height, light and how much of the frame each thing takes up; character positions (`center`, `use_coords`); when to use complexity; and the `vn bg` and `vn cg` switches. Done when a multi-character scene puts people where the prose does.
 
 ## Open
 
+- What count makes a tag safe to use (a first guess: an exact match with a count of 500 or more), and whether suggest-tags uses any quota (none seen, not confirmed).
 - Whether V5 has gained any reference-image feature since the MCP's note. If not, whether to offer V4.5 with vibe transfer as an alternative for portraits.
 - The size budget for the guide. The danbooru page carries most of the weight; leaving the design methods out keeps the rest small.
