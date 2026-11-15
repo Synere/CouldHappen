@@ -213,6 +213,8 @@ Also delivers the "NovelAI provider" section in APPLY, with tests for the parts 
 
 Blocked by nothing. Records an ADR on shipping pages adapted from nai5-prompting (GPL-3.0-only) in the AGPL-3.0-or-later release: GPLv3 §13 and AGPLv3 §13, the notices each adapted page keeps (copyright line, source link, NOTICE), and how the release ZIP carries them. Done when the ADR is accepted.
 
+**Closed 2026-11-16** by [ADR-10](../decisions/ADR-10-bundle-adapted-nai5-prompting-pages.md): the adapted pages go in `packages/scene-images/nai/`, GPL-3.0-only, with `NOTICE.md` and `LICENSE-GPL-3.0.txt` beside them.
+
 ## ISS-35 — Core and danbooru pages and the tag helper
 
 Blocked by ISS-33 and ISS-34. Delivers:

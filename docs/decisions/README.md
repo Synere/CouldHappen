@@ -16,6 +16,7 @@ The [approved design](../designs/couldhappen.md) remains the normative product a
 | [ADR-7](ADR-7-character-brains-and-voice.md) | Accepted | Ship the voice method as a writer reference and character brains as a package that requires game-master layers 1 to 4. |
 | [ADR-8](ADR-8-open-work-in-the-register.md) | Accepted | Keep open work in the groundwork register and plans, retire the progress note, and leave designs, reviews and drift reports to EGM. |
 | [ADR-9](ADR-9-character-brains-plus.md) | Accepted | Keep method-only character-brains and add character-brains-plus, whose stdlib script and event log brief only what visibility classes and `know` events allow. |
+| [ADR-10](ADR-10-bundle-adapted-nai5-prompting-pages.md) | Accepted | Ship the NovelAI guide pages adapted from nai5-prompting as a GPL-3.0-only folder, `scene-images/nai/`, each page keeping its notice, combined under §13 of both licences. |
 
 For new decisions, copy one of the templates:
 
