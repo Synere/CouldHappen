@@ -14,8 +14,9 @@ people, one "Character N: ..." action line per person. Then one character field 
 a header line "[Character N]", numbered from 1 and from the viewer's left, holding that person's gender,
 appearance and clothing. "[Character N = <cast id>]" fills the field from notes/prompts/cast/<cast id>.txt, the
 character's fixed cast block; lines under such a header replace the block's clothing (every line after its
-first). Lines starting with # are notes and are not sent. A line "nsfw: no" here or in
-notes/style.txt means the Director does not want NSFW pictures, and nsfw goes into the undesired content. After a
+first). "[Character N @ X,Y]" places that person on the canvas, X from 0 (left) to 1 (right), Y from 0
+(top) to 1 (bottom); give every character a position or none. Lines starting with # are notes and are not
+sent. A line "nsfw: no" here or in notes/style.txt means the Director does not want NSFW pictures, and nsfw goes into the undesired content. After a
 picture is made, the seed used is recorded in the prompt file as a "seed: N" line, so the picture can be remade
 or varied deliberately with --seed.
 
@@ -55,7 +56,8 @@ HEAVY_UC = ('lowres, artistic error, film grain, scan artifacts, worst quality, 
             'very displeasing, chromatic aberration, dithering, halftone, screentone, multiple views, logo, '
             'too many watermarks, negative space, blank page')
 USER_AGENT = 'couldhappen-scene-image/0.1'  # an honest agent: Cloudflare refuses Python's default one
-HEADER = re.compile(r'^\[\s*character\s*(\d+)\s*(?:=\s*([A-Za-z0-9_-]+)\s*)?\]$', re.IGNORECASE)
+HEADER = re.compile(r'^\[\s*character\s*(\d+)\s*(?:=\s*([A-Za-z0-9_-]+)\s*)?'
+                    r'(?:@\s*([0-9.]+)\s*,\s*([0-9.]+)\s*)?\]$', re.IGNORECASE)
 NO_NSFW = re.compile(r'^nsfw\s*:\s*no\s*$', re.IGNORECASE)
 SEED = re.compile(r'^seed\s*:\s*\d+\s*$', re.IGNORECASE)
 
@@ -80,8 +82,8 @@ def cast_block(cast_dir, cast_id):
 
 
 def parse(text, cast_dir='notes/prompts/cast'):
-    """Split a prompt file into (base prompt, [character fields], nsfw excluded)."""
-    base, characters, casts, no_nsfw = [], [], [], False
+    """Split a prompt file into (base prompt, [character fields], nsfw excluded, [positions] or None)."""
+    base, characters, casts, centers, no_nsfw = [], [], [], [], False
     current = base
     for raw in text.splitlines():
         line = raw.strip()
@@ -97,6 +99,16 @@ def parse(text, cast_dir='notes/prompts/cast'):
             current = []
             characters.append(current)
             casts.append(header.group(2))
+            if header.group(3) is None:
+                centers.append(None)
+            else:
+                try:
+                    x, y = float(header.group(3)), float(header.group(4))
+                except ValueError:
+                    raise ValueError(f'"{line}": a position is two numbers, X,Y') from None
+                if not (0 <= x <= 1 and 0 <= y <= 1):
+                    raise ValueError(f'"{line}": a position runs from 0 to 1 on each axis')
+                centers.append({'x': round(x, 2), 'y': round(y, 2)})
             continue
         current.append(raw)
     fields = []
@@ -110,30 +122,34 @@ def parse(text, cast_dir='notes/prompts/cast'):
         raise ValueError('a [Character N] header has nothing under it')
     if not base and not fields:
         raise ValueError('the prompt file is empty')
-    return base, fields, no_nsfw
+    if any(centers) and not all(centers):
+        raise ValueError('give every [Character N] a position (@ X,Y) or none')
+    return base, fields, no_nsfw, (centers if any(centers) else None)
 
 
-def payload(base, characters, *, width, height, steps, seed, no_nsfw=False, text=False):
-    """The JSON body for POST /ai/generate-image."""
+def payload(base, characters, *, width, height, steps, seed, no_nsfw=False, text=False, centers=None):
+    """The JSON body for POST /ai/generate-image. With centers, each character is placed on the canvas."""
     quality = QUALITY.replace(', no text', '') if text else QUALITY
     base = base.rstrip().rstrip(',').rstrip()
     prompt = (base + quality) if base else quality.lstrip(', ')
     uc = HEAVY_UC.replace(' logo,', '') if text else HEAVY_UC
     uc = ('nsfw, ' + uc) if no_nsfw else uc
-    center = {'x': 0.5, 'y': 0.5}
+    use_coords = bool(centers)
+    centers = centers or [{'x': 0.5, 'y': 0.5}] * len(characters)
+    pairs = list(zip(characters, centers))
     parameters = {
         'params_version': 4, 'width': width, 'height': height, 'scale': 5, 'sampler': 'k_euler_ancestral',
         'steps': steps, 'n_samples': 1, 'seed': seed, 'ucPresetId': 'heavy', 'qualityPresetId': 'none',
         'autoSmea': False, 'dynamic_thresholding': False, 'controlnet_strength': 1, 'legacy': False,
         'add_original_image': True, 'cfg_rescale': 0, 'noise_schedule': 'karras', 'legacy_v3_extend': False,
-        'use_coords': False, 'legacy_uc': False,
+        'use_coords': use_coords, 'legacy_uc': False,
         'normalize_reference_strength_multiple': True, 'inpaintImg2ImgStrength': 1,
-        'characterPrompts': [{'prompt': c, 'uc': '', 'center': center, 'enabled': True} for c in characters],
+        'characterPrompts': [{'prompt': c, 'uc': '', 'center': at, 'enabled': True} for c, at in pairs],
         'v4_prompt': {'caption': {'base_caption': prompt,
-                                  'char_captions': [{'char_caption': c, 'centers': [center]} for c in characters]},
-                      'use_coords': False, 'use_order': True},
+                                  'char_captions': [{'char_caption': c, 'centers': [at]} for c, at in pairs]},
+                      'use_coords': use_coords, 'use_order': True},
         'v4_negative_prompt': {'caption': {'base_caption': uc,
-                                           'char_captions': [{'char_caption': '', 'centers': [center]} for _ in characters]},
+                                           'char_captions': [{'char_caption': '', 'centers': [at]} for _, at in pairs]},
                                'legacy_uc': False},
         'negative_prompt': uc, 'straight_alpha': True, 'tag_hint_qt': 0, 'tag_hint_uc_preset': 2,
         'deliberate_euler_ancestral_bug': False, 'prefer_brownian': True, 'image_format': 'png',
@@ -199,8 +215,8 @@ def main(argv):
     if args.seed is not None and not 0 <= args.seed < 2 ** 32:
         sys.exit('--seed must be between 0 and 4294967295')
     try:
-        base, characters, no_nsfw = parse(args.prompt_file.read_text(encoding='utf-8'),
-                                          Path(__file__).resolve().parents[1] / 'notes/prompts/cast')
+        base, characters, no_nsfw, centers = parse(args.prompt_file.read_text(encoding='utf-8'),
+                                                   Path(__file__).resolve().parents[1] / 'notes/prompts/cast')
     except (OSError, ValueError) as error:
         sys.exit(f'Cannot use the prompt file: {error}')
     root = Path(__file__).resolve().parents[1]
@@ -212,7 +228,7 @@ def main(argv):
         sys.exit('NOVELAI_TOKEN is not set in this process environment')
     seed = args.seed if args.seed is not None else random.randint(0, 2 ** 32 - 1)
     body = json.dumps(payload(base, characters, width=width, height=height, steps=args.steps, seed=seed,
-                              no_nsfw=no_nsfw, text=args.text)).encode()
+                              no_nsfw=no_nsfw, text=args.text, centers=centers)).encode()
     url = os.environ.get('NOVELAI_IMAGE_URL', 'https://image.novelai.net').rstrip('/') + '/ai/generate-image'
     req = urllib.request.Request(url, body, {'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token,
                                              'User-Agent': USER_AGENT}, method='POST')

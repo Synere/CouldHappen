@@ -54,7 +54,7 @@ class Payload(unittest.TestCase):
         self.nai = load()
 
     def test_prompt_file_splits_into_base_and_numbered_character_fields(self):
-        base, characters, no_nsfw = self.nai.parse(
+        base, characters, no_nsfw, centers = self.nai.parse(
             '# a note\n2girls, indoors, window, soft lighting,\nThe girl on the left hands a cup to the other.\n\n\n\n'
             'Character 1: girl, source#giving, smile,\nCharacter 2: girl, target#giving,\n'
             '[Character 1]\ngirl, long hair,\nwhite shirt,\n[character 2]\ngirl, short hair,\nseed: 9\n')
@@ -62,6 +62,28 @@ class Payload(unittest.TestCase):
                                'Character 1: girl, source#giving, smile,\nCharacter 2: girl, target#giving,')
         self.assertEqual(characters, ['girl, long hair,\nwhite shirt,', 'girl, short hair,'])
         self.assertFalse(no_nsfw)
+
+    def test_positions_place_every_character_or_none(self):
+        text = '1girl, 1boy,\n[Character 1 @ 0.25,0.6]\ngirl,\n[Character 2 @ 0.75, 0.5]\nboy,\n'
+        base, characters, _, centers = self.nai.parse(text)
+        self.assertEqual(centers, [{'x': 0.25, 'y': 0.6}, {'x': 0.75, 'y': 0.5}])
+        sent = self.nai.payload(base, characters, width=1216, height=832, steps=23, seed=1, centers=centers)
+        p = sent['parameters']
+        self.assertTrue(p['use_coords'] and p['v4_prompt']['use_coords'])
+        self.assertEqual(p['characterPrompts'][1]['center'], {'x': 0.75, 'y': 0.5})
+        self.assertEqual(p['v4_prompt']['caption']['char_captions'][0]['centers'], [{'x': 0.25, 'y': 0.6}])
+        self.assertIsNone(self.nai.parse('1girl,\n[Character 1]\ngirl,\n')[3])
+        self.assertFalse(self.nai.payload('1girl', ['girl'], width=832, height=1216, steps=23, seed=1)['parameters']['use_coords'])
+        for bad in ('1girl, 1boy,\n[Character 1 @ 0.2,0.5]\ngirl,\n[Character 2]\nboy,\n',
+                    '1girl,\n[Character 1 @ 1.5,0.5]\ngirl,\n'):
+            with self.assertRaises(ValueError, msg=bad):
+                self.nai.parse(bad)
+
+    def test_a_cast_header_can_carry_a_position(self):
+        with tempfile.TemporaryDirectory() as cast:
+            Path(cast, 'brann.txt').write_text('boy, beard,\nleather apron,\n', encoding='utf-8')
+            _, characters, _, centers = self.nai.parse('1boy,\n[Character 1 = brann @ 0.5,0.5]\n', cast)
+            self.assertEqual((characters, centers), (['boy, beard,\nleather apron,'], [{'x': 0.5, 'y': 0.5}]))
 
     def test_character_headers_out_of_order_or_empty_are_refused(self):
         for text in ('1girl\n[Character 2]\ngirl\n', '1girl\n[Character 1]\n[Character 2]\ngirl\n'):
@@ -74,7 +96,7 @@ class Payload(unittest.TestCase):
                 '# Whisper. Chosen: grey eyes.\ngirl, long hair, grey hair, braid, grey eyes,\ndark green cloak, boots,\n',
                 encoding='utf-8')
             text = '2girls, indoors,\n[Character 1 = whisper]\n[Character 2 = whisper]\nwhite dress,\n'
-            base, characters, _ = self.nai.parse(text, cast)
+            base, characters, _, _ = self.nai.parse(text, cast)
             self.assertEqual(characters[0], 'girl, long hair, grey hair, braid, grey eyes,\ndark green cloak, boots,')
             self.assertEqual(characters[1], 'girl, long hair, grey hair, braid, grey eyes,\nwhite dress,')
             with self.assertRaises(ValueError):

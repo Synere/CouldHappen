@@ -1,12 +1,12 @@
 ---
 type: plan
-status: proposed
+status: active
 updated: 2026-11-16
 ---
 
 # NovelAI images
 
-**Purpose.** NovelAI as a second image provider in the `scene-images` package, with a NovelAI prompt guide the writer reads when it makes a picture. This is an idea, not started. Ends when the provider and its guide ship in `scene-images` with their entries in the pages the writer reads, or when the idea is abandoned.
+**Purpose.** NovelAI as a second image provider in the `scene-images` package, with a NovelAI prompt guide the writer reads when it makes a picture. Built on 2026-11-16 (ISS-33 to ISS-37); the live checks are ISS-38. Ends when the provider and its guide ship in `scene-images` with their entries in the pages the writer reads, or when the idea is abandoned.
 
 ## ISS-32 — NovelAI provider for scene-images
 
@@ -222,6 +222,7 @@ Raised on 2026-11-16 when ISS-33 closed. The offline tests cover payload buildin
 - **Two characters:** a prompt file with `[Character 1]` and `[Character 2]` fields returns a picture with two people whose looks follow their own fields.
 - **Tag helper:** `tools/nai_tags.py` prints only matches that start with the query.
 - **Same character twice:** one cast block used in two scenes, one of them with two characters, gives a consistent look.
+- **Positions:** a two-character scene with `@ X,Y` positions puts each person where the prose does.
 - **From prose:** a one-character scene written from a story passage with `nai/core.md` and `nai/danbooru.md`, its unsure tags checked with the helper, passes the picture check.
 
 ## ISS-34 — Decide on bundling adapted nai5-prompting text
@@ -256,6 +257,8 @@ Done when the same character looks consistent across two scenes, including one w
 ## ISS-37 — Scenes page
 
 Blocked by ISS-35. Delivers the scenes page: turning the prose's place and moment into framing, camera height, light and how much of the frame each thing takes up; character positions (`center`, `use_coords`); when to use complexity; and the `vn bg` and `vn cg` switches. Done when a multi-character scene puts people where the prose does.
+
+**Closed 2026-11-16, not yet observed in a story.** `nai/scenes.md`, an `@ X,Y` position on `[Character N]` headers in `scene_image_nai.py` (every character or none; with positions the script sends `use_coords` and each `center`), the APPLY pointer, and tests. The multi-character check is part of ISS-38.
 
 ## Open
 
