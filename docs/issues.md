@@ -4,7 +4,7 @@ The single register of open work for CouldHappen: to-dos, pending decisions, ope
 unverified facts, each with a stable `ISS-n` ID. A row is one short line. Its Source links to the item's home
 section: a heading that starts with its ID (`## ISS-n — title`) in another file, which holds the reasoning.
 
-- **Next ID: ISS-31.** IDs are never reused. Code comments and commits may cite them.
+- **Next ID: ISS-33.** IDs are never reused. Code comments and commits may cite them.
 - **New item:** write its home section first, then add a row here whose Source links to it, and bump Next ID.
 - **Resolved item:** move the row to Closed with the date and a one-line resolution, and update its home section.
 
@@ -56,6 +56,8 @@ Work order from 2026-11-11. The author's ranking: one `N. ISS-n — why` line pe
 
 | ID | Item | Area | Revisit when | Source |
 | --- | --- | --- | --- | --- |
+| ISS-32 | NovelAI provider for scene-images, with a guide that translates the prose into Danbooru tags (core, Danbooru, characters, scenes, reverse prompt) | packages | idea, open questions in the plan | [plan](plans/novelai-images.md#iss-32--novelai-provider-for-scene-images) |
+| ISS-31 | Crew package: a roster of agents with one adapter each; the main writer hands tasks to the others, including what it will not do | packages | idea, open questions in the plan | [plan](plans/crew-package.md#iss-31--crew-package) |
 | ISS-8 | Writing-style director package: a distilled style guide, a per-turn re-read, a style lint, and preset import as data | packages | idea, not started | [plan](plans/writing-style-package.md#iss-8--writing-style-package) |
 | ISS-9 | Literal comp pixel gates: `.impeccable/build/state.json` stays at `spec`; no pixel pass claimed | reader | the author explicitly downgrades comp authority | [known limitations](plans/known-limitations.md#iss-9--literal-comp-pixel-gates) |
 | ISS-10 | Dependency audit: two low dev-tooling findings (`deepmerge` under `@sveltejs/vite-plugin-svelte`) | web | an upstream patch lands, or a deliberate override is chosen | [known limitations](plans/known-limitations.md#iss-10--dependency-audit) |
