@@ -22,7 +22,7 @@ or varied deliberately with --seed.
 
 Defaults (the Opus free tier, Effort High): model nai-diffusion-5-full, 23 steps, one sample, Normal sizes only
 (portrait 832x1216, landscape 1216x832, square 1024x1024), sampler k_euler_ancestral, noise schedule karras,
-guidance 5. The Standard quality tags are appended to the base prompt and the Heavy V5 undesired content is
+guidance 7. The Standard quality tags are appended to the base prompt and the Heavy V5 undesired content is
 sent. Anything that costs Anlas (another size such as --size 1024x1536, or --steps above 28) is refused unless
 --spend-anlas is given, which needs the Director's explicit request each time. --text drops "no text" from the
 quality tags and logo from the undesired content, for a picture that needs readable text.
@@ -138,7 +138,7 @@ def payload(base, characters, *, width, height, steps, seed, no_nsfw=False, text
     centers = centers or [{'x': 0.5, 'y': 0.5}] * len(characters)
     pairs = list(zip(characters, centers))
     parameters = {
-        'params_version': 4, 'width': width, 'height': height, 'scale': 5, 'sampler': 'k_euler_ancestral',
+        'params_version': 4, 'width': width, 'height': height, 'scale': 7, 'sampler': 'k_euler_ancestral',
         'steps': steps, 'n_samples': 1, 'seed': seed, 'ucPresetId': 'heavy', 'qualityPresetId': 'none',
         'autoSmea': False, 'dynamic_thresholding': False, 'controlnet_strength': 1, 'legacy': False,
         'add_original_image': True, 'cfg_rescale': 0, 'noise_schedule': 'karras', 'legacy_v3_extend': False,

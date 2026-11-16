@@ -107,7 +107,7 @@ class Payload(unittest.TestCase):
         p = sent['parameters']
         self.assertEqual(sent['model'], 'nai-diffusion-5-full')
         self.assertEqual(sent['action'], 'generate')
-        self.assertEqual((p['width'], p['height'], p['steps'], p['n_samples'], p['scale']), (832, 1216, 23, 1, 5))
+        self.assertEqual((p['width'], p['height'], p['steps'], p['n_samples'], p['scale']), (832, 1216, 23, 1, 7))
         self.assertEqual((p['sampler'], p['noise_schedule'], p['image_format']), ('k_euler_ancestral', 'karras', 'png'))
         self.assertEqual(sent['input'], '1girl, indoors, very aesthetic, masterpiece, no text')
         self.assertEqual(p['v4_prompt']['caption']['base_caption'], sent['input'])

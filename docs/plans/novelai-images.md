@@ -38,7 +38,7 @@ Read on 2026-11-16, nothing run against the API:
 **Default generation settings: the most the Opus free tier allows, with Effort High.** The author set this on 2026-11-16:
 - **Steps:** 23. The author confirmed on 2026-11-16 that the capture was taken with Effort High, so High sends 23 steps. With Medium, the UI hides the steps input; what Medium sends is unknown.
 - **Sizes:** NovelAI's Normal sizes only: portrait 832×1216, landscape 1216×832, square 1024×1024. The writer picks the orientation that fits the moment, portrait for one person and landscape for a place or a group.
-- **Other settings:** sampler `k_euler_ancestral`, noise schedule `karras`, guidance 5.
+- **Other settings:** sampler `k_euler_ancestral`, noise schedule `karras`, guidance 7 (the author changed it from 5 on 2026-11-16, after the live check; 7 is what the web UI capture and the first working request used).
 - **Anything that costs Anlas** (a larger size, more steps) needs the Director's explicit request each time.
 
 **Effort**, from NovelAI's [announcement](https://journal.novelai.net/novelai-diffusion-v5-full-effort-toggle/) (added to V5 Full on 2026-10-08):
