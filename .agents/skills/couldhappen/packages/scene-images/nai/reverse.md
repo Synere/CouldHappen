@@ -11,7 +11,7 @@ Read this when a card supplies a portrait, when the first portrait of a cast mem
 
 Keep the sources apart, in the block's `#` notes and in what you tell the Director:
 
-- **Original prompt:** some pictures carry the prompt that made them in their metadata (a NovelAI PNG does). If there is one, say so and start from it, but keep only appearance and clothing; quality tags, UC and artist tags in it are not the character.
+- **Original prompt:** some pictures carry the prompt that made them in their metadata (a NovelAI PNG does). If there is one, say so and start from it, but keep only appearance and clothing; quality tags, UC and artist tags in it are not the character. Its artist tags are candidates for the story's style block instead (`python tools/nai_tags.py --png <file>` lists them; see [core.md](core.md), "Choosing artist tags").
 - **Seen:** what is plainly visible in the picture.
 - **Inferred:** what you judged from the picture but could be wrong (an eye colour in shadow, a garment half hidden).
 - **The story:** what the prose or card says. **The story wins** wherever it disagrees with the picture. Write the story's version into the block and tell the Director the picture differs.
@@ -33,7 +33,7 @@ For a cast block, read only the person: build, species traits, hair, eyes, skin,
 ## What never comes from the picture
 
 - **Who it is.** Do not recognise a known character from their looks. Use a canonical name only when the card or the Director says who it is; otherwise describe what is visible.
-- **Artist and style tags.** Do not guess an artist from a picture. The style stays the story's block in `notes/style.txt`.
+- **Who drew it.** Do not claim a picture was drawn by a given artist. Matching a reference's style with artist tags is a separate step with its own checks and the Director's choice ([core.md](core.md), "Choosing artist tags"); a cast block never carries artist tags, and the style stays the story's block in `notes/style.txt`.
 - **Quality tags, UC and negative emphasis.** None of these describe the character.
 - **Tagger output.** Do not treat an automatic tagger's guesses as fact.
 

@@ -4,7 +4,7 @@ The single register of open work for CouldHappen: to-dos, pending decisions, ope
 unverified facts, each with a stable `ISS-n` ID. A row is one short line. Its Source links to the item's home
 section: a heading that starts with its ID (`## ISS-n — title`) in another file, which holds the reasoning.
 
-- **Next ID: ISS-39.** IDs are never reused. Code comments and commits may cite them.
+- **Next ID: ISS-40.** IDs are never reused. Code comments and commits may cite them.
 - **New item:** write its home section first, then add a row here whose Source links to it, and bump Next ID.
 - **Resolved item:** move the row to Closed with the date and a one-line resolution, and update its home section.
 
@@ -78,6 +78,7 @@ Work order from 2026-11-11. The author's ranking: one `N. ISS-n — why` line pe
 
 | ID | Item | Closed | Resolution |
 | --- | --- | --- | --- |
+| ISS-39 | NovelAI artist tags: the writer proposes a style matched to the card image, checked with `nai_tags.py --artist` against Danbooru | 2026-11-16 | `nai_tags.py --artist` (Danbooru artist tags in prompt form, exact match marked, no account) and `--png` (artist tags embedded in a picture), the core page's "Choosing artist tags" (propose from the reference, check, one free test per option, the Director picks), with tests; not yet observed in a story |
 | ISS-38 | The NovelAI script makes a PNG in a release workspace, with one and with two character fields | 2026-11-16 | the author ran it with their own token: one-character and two-character pictures (cast blocks, positions, no leakage), the same character consistent across both, and the tag helper on V5 all worked; not yet observed in a story |
 | ISS-32 | NovelAI provider for scene-images, with a guide that translates the prose into Danbooru tags | 2026-11-16 | built as ISS-33 to ISS-37 and checked live in ISS-38; the plan is completed |
 | ISS-37 | NovelAI scenes page: positions, complexity, visual-novel switches | 2026-11-16 | `scene-images/nai/scenes.md` (GPL-3.0-only, ADR-10) and `[Character N @ X,Y]` positions sent as `use_coords` and `center`, with tests; live check in ISS-38; not yet observed in a story |

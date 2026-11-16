@@ -16,6 +16,8 @@ Use four sources, in this order:
 3. **The tag helper**, for any tag you are not sure exists: `python tools/nai_tags.py "socks rolled" "upper bo"`. It asks NovelAI's own tag suggester, so its counts show what the model learned, not raw Danbooru. Only a suggestion that starts with your query confirms a tag; the helper hides the rest. Counts top out at 10000, which only means "common". An exact match with a count of a few hundred or more is safe to use; no match, or a count in the tens, means describing that detail in a sentence instead. For example, `socks rolled down` has a count of 28: write "her socks have slipped down to her ankles" instead.
 4. **The Danbooru wiki, for meaning.** The helper says a tag exists, not what it means. When meaning matters, as with clothing state or `X focus` tags, read the tag's wiki page: `https://danbooru.donmai.us/wiki_pages/<tag_with_underscores>` (the [Safebooru mirror](https://safebooru.donmai.us/wiki_pages/help%3Aapi) shows only safe pictures). Check the tag is a general tag, not an alias or deprecated.
 
+**Artist tags** never come back from NovelAI's suggester. Check them with `python tools/nai_tags.py --artist <name>`, which asks Danbooru's public tag list; choosing them is covered in [core.md](core.md), "Choosing artist tags".
+
 Match in this order: the exact canonical tag, the canonical tag behind an alias, a broader stable tag, then a plain sentence. Never invent an underscore tag and treat it as checked.
 
 ## Spelling
