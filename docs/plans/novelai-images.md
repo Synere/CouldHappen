@@ -264,6 +264,9 @@ Blocked by ISS-35. Delivers the scenes page: turning the prose's place and momen
 
 ## Open
 
-- What count makes a tag safe to use (a first guess: an exact match with a count of 500 or more), and whether suggest-tags uses any quota (none seen, not confirmed).
-- Whether V5 has gained any reference-image feature since the MCP's note. If not, whether to offer V4.5 with vibe transfer as an alternative for portraits.
-- The size budget for the guide. The danbooru page carries most of the weight; leaving the design methods out keeps the rest small.
+Answers recorded on 2026-11-16, after the plan closed:
+
+- **Suggest-tags quota:** it uses none (the author, 2026-11-16), so the writer can check tags freely.
+- **What count makes a tag safe:** still a working rule, not tested. `nai/danbooru.md` treats an exact match with a count of a few hundred or more as safe. Settle it only if a story shows a tag above that count being ignored.
+- **Reference images:** Precise Reference costs 5 extra Anlas per picture on V4.5 (the author, from NovelAI's docs, 2026-11-16). Whether V5 gains it is still unknown. Until it does, cast blocks keep characters consistent, and `--ref` stays in the script's interface.
+- **The size budget for the guide:** the five pages and their notice came to about 45 KB, against roughly 120 KB of source sections.
