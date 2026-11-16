@@ -7,7 +7,7 @@ import threading
 from urllib.parse import unquote, urlsplit
 from uuid import uuid4
 
-from . import files, runtime
+from . import files, images, runtime
 
 
 class Failure(Exception):
@@ -275,7 +275,7 @@ def server(bridge, port=0):
                         raise files.Invalid('Asset is not publicly referenced')
                     data = files.public_asset(bridge.root, relative)
                     self.send_response(200)
-                    self.send_header('Content-Type', 'image/png')
+                    self.send_header('Content-Type', images.TYPES[relative.rsplit('.', 1)[1].lower()])
                     self.send_header('X-Content-Type-Options', 'nosniff')
                     self.send_header('Content-Length', str(len(data)))
                     self.end_headers()

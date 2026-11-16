@@ -41,6 +41,22 @@ Importing a card does not reveal the character to the player. When you decide to
 
 Characters without a card or portrait are fine. Keep source originals.
 
+## Images a card links to
+
+Cards often carry extra pictures as links: an expression sheet, a picture per greeting, a map, a character in another outfit. They are the author's work too. When the story will use one, fetch it with:
+
+```bash
+python -m helpers card-image --root . --source <import folder> --url <url>
+```
+
+It fetches only a link that appears in that card (its `card.json` or a variant), never one you found anywhere else, and only if the download really is a PNG, JPEG, WebP or GIF. The original stays private in the import folder, listed in its `assets.json`; a copy with its metadata removed lands in `public/assets/`, and the command prints its name as `picture`. Nothing is shown until you use it: as a picture line in a story entry (`![caption](/api/assets/<picture>)`) or as a cast `portrait`.
+
+- **Look before you show.** Open the private copy and check what it is. Some links are ads, banners for the author's other work, or pictures that do not suit this story; skip those.
+- **The Director's limits come first.** If a picture is more explicit than the story the Director has agreed to, ask them before showing it.
+- **Fetch what you will use**, not every link in the card. Each fetch tells the image's host that someone opened it.
+- **Never run scripts a card holds**, and never follow links found inside a downloaded page.
+
+
 ## Keeping the cast current
 
 The Cast panel is for people the player has actually met or heard of, and who matter right now. Update it in the same pause as the story entry that changes it:
@@ -49,4 +65,4 @@ The Cast panel is for people the player has actually met or heard of, and who ma
 - **Hide, do not delete, when they leave the scene.** If a character is no longer here (the player left the place, the enemy fled or was escaped from, the ally went away but may come back), set `"present": false`. The reader hides them. Keep their id, description and portrait so they return unchanged. Set `"present": true`, or remove the field, when they are back.
 - **Delete** only when they are gone for good: dead, destroyed, or permanently out of the story. Delete their portrait file too unless a story picture still uses it.
 - **Check at every scene change**, and whenever the player enters or leaves a place, defeats or escapes a foe, or parts ways with someone: read `public/cast.json` and make it match the scene.
-- A hidden character is still public data in `cast.json`; hiding is for the reader's panel, not for secrecy. Never put anything in `cast.json` that the player has not learned. Never fetch remote assets or run scripts embedded in a card.
+- A hidden character is still public data in `cast.json`; hiding is for the reader's panel, not for secrecy. Never put anything in `cast.json` that the player has not learned.

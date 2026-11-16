@@ -241,3 +241,69 @@ def portrait(root, source):
     name = digest(cleaned) + '.png'
     atomic(root / 'public/assets' / name, cleaned)
     return {'portrait': name, 'sha256': digest(cleaned), 'disclosed': False, 'source_path': str(source)}
+
+
+USER_AGENT = 'CouldHappen card-image (+https://github.com/Synere/CouldHappen)'
+
+
+def import_folder(root, source):
+    """An import folder from itself, a file in it, or the original card once it is imported."""
+    imports = (root / 'imports').resolve()
+    source = Path(source).resolve()
+    if source.is_relative_to(imports):
+        folder = imports / source.relative_to(imports).parts[0] if source != imports else None
+    elif source.is_file():
+        folder = imports / digest(bounded(source))
+    else:
+        folder = None
+    if folder is None or not (folder / 'card.json').is_file():
+        raise Invalid('Source must be an imported card, its import folder, or a file in it; '
+                      'run import-card on the card first')
+    return folder
+
+
+def card_image(root, source, url, fetch=None):
+    """Fetch one image a card links to, keep it privately and publish a copy without metadata (ADR-12).
+
+    Only a URL that appears in the import's card.json or one of its variants is fetched; the
+    format comes from the bytes. The public copy is not disclosed until an entry or the cast
+    refers to it.
+    """
+    from urllib.parse import urlsplit
+    from . import images
+    root = Path(root).resolve()
+    folder = import_folder(root, source)
+    if urlsplit(url).scheme not in ('http', 'https'):
+        raise Invalid('Only http and https links can be fetched')
+    texts = [json.dumps(json.loads(p.read_text(encoding='utf-8')), ensure_ascii=False)
+             for p in sorted(folder.glob('card*.json'))]
+    if not any(url in text for text in texts):
+        raise Invalid('That URL does not appear in this card; only links the card itself holds are fetched')
+    data = (fetch or _download)(url)
+    if len(data) > SOURCE_LIMIT:
+        raise Invalid('Download exceeds 32 MiB')
+    ext, cleaned = images.clean(data)
+    private = folder / 'assets' / f'{digest(data)}.{ext}'
+    atomic(private, data)
+    name = f'{digest(cleaned)}.{ext}'
+    atomic(root / 'public/assets' / name, cleaned)
+    log = folder / 'assets.json'
+    records = json.loads(log.read_text(encoding='utf-8')) if log.is_file() else []
+    record = {'url': url, 'file': f'assets/{private.name}', 'format': ext, 'picture': name}
+    if record not in records:
+        records.append(record)
+    write_json(log, records)
+    return {'picture': name, 'format': ext, 'disclosed': False, 'private_path': str(private), 'url': url}
+
+
+def _download(url):
+    from urllib.error import URLError
+    from urllib.request import Request, urlopen
+    from urllib.parse import urlsplit
+    try:
+        with urlopen(Request(url, headers={'User-Agent': USER_AGENT}), timeout=30) as response:
+            if urlsplit(response.geturl()).scheme not in ('http', 'https'):
+                raise Invalid('Link redirected away from http or https')
+            return response.read(SOURCE_LIMIT + 1)
+    except (URLError, TimeoutError, OSError) as exc:
+        raise Invalid(f'Could not fetch the image: {getattr(exc, "reason", exc)}') from None

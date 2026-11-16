@@ -53,7 +53,7 @@
  },
  {
   "line": "![x](/api/assets/a.jpg)",
-  "name": null
+  "name": "a.jpg"
  },
  {
   "line": "![x](/api/assets/nnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn.png)",
@@ -65,6 +65,30 @@
  },
  {
   "line": "![x](https://example.com/a.png)",
+  "name": null
+ },
+ {
+  "line": "![A map](/api/assets/map.jpg)",
+  "name": "map.jpg"
+ },
+ {
+  "line": "![](/api/assets/sheet.webp)",
+  "name": "sheet.webp"
+ },
+ {
+  "line": "![wave](/api/assets/wave.gif)",
+  "name": "wave.gif"
+ },
+ {
+  "line": "![x](/api/assets/a.jpeg)",
+  "name": null
+ },
+ {
+  "line": "![x](/api/assets/a.svg)",
+  "name": null
+ },
+ {
+  "line": "![x](/api/assets/a.PNG)",
   "name": null
  }
 ]

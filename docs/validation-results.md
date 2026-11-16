@@ -146,6 +146,19 @@ A release ZIP built from commit `39d5000` was unpacked in a scratch folder, and 
 
 SillyTavern's `character-card-parser.js` reads the first `ccv3` chunk, else the first `chara` chunk, and replaces every such chunk when it writes. ADR-11 makes `import-card` read the same one and keep the others as variants.
 
+## ISS-42 — Images a card links to — 2026-11-16 (scratch fetch)
+
+The same scratch workspace, with the working-tree helpers copied in, ran `card-image` against links from the imported Chub cards. Automated-check-level evidence: no host or story was involved, and no picture was shown in the reader.
+
+| Check | Outcome |
+| --- | --- |
+| Image links in the four Chub cards | 1 to 40 per card: Chub gallery PNGs, WebP on the creator's own host, PNG on ibb.co. |
+| Harrington Kingdom gallery PNG | **Fetched**: 1248×1824 PNG, kept privately and published; nothing to strip. |
+| Emily & Emma WebP | **Fetched**: 1472×2248 WebP, kept privately and published; nothing to strip. |
+| A URL not in the card | **Refused**: "That URL does not appear in this card". |
+| Decoding | Pillow opened the private and public copies of both at full size. |
+| Shown in the reader | Not observed. |
+
 ## Host and creative observations
 
 | Host / creative observation | Status |

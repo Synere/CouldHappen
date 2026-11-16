@@ -65,7 +65,7 @@ Read `START_HERE.md` and `docs/public-contract.md` first, then the reference for
 
 - [Capabilities](references/capabilities.md) and [setup](references/setup.md): first setup, reopening, or a change in your environment.
 - [Writing](references/writing.md): play, and **closing the game** when the player asks you to stop for now.
-- [Records and imports](references/records-and-imports.md): continuity notes, Director preferences, and character cards.
+- [Records and imports](references/records-and-imports.md): continuity notes, Director preferences, character cards, and the images a card links to.
 - [Voice](references/voice.md): before writing an entry with speech, or a new character's first line.
 - [Recovery](references/recovery.md): an interrupted session, Director Undo, or a mechanical failure.
 - [Interface](references/interface.md): changing the helper or the reader. [Future images](references/future-images.md) only when image tools are relevant.

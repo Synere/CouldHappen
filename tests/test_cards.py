@@ -101,6 +101,38 @@ class Cards(unittest.TestCase):
         self.assertEqual((card['data']['name'], fmt, variants), ('V3', 'v3', []))
         self.assertEqual(warnings, ['V3 preferred over legacy chara metadata'])
 
+    def test_card_image_fetches_only_the_cards_own_image_links(self):
+        # ADR-12: the URL must be in the card, the bytes must be an image; original private, copy clean.
+        from test_images import gif
+        temp, root = workspace()
+        self.addCleanup(temp.cleanup)
+        url = 'https://files.example/sheet.gif'
+        card = {'spec': 'chara_card_v2', 'data': {'name': 'E', 'first_mes': f'Hello <img src="{url}">'}}
+        source = root / 'card.png'
+        source.write_bytes(png([(b'chara', base64.b64encode(json.dumps(card).encode()))]))
+        folder = root / 'imports' / cards.import_card(root, source)['source_sha256']
+        fetched = []
+
+        def fetch(link):
+            fetched.append(link)
+            return gif(b'trailing secret')
+        result = cards.card_image(root, folder, url, fetch=fetch)
+        self.assertEqual((result['format'], result['disclosed'], fetched), ('gif', False, [url]))
+        public = (root / 'public/assets' / result['picture']).read_bytes()
+        self.assertNotIn(b'secret', public)
+        self.assertEqual(files.read_json(folder / 'assets.json'),
+                         [{'url': url, 'file': 'assets/' + result['private_path'].replace('\\', '/').rsplit('/', 1)[1],
+                           'format': 'gif', 'picture': result['picture']}])
+        self.assertIn(b'secret', (folder / 'assets').joinpath(files.read_json(folder / 'assets.json')[0]['file'][7:]).read_bytes())
+        self.assertEqual(cards.card_image(root, source, url, fetch=fetch)['picture'], result['picture'])
+        self.assertEqual(len(files.read_json(folder / 'assets.json')), 1)
+        for bad_url, body in (('https://elsewhere.example/x.gif', gif()), ('file:///etc/passwd', gif()),
+                              (url, b'<svg xmlns="http://www.w3.org/2000/svg"/>')):
+            with self.subTest(bad_url), self.assertRaises(files.Invalid):
+                cards.card_image(root, folder, bad_url, fetch=lambda _: body)
+        with self.assertRaises(files.Invalid):
+            cards.card_image(root, root / 'not-imported.png', url, fetch=fetch)
+
     def test_malformed_preferred_crc_and_limits(self):
         good = base64.b64encode(b'{"name":"legacy"}')
         for data in (png([(b'chara', good), (b'ccv3', b'broken')]), png([])[:-3], png([])[:-1]+b'x',

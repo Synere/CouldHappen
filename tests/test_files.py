@@ -168,6 +168,20 @@ class Files(unittest.TestCase):
         with self.assertRaises(files.Invalid):
             files.snapshot(root)
 
+    def test_pictures_in_four_formats_are_checked_against_their_extension(self):
+        # ADR-12: .jpg, .webp and .gif are served like .png, after a structure check.
+        from test_images import gif, jpeg, webp
+        temp, root = workspace()
+        self.addCleanup(temp.cleanup)
+        for name, data in (('a.jpg', jpeg()), ('b.webp', webp()), ('c.gif', gif())):
+            files.atomic(root / 'public/assets' / name, data)
+        files.atomic(root / 'public/story.md', '# Story\n\n' + ''.join(
+            files.entry(f'![x](/api/assets/{n})') for n in ('a.jpg', 'b.webp', 'c.gif')))
+        self.assertEqual(set(files.snapshot(root)['assets']), {'a.jpg', 'b.webp', 'c.gif'})
+        files.atomic(root / 'public/assets/c.gif', jpeg())
+        with self.assertRaises(files.Invalid):
+            files.snapshot(root)
+
     def test_picture_line_fixture(self):
         """The reader's splitBody (web/tests/session.test.js) runs the same fixture; the two patterns must agree."""
         for case in json.loads((REPO / 'tests/fixtures/picture_lines.json').read_text(encoding='utf-8')):

@@ -11,10 +11,10 @@ export function markdown(body) {
   });
 }
 
-const PICTURE = /^!\[([^\]\n]{0,200})\]\(\/api\/assets\/([A-Za-z0-9][A-Za-z0-9._-]{0,120}\.png)\)\s*$/;
+const PICTURE = /^!\[([^\]\n]{0,200})\]\(\/api\/assets\/([A-Za-z0-9][A-Za-z0-9._-]{0,120}\.(?:png|jpg|webp|gif))\)\s*$/;
 
 /** Split a passage into prose and the pictures attached to it. A picture is a line of its own,
- * `![caption](/api/assets/name.png)`, outside code fences; any other image syntax stays prose and is dropped by the sanitizer.
+ * `![caption](/api/assets/name.png)` (or .jpg, .webp, .gif), outside code fences; any other image syntax stays prose and is dropped by the sanitizer.
  * @param {string} body
  * @returns {{text:string,pictures:{alt:string,name:string}[]}} */
 export function splitBody(body) {

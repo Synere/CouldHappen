@@ -18,6 +18,7 @@ The [approved design](../designs/couldhappen.md) remains the normative product a
 | [ADR-9](ADR-9-character-brains-plus.md) | Accepted | Keep method-only character-brains and add character-brains-plus, whose stdlib script and event log brief only what visibility classes and `know` events allow. |
 | [ADR-10](ADR-10-bundle-adapted-nai5-prompting-pages.md) | Accepted | Ship the NovelAI guide pages adapted from nai5-prompting as a GPL-3.0-only folder, `scene-images/nai/`, each page keeping its notice, combined under §13 of both licences. |
 | [ADR-11](ADR-11-import-every-card-variant.md) | Accepted | Import a PNG holding several card definitions: `card.json` is the one SillyTavern reads, the rest are kept as `card.<n>.json` variants listed in the receipt. |
+| [ADR-12](ADR-12-fetch-images-a-card-links.md) | Accepted | Let the writer fetch images a card links to through `card-image`, which checks the format, keeps the original privately and publishes a copy without metadata; the reader shows PNG, JPEG, WebP and GIF. |
 
 For new decisions, copy one of the templates:
 

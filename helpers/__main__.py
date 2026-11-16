@@ -22,6 +22,10 @@ def main():
             sub.add_argument('--timeout', type=float, default=0)
         if name in ('import-card', 'portrait'):
             sub.add_argument('--source', required=True)
+    sub = commands.add_parser('card-image')
+    sub.add_argument('--root', default='.')
+    sub.add_argument('--source', required=True)
+    sub.add_argument('--url', required=True)
     sub = commands.add_parser('entry')
     sub.add_argument('--role', choices=('writer', 'human'), default='writer')
     sub.add_argument('--body-file', required=True)
@@ -63,6 +67,8 @@ def main():
             result, code = runtime.wait(args.root, args.timeout)
         elif args.command in ('import-card', 'portrait'):
             result = (cards.import_card if args.command == 'import-card' else cards.portrait)(args.root, args.source)
+        elif args.command == 'card-image':
+            result = cards.card_image(args.root, args.source, args.url)
         elif args.command == 'new-story':
             result = stories.new_story(args.root, args.destination)
         elif args.command == 'stop':

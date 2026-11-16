@@ -120,30 +120,32 @@ def asset_path(root, relative):
         raise Invalid('Invalid public portrait path')
     base = (Path(root) / 'public/assets').resolve()
     path = (base / relative).resolve()
-    if not path.is_relative_to(base) or path.suffix.lower() != '.png' or not path.is_file():
-        raise Invalid('Missing or escaped public PNG')
+    if not path.is_relative_to(base) or path.suffix.lower() not in ('.png', '.jpg', '.webp', '.gif') or not path.is_file():
+        raise Invalid('Missing or escaped public picture (PNG, JPEG, WebP or GIF)')
     return path
 
 
 def public_asset(root, relative):
-    """Read a referenced public PNG only after path and critical-structure checks."""
+    """Read a referenced public picture only after path and structure checks (ADR-12)."""
     path = asset_path(root, relative)
-    from .cards import SOURCE_LIMIT, chunks
+    from .cards import SOURCE_LIMIT
+    from .images import check
     if path.stat().st_size > SOURCE_LIMIT:
-        raise Invalid('Public portrait exceeds 32 MiB')
+        raise Invalid('Public picture exceeds 32 MiB')
     data = path.read_bytes()
+    ext = path.suffix[1:].lower()
     try:
-        chunks(data)
+        check(data, ext)
     except Invalid as exc:
-        raise Invalid(f'Public portrait is not a valid PNG: {exc}') from None
+        raise Invalid(f'Public picture is not a valid {ext.upper()}: {exc}') from None
     return data
 
 
-PICTURE = re.compile(r'^!\[[^\]\n]{0,200}\]\(/api/assets/([A-Za-z0-9][A-Za-z0-9._-]{0,120}\.png)\)\s*$')
+PICTURE = re.compile(r'^!\[[^\]\n]{0,200}\]\(/api/assets/([A-Za-z0-9][A-Za-z0-9._-]{0,120}\.(?:png|jpg|webp|gif))\)\s*$')
 
 
 def pictures(body):
-    """Names of the pictures attached to a passage: lines of the form ![caption](/api/assets/name.png) outside code fences."""
+    """Names of the pictures attached to a passage: lines of the form ![caption](/api/assets/name.png) outside code fences (.png, .jpg, .webp or .gif)."""
     names, fenced = [], False
     for line in body.split('\n'):
         if re.match(r'^\s*(```|~~~)', line):
