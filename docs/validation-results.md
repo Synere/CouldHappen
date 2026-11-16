@@ -135,6 +135,17 @@ A release ZIP built from commit `5cee531` was unpacked as a workspace with `tool
 | Tag helper | **Worked on V5.** `"upper bo"` showed only `upper body` (10000+), `"socks rolled"` only `socks rolled down` (28); fuzzy matches were hidden. |
 | From prose in a story | Not observed: the prompts were written by hand, not from a story passage. |
 
+## ISS-40 — Chub cards with two card definitions — 2026-11-16 (scratch import)
+
+A release ZIP built from commit `39d5000` was unpacked in a scratch folder, and `import-card` was run on five PNG cards the author downloaded. This is automated-check-level evidence: no host or story was involved.
+
+| Card | Outcome before [ADR-11](decisions/ADR-11-import-every-card-variant.md) |
+| --- | --- |
+| Picking up the Brats from school (one `chara` chunk) | Imported, V2, no warnings. |
+| Four Chub downloads (`main_<slug>_spec_v2.png`) | **Refused**, "Conflicting card definitions". Each holds two different `chara` chunks. The first is Chub's current export (version `main`, a Chub id, the linked lorebook); the second is an older definition from the uploaded image. Descriptions and first messages match; tags, creator notes, greetings and lorebooks differ. Harrington Kingdom's second chunk has no lorebook, where the first has six entries. |
+
+SillyTavern's `character-card-parser.js` reads the first `ccv3` chunk, else the first `chara` chunk, and replaces every such chunk when it writes. ADR-11 makes `import-card` read the same one and keep the others as variants.
+
 ## Host and creative observations
 
 | Host / creative observation | Status |

@@ -4,7 +4,7 @@ The single register of open work for CouldHappen: to-dos, pending decisions, ope
 unverified facts, each with a stable `ISS-n` ID. A row is one short line. Its Source links to the item's home
 section: a heading that starts with its ID (`## ISS-n — title`) in another file, which holds the reasoning.
 
-- **Next ID: ISS-40.** IDs are never reused. Code comments and commits may cite them.
+- **Next ID: ISS-42.** IDs are never reused. Code comments and commits may cite them.
 - **New item:** write its home section first, then add a row here whose Source links to it, and bump Next ID.
 - **Resolved item:** move the row to Closed with the date and a one-line resolution, and update its home section.
 
@@ -78,6 +78,8 @@ Work order from 2026-11-11. The author's ranking: one `N. ISS-n — why` line pe
 
 | ID | Item | Closed | Resolution |
 | --- | --- | --- | --- |
+| ISS-41 | NovelAI artist tags off by default; candidates checked against their real Danbooru pictures ([plan](plans/novelai-artist-opt-in.md#iss-41--artist-tags-by-default-off-with-sample-pictures)) | 2026-11-16 | `nai_tags.py --artist ... --samples DIR` saves each exact artist's top-scored previews, any content rating, from Danbooru's own hosts; the core page offers artist tags only when the Director asks or the card PNG names artists, then samples, then one free test portrait each; with tests; not yet observed in a story |
+| ISS-40 | `import-card` refused every Chub card: each PNG holds two different `chara` chunks ([evidence](validation-results.md#iss-40--chub-cards-with-two-card-definitions--2026-11-16-scratch-import)) | 2026-11-16 | [ADR-11](decisions/ADR-11-import-every-card-variant.md): `card.json` is the chunk SillyTavern reads, the others are kept as `card.<n>.json` and `card.<n>.md` and listed in the receipt's `variants` with the fields that differ; the imports page tells the writer to compare them and ask the Director; with tests; not yet observed in a story |
 | ISS-39 | NovelAI artist tags: the writer proposes a style matched to the card image, checked with `nai_tags.py --artist` against Danbooru | 2026-11-16 | `nai_tags.py --artist` (Danbooru artist tags in prompt form, exact match marked, no account) and `--png` (artist tags embedded in a picture), the core page's "Choosing artist tags" (propose from the reference, check, one free test per option, the Director picks), with tests; not yet observed in a story |
 | ISS-38 | The NovelAI script makes a PNG in a release workspace, with one and with two character fields | 2026-11-16 | the author ran it with their own token: one-character and two-character pictures (cast blocks, positions, no leakage), the same character consistent across both, and the tag helper on V5 all worked; not yet observed in a story |
 | ISS-32 | NovelAI provider for scene-images, with a guide that translates the prose into Danbooru tags | 2026-11-16 | built as ISS-33 to ISS-37 and checked live in ISS-38; the plan is completed |

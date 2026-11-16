@@ -71,10 +71,40 @@ class Cards(unittest.TestCase):
                       'Two moons\nrise.', 'Moons', '"moon"', '"night"', 'custom_field'):
             self.assertIn(piece, text)
 
+    def test_several_definitions_import_as_variants(self):
+        # ADR-11: card.json is the chunk SillyTavern reads; other distinct ones are kept.
+        temp, root = workspace()
+        self.addCleanup(temp.cleanup)
+
+        def v2(**fields):
+            return base64.b64encode(json.dumps({'spec': 'chara_card_v2', 'data': {'name': 'E', **fields}}).encode())
+        current = v2(tags=['main'], character_book={'entries': [{'content': 'Lore'}]})
+        stale = v2(tags=['old'])
+        source = root / 'card.png'
+        source.write_bytes(png([(b'chara', current), (b'chara', current), (b'Chara', b'broken'), (b'chara', stale)]))
+        result = cards.import_card(root, source)
+        folder = root / 'imports' / result['source_sha256']
+        self.assertEqual(files.read_json(folder / 'card.json')['data']['tags'], ['main'])
+        self.assertEqual(files.read_json(folder / 'card.3.json')['data']['tags'], ['old'])
+        self.assertIn('old', (folder / 'card.3.md').read_text(encoding='utf-8'))
+        self.assertFalse((folder / 'card.2.json').exists())
+        self.assertEqual(result['variants'], [{'card_file': 'card.3.json', 'readable_file': 'card.3.md',
+                                               'differs': ['character_book', 'tags']}])
+        self.assertEqual(files.read_json(folder / 'import.json')['variants'], result['variants'])
+        self.assertTrue(any('definition 2 skipped' in w for w in result['warnings']))
+        self.assertTrue(any('3 different chara' in w for w in result['warnings']))
+
+        _, _, warnings, variants = cards.extract_png(png([(b'chara', stale), (b'chara', stale)]))
+        self.assertEqual((warnings, variants), ([], []))
+        v3 = base64.b64encode(json.dumps({'spec': 'chara_card_v3', 'data': {'name': 'V3'}}).encode())
+        card, fmt, warnings, variants = cards.extract_png(png([(b'chara', current), (b'chara', stale), (b'ccv3', v3)]))
+        self.assertEqual((card['data']['name'], fmt, variants), ('V3', 'v3', []))
+        self.assertEqual(warnings, ['V3 preferred over legacy chara metadata'])
+
     def test_malformed_preferred_crc_and_limits(self):
         good = base64.b64encode(b'{"name":"legacy"}')
         for data in (png([(b'chara', good), (b'ccv3', b'broken')]), png([])[:-3], png([])[:-1]+b'x',
-                     png([(b'chara', good), (b'chara', base64.b64encode(b'{"name":"other"}'))])):
+                     png([(b'chara', b'broken'), (b'chara', good)])):
             with self.assertRaises(files.Invalid):
                 cards.extract_png(data)
         with self.assertRaises(files.Invalid):

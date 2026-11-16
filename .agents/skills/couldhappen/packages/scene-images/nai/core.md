@@ -103,17 +103,22 @@ New tags are unweighted. Add a weight only when a tried picture shows a tag bein
 
 ## The style block
 
-One story keeps one art style through a fixed block in `notes/style.txt`: tags for the medium and technique (`watercolor (medium)`, `anime coloring`, `flat color`, `sketch`) and the artist tags the Director chose, kept exactly as chosen, with their order, weights, spaces and years. Paste it unchanged after a blank line, after the `Character N:` lines and before the `[Character 1]` field. Never add, reorder or reweight it for one picture. If the Director changes it, change the file, not one prompt.
+One story keeps one art style through a fixed block in `notes/style.txt`: tags for the medium and technique (`watercolor (medium)`, `anime coloring`, `flat color`, `sketch`) and any artist tags the Director chose, kept exactly as chosen, with their order, weights, spaces and years. Paste it unchanged after a blank line, after the `Character N:` lines and before the `[Character 1]` field. Never add, reorder or reweight it for one picture. If the Director changes it, change the file, not one prompt.
 
 ### Choosing artist tags
 
-Danbooru artist tags give a story one recognisable art style. You propose them; the Director chooses. Do this when you first set up NovelAI pictures, and again only if the Director asks for a new style.
+By default a story uses no artist tags: NovelAI's own style with the medium tags is the default, and you never add artist tags on your own. Offer them in two cases only:
 
-1. **Find the reference.** By default, match the story's own look: the imported card's PNG, or an image embedded in the card or supplied by the Director. With no reference, propose a style from the story's tone, or none at all (medium tags alone are fine).
-2. **Read what the reference says about itself.** Run `python tools/nai_tags.py --png <the card PNG>`. A picture made with NovelAI often carries its prompt, and any `artist:` tags in it are your first candidates.
-3. **Describe the reference's style in words:** line weight, colouring (cel shading, soft painterly, flat), eyes and faces, palette, detail level, era. Then think of two or three Danbooru artists whose known style is close to that description. You are matching a look, not identifying who drew the picture: never tell the Director the reference was drawn by someone.
-4. **Check each candidate** with `python tools/nai_tags.py --artist <name>` (NovelAI's suggester does not complete artist tags, so this asks Danbooru). Keep only exact matches; a few hundred posts or more means the model has probably learned the style. Drop a candidate with no exact match or a count in the tens.
-5. **Try them.** With the Director's approval, make one free test portrait per candidate: the same cast block, the same seed (`--seed`), only the style block changed. Show the tests beside the reference and let the Director pick, mix two, or ask for something else.
+- **The Director asks** for a particular style, or to match the look of the card or another picture.
+- **The reference names its own artists.** Run `python tools/nai_tags.py --png <the card PNG>` when you set up NovelAI pictures. A picture made with NovelAI often carries its prompt, and `artist:` tags found there come from the picture itself, not from your memory. Tell the Director what was found and offer them; do not apply them.
+
+Your memory of what an artist's work looks like is unreliable, so check every candidate against real pictures before you name it to the Director:
+
+1. **Find the reference:** the imported card's PNG, an image embedded in the card, or a picture the Director supplied. The `--png` tags, if any, are the first candidates.
+2. **Describe the reference's style in words** (line weight, colouring such as cel shading, soft painterly or flat, eyes and faces, palette, detail level, era). If the Director asked for a style match, add two or three Danbooru artists you think are close; otherwise stay with the `--png` tags. You are matching a look, not identifying who drew the picture: never tell the Director the reference was drawn by someone.
+3. **Check each candidate exists:** `python tools/nai_tags.py --artist <name> --samples notes/style-samples`. Keep only exact matches; a few hundred posts or more means the model has probably learned the style. Drop a candidate with no exact match or a count in the tens.
+4. **Look at the samples.** `--samples` saves each exact artist's top-scored Danbooru pictures into `notes/style-samples/`, whatever their content rating: only the style matters here, and some artists draw only adult work. Open them beside the reference and drop any candidate whose real work does not look like it. Tell the Director which you dropped and why.
+5. **Try them.** With the Director's approval, make one free test portrait per remaining candidate: the same cast block, the same seed (`--seed`), only the style block changed. NovelAI's reading of a tag can differ from the artist's own pictures, so this is the real check. Show the tests beside the reference and let the Director pick, mix two, or keep no artist at all.
 6. **Record the choice** in `notes/style.txt`, with a `#` note on the reference and the date. The writer never swaps artists on its own after that.
 
 Write an artist tag the way NovelAI reads it: `artist:` and the Danbooru name in lowercase with spaces for underscores (`artist:ningen mame`), as the helper prints it. Artist tags are strong. Soften one that takes over with a weight below 1 (`0.8::artist:ningen mame::`), and when mixing two, weight the lesser one lower. A name that ends in a number needs a comma before `::` (`0.8::artist:name123, ::`).

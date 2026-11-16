@@ -1,6 +1,7 @@
 """Check Danbooru tags for NovelAI prompts. Makes no image. Usage:
     python tools/nai_tags.py TAG [TAG ...]            general tags, from NovelAI's tag suggester
-    python tools/nai_tags.py --artist NAME [NAME ...] artist tags, from Danbooru's public tag list
+    python tools/nai_tags.py --artist NAME [NAME ...] [--samples DIR]
+                                                      artist tags, from Danbooru's public tag list
     python tools/nai_tags.py --png FILE [FILE ...]    artist tags written into a picture's embedded text
 
 General tags: prints the suggestions NovelAI's V5 model knows that start with the query, with how common each is
@@ -13,6 +14,11 @@ Artist tags: NovelAI's suggester does not complete them, so --artist asks Danboo
 tags (category 1) that start with each name, most posts first, and prints each the way it goes in a prompt
 (artist:name, lowercase, spaces for underscores). "exact" marks the tag that is the name itself. A low post count
 means the model may barely know the style. Needs no token and no account.
+
+--samples DIR also saves each exact artist's top-scored Danbooru pictures (order:score), as 360-pixel previews,
+into DIR (made if missing) and prints their paths, so the writer can look at the artist's real work beside the
+reference instead of trusting its memory of the style. Every content rating is included: only the style matters,
+and some artists draw only adult work. Previews are only fetched from Danbooru's own hosts.
 
 --png reads a PNG's text chunks, such as the prompt NovelAI stores in its own pictures or a card's embedded
 data, and prints the artist: tags it finds. Reads the file only.
@@ -31,9 +37,11 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import zlib
+from pathlib import Path
 
 MODEL = 'nai-diffusion-5-full'
 TOP = 10000  # the suggester's counts stop here
+SAMPLES = 4  # previews saved per artist with --samples
 USER_AGENT = 'couldhappen-scene-image/0.1'  # an honest agent: Cloudflare refuses Python's default one
 ARTIST_IN_TEXT = re.compile(r'artist:\s*([^,:{}\[\]"\n]+?)\s*(?=,|::|\}|\]|"|\n|$)', re.IGNORECASE)
 
@@ -62,9 +70,13 @@ def artist_tag(name):
     return 'artist:' + normal(name)
 
 
+def wanted_name(query):
+    return normal(query.split(':', 1)[1] if query.lower().startswith('artist:') else query)
+
+
 def artist_lines(query, found):
     """Lines for Danbooru's artist tags, the exact name marked."""
-    wanted = normal(query.split(':', 1)[1] if query.lower().startswith('artist:') else query)
+    wanted = wanted_name(query)
     out = []
     for tag in found:
         if tag.get('category') != 1:
@@ -132,6 +144,45 @@ def get(url, headers):
         return json.loads(reply.read())
 
 
+def preview_url(post):
+    """A post's 360-pixel preview, or its smaller one."""
+    asset = post.get('media_asset') or {}
+    for variant in asset.get('variants') or []:
+        if variant.get('type') == '360x360' and variant.get('url'):
+            return variant['url']
+    return post.get('preview_file_url')
+
+
+def trusted(url, base):
+    """Only fetch from Danbooru itself (or the test server standing in for it)."""
+    parts, home = urllib.parse.urlsplit(url), urllib.parse.urlsplit(base)
+    host = parts.hostname or ''
+    return (parts.scheme == 'https' and (host == 'donmai.us' or host.endswith('.donmai.us'))) or         (parts.scheme == home.scheme and parts.netloc == home.netloc)
+
+
+def save_samples(name, base, folder):
+    """Save one artist's top-scored pictures; return their paths."""
+    url = base + '/posts.json?' + urllib.parse.urlencode({
+        'tags': name + ' order:score', 'limit': SAMPLES * 2, 'only': 'id,score,preview_file_url,media_asset'})
+    posts = get(url, {'User-Agent': USER_AGENT, 'Accept': 'application/json'})
+    posts = [p for p in posts if isinstance(p, dict)] if isinstance(posts, list) else []
+    saved = []
+    for post in posts:
+        link = preview_url(post)
+        if len(saved) >= SAMPLES or not link or not trusted(link, base):
+            continue
+        suffix = Path(urllib.parse.urlsplit(link).path).suffix.lower()
+        if suffix not in ('.jpg', '.jpeg', '.png', '.webp'):
+            continue
+        request = urllib.request.Request(link, headers={'User-Agent': USER_AGENT})
+        with urllib.request.urlopen(request, timeout=30) as reply:
+            data = reply.read(5_000_000)
+        path = Path(folder, f"{name}-{int(post.get('id', 0))}{suffix}")
+        path.write_bytes(data)
+        saved.append(path)
+    return saved
+
+
 def check_pngs(paths):
     for path in paths:
         try:
@@ -143,11 +194,13 @@ def check_pngs(paths):
         print(f'{path}: ' + (', '.join(found) if found else 'no artist: tags in its embedded text'))
 
 
-def check_artists(names):
+def check_artists(names, folder=None):
     base = os.environ.get('DANBOORU_URL', 'https://danbooru.donmai.us').rstrip('/')
     failed = False
+    if folder:
+        Path(folder).mkdir(parents=True, exist_ok=True)
     for query in names:
-        name = normal(query.split(':', 1)[1] if query.lower().startswith('artist:') else query).replace(' ', '_')
+        name = wanted_name(query).replace(' ', '_')
         url = base + '/tags.json?' + urllib.parse.urlencode({
             'search[name_or_alias_matches]': name + '*', 'search[category]': 1, 'search[hide_empty]': 'true',
             'search[order]': 'count', 'limit': 10})
@@ -165,6 +218,14 @@ def check_artists(names):
             continue
         print(f'{query!r}:')
         print('\n'.join(shown))
+        if folder and any(l.endswith('exact') for l in shown):
+            try:
+                saved = save_samples(name, base, folder)
+            except (urllib.error.URLError, OSError, ValueError) as error:
+                print(f'  samples: could not fetch ({error})')
+                failed = True
+                continue
+            print('  samples: ' + (', '.join(str(p) for p in saved) if saved else 'no pictures with a preview'))
     return failed
 
 
@@ -203,7 +264,14 @@ def main(argv):
         check_pngs(argv[1:] or sys.exit('--png takes one or more PNG files'))
         return
     if argv[0] == '--artist':
-        failed = check_artists(argv[1:] or sys.exit('--artist takes one or more names'))
+        names, folder = argv[1:], None
+        if '--samples' in names:
+            at = names.index('--samples')
+            if at + 1 >= len(names):
+                sys.exit('--samples takes a folder')
+            folder = names[at + 1]
+            names = names[:at] + names[at + 2:]
+        failed = check_artists(names or sys.exit('--artist takes one or more names'), folder)
     else:
         failed = check_tags(argv)
     if failed:

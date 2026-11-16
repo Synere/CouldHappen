@@ -11,7 +11,7 @@ Read this when a card supplies a portrait, when the first portrait of a cast mem
 
 Keep the sources apart, in the block's `#` notes and in what you tell the Director:
 
-- **Original prompt:** some pictures carry the prompt that made them in their metadata (a NovelAI PNG does). If there is one, say so and start from it, but keep only appearance and clothing; quality tags, UC and artist tags in it are not the character. Its artist tags are candidates for the story's style block instead (`python tools/nai_tags.py --png <file>` lists them; see [core.md](core.md), "Choosing artist tags").
+- **Original prompt:** some pictures carry the prompt that made them in their metadata (a NovelAI PNG does). If there is one, say so and start from it, but keep only appearance and clothing; quality tags, UC and artist tags in it are not the character. Its artist tags can be offered to the Director for the story's style block, never applied on your own (`python tools/nai_tags.py --png <file>` lists them; see [core.md](core.md), "Choosing artist tags").
 - **Seen:** what is plainly visible in the picture.
 - **Inferred:** what you judged from the picture but could be wrong (an eye colour in shadow, a garment half hidden).
 - **The story:** what the prose or card says. **The story wins** wherever it disagrees with the picture. Write the story's version into the block and tell the Director the picture differs.

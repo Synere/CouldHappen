@@ -81,29 +81,55 @@ def definition(data):
     return card, fmt
 
 
-def extract_png(data):
-    fields = {}
-    for kind, content, _ in chunks(data):
-        if kind == b'tEXt' and b'\0' in content:
-            key, value = content.split(b'\0', 1)
-            if key in (b'chara', b'ccv3'):
-                if key in fields and fields[key] != value:
-                    raise Invalid('Conflicting card definitions')
-                fields[key] = value
-    key = b'ccv3' if b'ccv3' in fields else b'chara'
-    if key not in fields:
-        raise Invalid('PNG has no supported card metadata')
-    if len(fields[key]) > (META_LIMIT + 2) // 3 * 4:
+def _decode(key, value):
+    if len(value) > (META_LIMIT + 2) // 3 * 4:
         raise Invalid('Encoded card metadata exceeds limit')
     try:
-        decoded = base64.b64decode(fields[key], validate=True)
+        decoded = base64.b64decode(value, validate=True)
     except ValueError:
         raise Invalid('Malformed base64 card metadata') from None
     card, fmt = definition(decoded)
     if key == b'ccv3' and fmt != 'v3':
         raise Invalid('ccv3 metadata must contain a V3 definition')
-    warnings = ['V3 preferred over legacy chara metadata'] if len(fields) == 2 else []
-    return card, fmt, warnings
+    return card, fmt
+
+
+def extract_png(data):
+    """Read the definition SillyTavern reads, plus any other distinct ones under that key (ADR-11).
+
+    SillyTavern takes the first ccv3 chunk, else the first chara chunk, keywords compared
+    without regard to case. Later chunks under the same key that differ are variants: the
+    file does not say which one is current, so they are kept for the writer to compare.
+    """
+    fields = {b'chara': [], b'ccv3': []}
+    for kind, content, _ in chunks(data):
+        if kind == b'tEXt' and b'\0' in content:
+            key, value = content.split(b'\0', 1)
+            key = key.lower()
+            if key in fields and value not in fields[key]:
+                fields[key].append(value)
+    key = b'ccv3' if fields[b'ccv3'] else b'chara'
+    if not fields[key]:
+        raise Invalid('PNG has no supported card metadata')
+    card, fmt = _decode(key, fields[key][0])
+    warnings = ['V3 preferred over legacy chara metadata'] if fields[b'ccv3'] and fields[b'chara'] else []
+    variants = []
+    for number, value in enumerate(fields[key][1:], 2):
+        try:
+            variants.append((number, *_decode(key, value)))
+        except Invalid as error:
+            warnings.append(f'Card definition {number} skipped: {error}')
+    if len(fields[key]) > 1:
+        warnings.append(f'PNG holds {len(fields[key])} different {key.decode()} card definitions; card.json is '
+                        'the first, which SillyTavern reads, and the others are kept as variants')
+    return card, fmt, warnings, variants
+
+
+def differing_fields(card, other):
+    """Top-level card fields (under data for V2/V3) whose values differ, sorted."""
+    a = card.get('data') if isinstance(card.get('data'), dict) else card
+    b = other.get('data') if isinstance(other.get('data'), dict) else other
+    return sorted(k for k in set(a) | set(b) if a.get(k) != b.get(k))
 
 
 TEXT_FIELDS = ('description', 'personality', 'scenario', 'system_prompt', 'post_history_instructions',
@@ -155,10 +181,10 @@ def import_card(root, source):
     data = bounded(source)
     suffix = source.suffix.lower()
     if suffix == '.png':
-        card, fmt, warnings = extract_png(data)
+        card, fmt, warnings, extra = extract_png(data)
     elif suffix == '.json':
         card, fmt = definition(data)
-        warnings = []
+        warnings, extra = [], []
     else:
         raise Invalid('Only local PNG and JSON cards are supported; no archives or remote assets')
     sha = digest(data)
@@ -169,8 +195,15 @@ def import_card(root, source):
     atomic(target, data)
     write_json(folder / 'card.json', card)
     atomic(folder / 'card.md', readable(card).encode('utf-8'))
+    variants = []
+    for number, other, _ in extra:
+        write_json(folder / f'card.{number}.json', other)
+        atomic(folder / f'card.{number}.md', readable(other).encode('utf-8'))
+        variants.append({'card_file': f'card.{number}.json', 'readable_file': f'card.{number}.md',
+                         'differs': differing_fields(card, other)})
     receipt = {'source_sha256': sha, 'format': fmt, 'result': 'extracted', 'warnings': warnings,
-               'source_name': source.name, 'source_file': target.name, 'readable_file': 'card.md'}
+               'source_name': source.name, 'source_file': target.name, 'readable_file': 'card.md',
+               'variants': variants}
     write_json(folder / 'import.json', receipt)
     return {'path': str(folder), 'source_path': str(target), **receipt}
 

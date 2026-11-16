@@ -102,8 +102,21 @@ class Danbooru(BaseHTTPRequestHandler):
         url = urlparse(self.path)
         query = parse_qs(url.query)
         seen.append((url.path, query, dict(self.headers)))
-        found = ARTISTS if query['search[name_or_alias_matches]'][0].startswith('ningen') else []
-        data = json.dumps(found).encode()
+        if url.path.startswith('/img/'):
+            data = b'picture'
+        elif url.path == '/posts.json':
+            home = f'http://127.0.0.1:{self.server.server_port}'
+            data = json.dumps([
+                {'id': 1, 'rating': 'g', 'media_asset': {'variants': [
+                    {'type': '180x180', 'url': home + '/img/small.jpg'}, {'type': '360x360', 'url': home + '/img/1.jpg'}]}},
+                {'id': 2, 'rating': 's', 'preview_file_url': home + '/img/2.jpg'},
+                {'id': 3, 'rating': 'g', 'preview_file_url': 'http://elsewhere.example/3.jpg'},
+                {'id': 4, 'rating': 'g', 'preview_file_url': home + '/img/4.png'},
+                {'id': 5, 'rating': 'e', 'preview_file_url': home + '/img/5.jpg'},
+                {'id': 6, 'rating': 'q', 'preview_file_url': home + '/img/6.jpg'}]).encode()
+        else:
+            found = ARTISTS if query['search[name_or_alias_matches]'][0].startswith('ningen') else []
+            data = json.dumps(found).encode()
         self.send_response(200)
         self.send_header('Content-Length', str(len(data)))
         self.end_headers()
@@ -166,6 +179,25 @@ class Artists(unittest.TestCase):
         self.assertIn('artist:ningen mame', done.stdout)
         self.assertNotIn('ningen tag', done.stdout)
         self.assertIn("'zzqx': no Danbooru artist tag starts with this", done.stdout)
+
+    def test_samples_saves_the_top_scored_previews_from_danbooru_only(self):
+        server = HTTPServer(('127.0.0.1', 0), Danbooru)
+        threading.Thread(target=server.serve_forever, daemon=True).start()
+        self.addCleanup(server.server_close)
+        self.addCleanup(server.shutdown)
+        env = dict(os.environ, DANBOORU_URL=f'http://127.0.0.1:{server.server_port}')
+        seen.clear()
+        with tempfile.TemporaryDirectory() as temp:
+            folder = Path(temp, 'style-samples')
+            done = subprocess.run([sys.executable, '-I', str(SCRIPT), '--artist', 'ningen mame', '--samples', str(folder)],
+                                  env=env, capture_output=True, text=True)
+            self.assertEqual(done.returncode, 0, done.stderr)
+            self.assertEqual(sorted(f.name for f in folder.iterdir()), ['ningen_mame-1.jpg', 'ningen_mame-2.jpg', 'ningen_mame-4.png', 'ningen_mame-5.jpg'])
+            self.assertEqual(Path(folder, 'ningen_mame-1.jpg').read_bytes(), b'picture')
+        posts = [q for path, q, _ in seen if path == '/posts.json']
+        self.assertEqual(posts[0]['tags'], ['ningen_mame order:score'])
+        self.assertNotIn('/img/6.jpg', [path for path, _, _ in seen])
+        self.assertIn('samples: ', done.stdout)
 
     def test_png_mode_prints_the_artist_tags_of_a_file(self):
         with tempfile.TemporaryDirectory() as temp:
