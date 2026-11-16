@@ -49,7 +49,7 @@ Cards often carry extra pictures as links: an expression sheet, a picture per gr
 python -m helpers card-image --root . --source <import folder> --url <url>
 ```
 
-It fetches only a link that appears in that card (its `card.json` or a variant), never one you found anywhere else, and only if the download really is a PNG, JPEG, WebP or GIF. The original stays private in the import folder, listed in its `assets.json`; a copy with its metadata removed lands in `public/assets/`, and the command prints its name as `picture`. Nothing is shown until you use it: as a picture line in a story entry (`![caption](/api/assets/<picture>)`) or as a cast `portrait`.
+It fetches only a link that appears in that card (its `card.json` or a variant), never one you found anywhere else, and only if the download really is a PNG, JPEG, WebP or GIF. The original stays private in the import folder, listed in its `assets.json`; a copy with its metadata removed lands in `public/assets/`, and the command prints its name as `picture`. Nothing is shown until you use it: as a picture line in a story entry (an exclamation mark, the caption in square brackets, then `/api/assets/` and the picture's name in parentheses, as for scene pictures) or as a cast `portrait`.
 
 - **Look before you show.** Open the private copy and check what it is. Some links are ads, banners for the author's other work, or pictures that do not suit this story; skip those.
 - **The Director's limits come first.** If a picture is more explicit than the story the Director has agreed to, ask them before showing it.
