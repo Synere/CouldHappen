@@ -123,6 +123,18 @@ The author ran further Claude Code (desktop app, Sonnet 5.5) sessions in unpacke
 | Pictures | Scene pictures were checked against the scene and regenerated when wrong; scene-images 0.1.12 (pictures attached to a turn, Make portrait button, reference portraits) was merged and exercised. |
 | Writer feedback | The 0.1.10 writer left developer feedback in `notes/feedback-for-developers.md` (non-atomic turns, duplicated state, `wait` returning only ids); not yet triaged here. |
 
+## NovelAI provider live check — 2026-11-16 (author's terminal, own token)
+
+A release ZIP built from commit `5cee531` was unpacked as a workspace with `tools/scene_image_nai.py`, `tools/nai_tags.py`, two cast blocks and two prompt files. The author ran both scripts with their own NovelAI token; Claude looked at the output and the pictures. No story was played.
+
+| Observation | Outcome |
+| --- | --- |
+| One character | **Worked.** A valid 832×1216 PNG landed in `public/assets/`, its name was printed, and `seed: 377050443` was recorded in the prompt file. Every tag held except framing: `upper body` with `sitting` gave a seated picture down to the knees. |
+| Two characters, cast blocks, positions | **Worked.** A 1216×832 PNG with `[Character 1 = whisper @ 0.25,0.55]` and `[Character 2 = brann @ 0.75,0.6]`: she stands at the door on the left, he sits by the fire on the right, they look at each other. No appearance leaked between the two fields. |
+| Same character twice | **Consistent.** Whisper's cast block gave the same braid, eyes, cloak and clothes in both pictures. |
+| Tag helper | **Worked on V5.** `"upper bo"` showed only `upper body` (10000+), `"socks rolled"` only `socks rolled down` (28); fuzzy matches were hidden. |
+| From prose in a story | Not observed: the prompts were written by hand, not from a story passage. |
+
 ## Host and creative observations
 
 | Host / creative observation | Status |

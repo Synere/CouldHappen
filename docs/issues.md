@@ -56,7 +56,6 @@ Work order from 2026-11-11. The author's ranking: one `N. ISS-n — why` line pe
 
 | ID | Item | Area | Revisit when | Source |
 | --- | --- | --- | --- | --- |
-| ISS-32 | NovelAI provider for scene-images, with a guide that translates the prose into Danbooru tags (core, Danbooru, characters, scenes, reverse prompt) | packages | ISS-33 to ISS-37 closed 2026-11-16; closes when the live checks in ISS-38 pass | [plan](plans/novelai-images.md#iss-32--novelai-provider-for-scene-images) |
 | ISS-31 | Crew package: a roster of agents with one adapter each; the main writer hands tasks to the others, including what it will not do | packages | idea, open questions in the plan | [plan](plans/crew-package.md#iss-31--crew-package) |
 | ISS-8 | Writing-style director package: a distilled style guide, a per-turn re-read, a style lint, and preset import as data | packages | idea, not started | [plan](plans/writing-style-package.md#iss-8--writing-style-package) |
 | ISS-9 | Literal comp pixel gates: `.impeccable/build/state.json` stays at `spec`; no pixel pass claimed | reader | the author explicitly downgrades comp authority | [known limitations](plans/known-limitations.md#iss-9--literal-comp-pixel-gates) |
@@ -74,12 +73,13 @@ Work order from 2026-11-11. The author's ranking: one `N. ISS-n — why` line pe
 | ISS-14 | The writer closes the game when the player asks | hosts | observe in a release workspace session | [host validation](plans/host-validation.md#iss-14--closing-the-game-on-request) |
 | ISS-15 | The skill's wait check works after a host restart | hosts | restart the host mid-session and observe | [host validation](plans/host-validation.md#iss-15--wait-check-after-a-host-restart) |
 | ISS-16 | The voice reference works on a host | skill | observe in a release workspace session | [host validation](plans/host-validation.md#iss-16--voice-reference-on-a-host) |
-| ISS-38 | The NovelAI script makes a PNG in a release workspace, with one and with two character fields | packages | the author runs the prepared commands with their own token | [plan](plans/novelai-images.md#iss-38--live-checks-of-the-novelai-script) |
 
 ## Closed
 
 | ID | Item | Closed | Resolution |
 | --- | --- | --- | --- |
+| ISS-38 | The NovelAI script makes a PNG in a release workspace, with one and with two character fields | 2026-11-16 | the author ran it with their own token: one-character and two-character pictures (cast blocks, positions, no leakage), the same character consistent across both, and the tag helper on V5 all worked; not yet observed in a story |
+| ISS-32 | NovelAI provider for scene-images, with a guide that translates the prose into Danbooru tags | 2026-11-16 | built as ISS-33 to ISS-37 and checked live in ISS-38; the plan is completed |
 | ISS-37 | NovelAI scenes page: positions, complexity, visual-novel switches | 2026-11-16 | `scene-images/nai/scenes.md` (GPL-3.0-only, ADR-10) and `[Character N @ X,Y]` positions sent as `use_coords` and `center`, with tests; live check in ISS-38; not yet observed in a story |
 | ISS-36 | NovelAI cast tag blocks, characters and reverse pages: the same character across scenes | 2026-11-16 | `scene-images/nai/characters.md` and `reverse.md` (GPL-3.0-only, ADR-10), cast blocks in `notes/prompts/cast/<id>.txt` read by the script through `[Character N = <id>]`, the picture check asks whether each character matches their block; live check in ISS-38; not yet observed in a story |
 | ISS-35 | NovelAI core and danbooru pages and `nai_tags.py`: a one-character scene from prose to checked tags | 2026-11-16 | `scene-images/nai/core.md` and `danbooru.md` (GPL-3.0-only with their notices, ADR-10), `files/nai_tags.py` (only matches that start with the query, counts shown as 10000+ at the cap, confidence rounded), APPLY, the index, the capability page and the README updated, with tests; live check in ISS-38; not yet observed in a story |

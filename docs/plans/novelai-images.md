@@ -1,12 +1,12 @@
 ---
 type: plan
-status: active
+status: completed
 updated: 2026-11-16
 ---
 
 # NovelAI images
 
-**Purpose.** NovelAI as a second image provider in the `scene-images` package, with a NovelAI prompt guide the writer reads when it makes a picture. Built on 2026-11-16 (ISS-33 to ISS-37); the live checks are ISS-38. Ends when the provider and its guide ship in `scene-images` with their entries in the pages the writer reads, or when the idea is abandoned.
+**Purpose.** NovelAI as a second image provider in the `scene-images` package, with a NovelAI prompt guide the writer reads when it makes a picture. Built on 2026-11-16 (ISS-33 to ISS-37) and checked live (ISS-38). Ends when the provider and its guide ship in `scene-images` with their entries in the pages the writer reads, or when the idea is abandoned.
 
 ## ISS-32 — NovelAI provider for scene-images
 
@@ -224,6 +224,8 @@ Raised on 2026-11-16 when ISS-33 closed. The offline tests cover payload buildin
 - **Same character twice:** one cast block used in two scenes, one of them with two characters, gives a consistent look.
 - **Positions:** a two-character scene with `@ X,Y` positions puts each person where the prose does.
 - **From prose:** a one-character scene written from a story passage with `nai/core.md` and `nai/danbooru.md`, its unsure tags checked with the helper, passes the picture check.
+
+**Closed 2026-11-16.** The author ran the checks in a release workspace with their own token ([validation results](../validation-results.md#novelai-provider-live-check--2026-11-16-authors-terminal-own-token)). One character, two characters with cast blocks and positions, the same character twice, and the tag helper all worked; `upper body` with `sitting` again came out to the knees, which `nai/core.md` already lists under troubleshooting. A scene written from a story passage is not yet observed in a story.
 
 ## ISS-34 — Decide on bundling adapted nai5-prompting text
 
